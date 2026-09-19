@@ -1,0 +1,146 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# PlanLabel continuous integration.
+#
+# Runs exactly the `make check` a developer runs locally:
+#   ruff format --check  ->  ruff check  ->  mypy --strict  ->  pytest -q
+# Nothing is duplicated here, so the two cannot drift apart.
+#
+# No secrets are used and none are needed.
+#
+# External CLIs are deliberately NOT installed. veraPDF, Inkscape and
+# tesseract/ocrmypdf are GPL tools that PlanLabel only ever shells out to when
+# they happen to be on PATH. Every test that can use one must probe PATH and skip
+# when it is absent. CI is the reference environment in which they are absent,
+# which is what keeps that rule honest.
+
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: this workflow only ever reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pushes to a pull request are cancelled. Pushes to main always run
+  # to completion, so every phase commit gets its own green or red result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHONUNBUFFERED: "1"
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  check:
+    name: ${{ matrix.os }} / py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    strategy:
+      # Report all four cells; a macOS-only wheel problem must not be hidden by
+      # an unrelated Linux failure.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+        # Both runners are load-bearing: pikepdf and (from Phase 4) ifcopenshell
+        # publish a separate binary wheel per Python-minor x platform, so each
+        # cell installs different compiled code.
+        #
+        # Do NOT downgrade these images. ifcopenshell's Linux wheels are
+        # manylinux_2_31, so ubuntu-20.04 and any musl/Alpine container cannot
+        # resolve them; pikepdf 10.x arm64 wheels are tagged macosx_14_0, so a
+        # pre-14 macOS runner silently backtracks to pikepdf 8.
+
+    env:
+      # The repository commits .python-version (3.12) so contributors get a
+      # pinned interpreter. UV_PYTHON takes precedence over that file, so setting
+      # it here is what keeps the matrix authoritative instead of every cell
+      # silently testing 3.12. setup-uv also sets it from python-version below;
+      # this is the explicit, load-bearing statement of intent.
+      UV_PYTHON: ${{ matrix.python-version }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          # Do not leave the job token in .git/config; nothing here pushes.
+          persist-credentials: false
+
+      - name: Set up uv and Python ${{ matrix.python-version }}
+        # setup-uv deliberately stopped publishing major and minor tags at v8, so
+        # there is no @v10 to track. v10.1.0 is an immutable release tag, which
+        # means it does NOT float onto security fixes -- bump it deliberately, or
+        # let Dependabot do it. To pin by digest instead, swap in:
+        #   astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@v10.1.0
+        with:
+          # uv downloads the interpreter itself, so no setup-python step is needed.
+          python-version: ${{ matrix.python-version }}
+          # Create and PATH-activate .venv up front, so make recipes work whether
+          # they say `uv run ruff` or bare `ruff`.
+          activate-environment: true
+          enable-cache: true
+          # The cache key already includes arch, OS and Python version, so the
+          # four cells never share an entry. Narrowing the dependency part to the
+          # lockfile means pyproject.toml edits that do not change resolution
+          # keep the cache warm.
+          cache-dependency-glob: uv.lock
+          # `version` is intentionally unset: setup-uv reads it from
+          # [tool.uv] required-version in pyproject.toml, so dev and CI are
+          # pinned to one uv range from a single place.
+
+      - name: Install the locked dependencies
+        # --locked fails instead of silently relocking, so a stale uv.lock is a
+        # CI error rather than a surprise. --all-packages covers both workspace
+        # members. Extras are deliberately not installed: see the dev group note
+        # in pyproject.toml.
+        run: uv sync --locked --all-packages --dev
+
+      - name: make check
+        run: make check
+
+      - name: Phase 0 gate - the CLI reports its version
+        run: uv run --no-sync planlabel --version
+
+      - name: Licence policy holds
+        # The hardest constraint in the project: no AGPL, no PyMuPDF, and no
+        # unacknowledged copyleft anywhere in the installed closure.
+        run: uv run --no-sync python tools/audit_licenses.py
+
+# ---------------------------------------------------------------------------
+# Phase 4 follow-up -- do not delete.
+#
+# `make samples` imports cairosvg, which is a cffi binding to a SYSTEM libcairo
+# that no wheel can ship. Once the svg extra is installed in CI, these two steps
+# must be added before the sync step, or macOS turns red with an opaque
+# `OSError: no library called "cairo-2" was found`. Both were verified locally.
+#
+#   - name: Install libcairo (Linux)
+#     if: runner.os == 'Linux'
+#     run: |
+#       if ! ldconfig -p 2>/dev/null | grep -q 'libcairo\.so\.2'; then
+#         sudo apt-get update -qq
+#         sudo apt-get install -y --no-install-recommends libcairo2
+#       fi
+#
+#   - name: Install libcairo (macOS)
+#     if: runner.os == 'macOS'
+#     env:
+#       HOMEBREW_NO_AUTO_UPDATE: "1"
+#       HOMEBREW_NO_INSTALL_CLEANUP: "1"
+#     run: |
+#       brew list --formula cairo >/dev/null 2>&1 || brew install cairo
+#       # ctypes.util.find_library() does not search /opt/homebrew/lib on Apple
+#       # silicon, so cairocffi cannot load libcairo.2.dylib without this.
+#       echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib:${DYLD_FALLBACK_LIBRARY_PATH:-/usr/local/lib:/usr/lib}" >> "$GITHUB_ENV"
+#
+# The sync step then becomes:
+#   run: uv sync --locked --all-packages --all-extras --dev
+# ---------------------------------------------------------------------------

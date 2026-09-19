@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: Apache-2.0
+# Install with: make hooks       Run over everything with: make precommit
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  # ----------------------------------------------------------------- hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-added-large-files
+        # No committed binaries over 200 kB. uv.lock is generated text that must
+        # be committed and is already well past that, so it is exempt.
+        args: [--maxkb=200]
+        exclude: ^uv\.lock$
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: check-ast
+      - id: debug-statements
+      - id: detect-private-key
+      - id: forbid-submodules
+
+  # -------------------------------------------------------------------- ruff
+  # ruff-format runs before ruff-check so autofixes are re-formatted. The hook
+  # id is `ruff-check`; plain `ruff` is now only a legacy alias.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-format
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+
+  # ------------------------------------------------- JSON schema self-checks
+  # check-metaschema validates that each file under planlabel/schema/ is itself
+  # a well-formed JSON Schema for the draft its own $schema declares. Phase 1
+  # adds those files; until then nothing matches the pattern and the hook is
+  # skipped. That is why `files:` is used and `always_run` deliberately is not.
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.38.0
+    hooks:
+      - id: check-metaschema
+        name: planlabel schemas are valid JSON Schema
+        files: ^planlabel/schema/.*\.json$
+      - id: check-github-workflows
+        args: [--verbose]
+
+  # ------------------------------------------------------- local (uv-backed)
+  # mypy and uv run from the project's own locked environment. A mirrors-mypy
+  # hook would need every runtime dependency duplicated into
+  # additional_dependencies and would drift from uv.lock; this cannot.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict (both distributions)
+        entry: uv run --frozen mypy --strict planlabel planlabel_mcp/planlabel_mcp
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+        require_serial: true
+
+      - id: uv-lock-check
+        name: uv.lock matches pyproject.toml
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|planlabel_mcp/pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      # Ruff's CPY001 enforces the SPDX header for Python. This extends the same
+      # rule to the files ruff does not lint.
+      - id: spdx-header
+        name: every source file carries the SPDX Apache-2.0 header
+        entry: python3 tools/check_spdx.py
+        language: system
+        types_or: [python, makefile, yaml, toml]
+        exclude: ^(uv\.lock|\.github/dependabot\.yml)$

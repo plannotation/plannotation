@@ -1,0 +1,318 @@
+# SPDX-License-Identifier: Apache-2.0
+# Workspace root. This file is both the `planlabel` distribution and the uv
+# workspace root; `planlabel_mcp/` is the one member. One uv.lock covers both.
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+# ---------------------------------------------------------------------------
+# Distribution: planlabel
+# ---------------------------------------------------------------------------
+[project]
+name = "planlabel"
+dynamic = ["version"]                      # single-sourced from planlabel/__init__.py
+description = "An open drawing-semantics sidecar for 2D construction drawings: write, read, validate and inspect machine-readable labels on PDF pages."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "The PlanLabel Authors" }]
+keywords = ["pdf", "ifc", "bim", "aec", "construction", "drawings", "openbim", "mcp"]
+# Upper bound is not a preference: ifcopenshell declares >=3.10,<3.15, and it is
+# the project's real interpreter ceiling.
+requires-python = ">=3.11,<3.15"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Text Processing :: Markup",
+  "Typing :: Typed",
+]
+
+# Every runtime dependency here is permissive. Installing `planlabel` with no
+# extras pulls a closure with zero copyleft; see THIRD_PARTY_LICENSES.md.
+dependencies = [
+  "typer>=0.15",         # MIT
+  "pydantic>=2.9",       # MIT
+  "jsonschema>=4.23",    # MIT
+  "pikepdf>=9.11",       # MPL-2.0, bundling qpdf (Apache-2.0)
+  "pypdfium2>=5.9",      # BSD-3-Clause AND Apache-2.0
+  "pdfplumber>=0.11.4",  # MIT
+  "svgelements>=1.9.6",  # MIT
+  "numpy>=1.26",         # BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
+  "rich>=13.9",          # MIT
+]
+
+[project.optional-dependencies]
+# Both LGPL dependencies the licence policy tolerates are isolated behind extras,
+# so the default install stays wholly permissive and the legal story is a
+# one-liner. Both MUST be imported lazily, inside functions, never at module
+# scope -- see the note on cairosvg below.
+#
+# cairosvg is a cffi binding to a SYSTEM libcairo that no wheel can ship. It
+# installs anywhere and then fails at import with
+#   OSError: no library called "cairo-2" was found
+# on any machine without libcairo2 / `brew install cairo`. Keeping it out of the
+# core dependencies is what stops `planlabel read` crashing on a bare machine.
+svg = ["cairosvg>=2.7.1"]              # LGPL-3.0-or-later, unmodified dependency
+# ifcopenshell publishes no sdist, only wheels, and pulls shapely, which vendors
+# GEOS (LGPL-2.1) as a prebuilt library. A 42 MB wheel unpacking to ~179 MB.
+ifc = ["ifcopenshell>=0.8.4"]          # LGPL-3.0-or-later, unmodified dependency
+bench = ["anthropic>=0.40"]            # MIT, benchmark only; tests never import it
+all = ["planlabel[svg,ifc,bench]"]
+
+[project.scripts]
+planlabel = "planlabel.cli:app"
+
+[project.urls]
+Homepage = "https://srtgn.github.io/planlabel/"
+Documentation = "https://srtgn.github.io/planlabel/"
+Specification = "https://srtgn.github.io/planlabel/spec/0.1"
+Schema = "https://srtgn.github.io/planlabel/schema/0.1/planlabel.schema.json"
+Source = "https://github.com/srtgn/planlabel"
+Issues = "https://github.com/srtgn/planlabel/issues"
+Changelog = "https://github.com/srtgn/planlabel/blob/main/CHANGELOG.md"
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+[tool.hatch.version]
+path = "planlabel/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+# Ships every non-Python file under planlabel/ too, which is how
+# planlabel/schema/*.json reaches users as package data from Phase 1.
+packages = ["planlabel"]
+
+[tool.hatch.build.targets.sdist]
+# Leading slashes anchor at the project root; without them hatchling globs
+# recursively and drags the member distribution's files into the core sdist.
+include = [
+  "/planlabel",
+  "/spec",
+  "/tests",
+  "/README.md",
+  "/LICENSE",
+  "/NOTICE",
+  "/CHANGELOG.md",
+]
+
+# ---------------------------------------------------------------------------
+# uv workspace
+# ---------------------------------------------------------------------------
+[tool.uv.workspace]
+members = ["planlabel_mcp"]
+
+[tool.uv.sources]
+planlabel-mcp = { workspace = true }
+
+[tool.uv]
+# Pin the uv range from one place. Without it a future uv could bump the lockfile
+# revision and make `uv sync --locked` fail in CI with no repository change.
+required-version = ">=0.11,<0.12"
+default-groups = ["dev"]
+
+[dependency-groups]
+# PEP 735 group: development tooling never ships to users.
+#
+# Deliberately lean -- it does NOT pull the svg/ifc extras. Phase 0 needs neither,
+# and keeping them out means CI installs no 42 MB ifcopenshell wheel and needs no
+# apt/brew libcairo step. Local development gets them via `make install`, which
+# syncs --all-extras; Phase 4 is when CI starts needing them too.
+dev = [
+  "planlabel-mcp",
+  "ruff>=0.8",
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "pre-commit>=4.0",
+  "types-jsonschema>=4.23",  # jsonschema ships no py.typed; real stubs beat an override
+]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["planlabel", "planlabel_mcp", "tests"]
+extend-exclude = ["inspector", "samples", "bench/results", "tests/fixtures/realworld"]
+
+[tool.ruff.lint]
+# A typed, spec-driven library: the annotation, docstring, security, pathlib and
+# bugbear families all pay for themselves. CPY001 is what mechanically enforces
+# the SPDX header required of every source file.
+# Codes, not names: ruff only accepts rule names in a selector under preview
+# mode, and preview would pull in unrelated unstable rules.
+select = [
+  "A",    # flake8-builtins          -- no shadowing id/type/format
+  "ANN",  # flake8-annotations       -- every signature annotated
+  "ARG",  # flake8-unused-arguments
+  "B",    # flake8-bugbear
+  "BLE",  # flake8-blind-except
+  "C4",   # flake8-comprehensions
+  "CPY",  # flake8-copyright         -- the SPDX header, enforced
+  "D",    # pydocstyle
+  "DTZ",  # flake8-datetimez         -- tz-aware timestamps, for determinism
+  "E",    # pycodestyle errors
+  "EM",   # flake8-errmsg
+  "ERA",  # eradicate                -- no commented-out code
+  "EXE",  # flake8-executable
+  "F",    # pyflakes
+  "FA",   # flake8-future-annotations
+  "FBT",  # flake8-boolean-trap
+  "FLY",  # flynt
+  "G",    # flake8-logging-format
+  "I",    # isort
+  "ICN",  # flake8-import-conventions
+  "INP",  # flake8-no-pep420
+  "ISC",  # flake8-implicit-str-concat
+  "LOG",  # flake8-logging
+  "N",    # pep8-naming
+  "NPY",  # numpy-specific
+  "PERF", # perflint
+  "PGH",  # pygrep-hooks             -- bans bare `# type: ignore`
+  "PIE",  # flake8-pie
+  "PL",   # pylint
+  "PT",   # flake8-pytest-style
+  "PTH",  # flake8-use-pathlib
+  "PYI",  # flake8-pyi
+  "RET",  # flake8-return
+  "RSE",  # flake8-raise
+  "RUF",  # ruff-specific
+  "S",    # flake8-bandit
+  "SIM",  # flake8-simplify
+  "SLF",  # flake8-self
+  "SLOT", # flake8-slots
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print             -- logging, never print, outside the CLI
+  "TC",   # flake8-type-checking
+  "TID",  # flake8-tidy-imports
+  "TRY",  # tryceratops
+  "UP",   # pyupgrade
+  "W",    # pycodestyle warnings
+  "YTT",  # flake8-2020
+]
+ignore = [
+  "ISC001",  # conflicts with the formatter
+  "TRY003",  # fights readable, specific error messages
+]
+
+[tool.ruff.lint.flake8-copyright]
+# The default notice-rgx looks for "Copyright <year>", which an SPDX one-liner
+# does not contain -- without this override the rule passes on every file while
+# catching nothing. Anchoring on Apache-2.0 additionally rejects a file carrying
+# an MIT or GPL header that was copied in from elsewhere.
+notice-rgx = "(?i)SPDX-License-Identifier:\\s*Apache-2\\.0"
+min-file-size = 1  # exempt genuinely empty files only
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 8
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-type-checking]
+# pydantic and typer read annotations at runtime; their imports must never be
+# moved into a TYPE_CHECKING block.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+runtime-evaluated-decorators = ["pydantic.validate_call"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["planlabel", "planlabel_mcp"]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer expresses every flag as a boolean parameter, so the boolean-trap rules
+# cannot be satisfied without abandoning the framework. They stay on everywhere
+# else, where they genuinely help for `attach(..., incremental=True)` APIs.
+"planlabel/cli.py" = ["FBT001", "FBT002"]
+"planlabel_mcp/planlabel_mcp/server.py" = ["FBT001", "FBT002"]
+"tests/**" = [
+  "S101",     # assert is the point
+  "PLR2004",  # magic values are fine in expectations
+  "SLF001",   # tests may reach into private members
+]
+"tools/**" = ["INP001", "T201"]  # standalone maintenance scripts, not a package
+"bench/**" = ["T201"]
+"bonsai_ext/**" = ["ANN", "D", "INP001"]  # Blender operators, checked by hand
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["planlabel", "planlabel_mcp/planlabel_mcp", "tests"]
+mypy_path = "planlabel_mcp"
+warn_unreachable = true
+pretty = true
+enable_error_code = [
+  "ignore-without-code",
+  "possibly-undefined",
+  "redundant-expr",
+  "truthy-bool",
+  "unused-awaitable",
+]
+
+# Measured against the locked wheels, not assumed: ifcopenshell, pikepdf,
+# pdfplumber, numpy, mcp, typer, pydantic and rich all ship py.typed and pass
+# --strict with real calls. jsonschema ships no py.typed but is covered by the
+# types-jsonschema stubs in the dev group -- deliberately NOT listed here, since
+# an override would throw away working type information.
+[[tool.mypy.overrides]]
+module = ["cairosvg.*", "pypdfium2.*", "svgelements.*"]
+ignore_missing_imports = true
+
+# Those three now produce Any. This makes it an error to let one leak into a
+# PlanLabel signature -- the public API must stay typed -- while leaving internal
+# use of them unrestricted.
+[[tool.mypy.overrides]]
+module = ["planlabel.*", "planlabel_mcp.*"]
+disallow_any_unimported = true
+
+# ---------------------------------------------------------------------------
+# pytest and coverage
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-q", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+xfail_strict = true
+# Warnings are errors: a DeprecationWarning from a PDF dependency is a signal,
+# not noise. Narrow with a targeted ignore rather than weakening this default.
+filterwarnings = ["error"]
+markers = [
+  "slow: takes more than a second",
+  "external: needs an external CLI (verapdf, inkscape, ocrmypdf)",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["planlabel", "planlabel_mcp"]
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@(abc\\.)?abstractmethod",
+  "if __name__ == .__main__.:",
+]
