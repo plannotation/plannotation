@@ -1,0 +1,110 @@
+# PlanLabel -- ignored files.
+#
+# Deliberately NOT ignored:
+#   uv.lock          CI runs `uv sync --locked` against it.
+#   .python-version  Pins the contributor interpreter. CI sets UV_PYTHON from the
+#                    matrix so this file never overrides a matrix cell.
+
+# ---------------------------------------------------------------- Python ----
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+*.pyd
+
+# ------------------------------------------------------- build artefacts ----
+build/
+dist/
+sdist/
+wheels/
+*.egg
+*.egg-info/
+.eggs/
+MANIFEST
+
+# ------------------------------------------------ uv / virtual environments --
+.venv/
+.venvs/
+venv/
+env/
+.uv/
+
+# ----------------------------------------------------------- tool caches ----
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytest_cache/
+.pytype/
+.pyre/
+.cache/
+.tox/
+.nox/
+.hypothesis/
+
+# -------------------------------------------------------------- coverage ----
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+*.cover
+nosetests.xml
+junit*.xml
+report.xml
+
+# ----------------------------------------------------- secrets / local env --
+# The benchmark harness reads ANTHROPIC_API_KEY from .env. No key ever belongs
+# in the repository.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ------------------------------------------------------------ real-world ----
+# Phase 7 is exercised against real construction PDFs -- third-party material
+# that must NEVER be committed. The tests skip when the directory is absent,
+# which is the state of every clean clone.
+tests/fixtures/realworld/
+
+# ------------------------------------------------ generated / heavy output --
+# Vendored pdf.js build for the offline inspector: third-party and far over the
+# 200 kB limit on committed binaries.
+inspector/vendor/
+# Cached model responses from the benchmark runner. bench/results/*.md and
+# bench/questions.jsonl are committed; the response cache is not.
+bench/.cache/
+bench/cache/
+# Documentation and GitHub Pages build output.
+docs/_build/
+site/
+_site/
+
+# Generated sample sets. `make samples` rebuilds these, and the PDFs and IFCs
+# exceed the 200 kB limit on committed binaries. Uncomment in Phase 4 if the
+# decision is not to commit them; samples/README.md stays either way.
+# samples/*/model.ifc
+# samples/*/sheet.svg
+# samples/*/sheet.pdf
+# samples/*/sheet.labelled.pdf
+# samples/*/labels.json
+# samples/*/groundtruth.jsonl
+
+# ------------------------------------------------------------------ misc ----
+*.log
+.ipynb_checkpoints/
+
+# ------------------------------------------------------------ OS / editor ----
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
