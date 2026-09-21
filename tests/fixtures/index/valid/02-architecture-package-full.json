@@ -1,0 +1,52 @@
+{
+  "extensions": {
+    "x-lindenhof-issue": {
+      "issuedOn": "2026-04-10",
+      "package": "architecture",
+      "sheetCount": 3
+    },
+    "x-planlabel-export": {
+      "authoringTool": "Allplan 2026",
+      "exportProfile": "TWP-Standard"
+    }
+  },
+  "generator": {
+    "created": "2026-04-09T17:26:05Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-architektur.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "f11100ea29b511f63bba85ce58be117b44f94d9f1809de5803f3c3b0211d5cc6"
+  },
+  "pages": [
+    {
+      "file": "planlabel-p0000.json",
+      "level": "L1",
+      "pageIndex": 0,
+      "revision": "A",
+      "sheetId": "ARC-100",
+      "title": "Übersichtsplan Bauteil A"
+    },
+    {
+      "file": "planlabel-p0002.json",
+      "level": "L2",
+      "pageIndex": 2,
+      "revision": "C",
+      "sheetId": "ARC-201",
+      "title": "Grundriss Erdgeschoss"
+    },
+    {
+      "file": "planlabel-p0006.json",
+      "level": "L3",
+      "pageIndex": 6,
+      "revision": "C",
+      "sheetId": "ARC-301",
+      "title": "Schnitt B-B"
+    }
+  ],
+  "planlabel": "0.1",
+  "provenance": "authored"
+}

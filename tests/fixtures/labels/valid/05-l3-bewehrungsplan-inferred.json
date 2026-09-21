@@ -1,0 +1,234 @@
+{
+  "annotations": [
+    {
+      "confidence": 0.69,
+      "id": "a-tag-pos1",
+      "paperBBox": [
+        300.5,
+        236.25,
+        392.75,
+        250.5
+      ],
+      "provenance": "inferred",
+      "shows": {
+        "element": "e-bar-01"
+      },
+      "text": "18 Ø12 e=15",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.55,
+      "id": "a-tag-mesh",
+      "paperBBox": [
+        318.5,
+        396.25,
+        388.75,
+        410.5
+      ],
+      "provenance": "inferred",
+      "shows": {
+        "element": "e-mesh-01",
+        "property": "Tag"
+      },
+      "text": "Q188A",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.63,
+      "geometry": [
+        [
+          72.25,
+          224.5
+        ],
+        [
+          578.5,
+          224.5
+        ]
+      ],
+      "id": "a-dim-bar1",
+      "measures": [
+        "e-bar-01"
+      ],
+      "paperBBox": [
+        72.25,
+        216.5,
+        578.5,
+        232.75
+      ],
+      "provenance": "inferred",
+      "text": "5060",
+      "type": "dimension",
+      "unit": "mm",
+      "value": 5060,
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.48,
+      "geometry": [
+        [
+          250.5,
+          250.75
+        ],
+        [
+          280.25,
+          244.5
+        ],
+        [
+          302.25,
+          244.5
+        ]
+      ],
+      "id": "a-leader-01",
+      "paperBBox": [
+        250.5,
+        244.5,
+        302.25,
+        250.75
+      ],
+      "provenance": "inferred",
+      "type": "leader",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.57,
+      "id": "a-keynote-01",
+      "paperBBox": [
+        30.5,
+        40.25,
+        320.75,
+        96.5
+      ],
+      "provenance": "inferred",
+      "text": "Betondeckung nom c = 30 mm, Expositionsklasse XC1.",
+      "type": "keynote"
+    }
+  ],
+  "elements": [
+    {
+      "confidence": 0.88,
+      "id": "e-slab-01",
+      "ifcClass": "IfcSlab",
+      "name": "Decke über EG",
+      "paperBBox": [
+        60.5,
+        230.25,
+        590.75,
+        530.5
+      ],
+      "provenance": "inferred",
+      "representation": "projection",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.74,
+      "id": "e-bar-01",
+      "ifcClass": "IfcReinforcingBar",
+      "paperBBox": [
+        72.25,
+        244.5,
+        578.5,
+        250.75
+      ],
+      "predefinedType": "MAIN",
+      "provenance": "inferred",
+      "representation": "symbol",
+      "tag": "Pos. 1",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.71,
+      "id": "e-bar-02",
+      "ifcClass": "IfcReinforcingBar",
+      "paperBBox": [
+        72.25,
+        262.5,
+        578.5,
+        268.75
+      ],
+      "predefinedType": "MAIN",
+      "provenance": "inferred",
+      "representation": "symbol",
+      "tag": "Pos. 2",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.58,
+      "id": "e-bar-03",
+      "ifcClass": "IfcReinforcingBar",
+      "paperBBox": [
+        96.5,
+        244.5,
+        102.75,
+        516.25
+      ],
+      "predefinedType": "MAIN",
+      "provenance": "inferred",
+      "representation": "symbol",
+      "tag": "Pos. 3",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.52,
+      "id": "e-mesh-01",
+      "ifcClass": "IfcReinforcingMesh",
+      "paperBBox": [
+        110.5,
+        280.25,
+        560.75,
+        500.5
+      ],
+      "provenance": "inferred",
+      "representation": "symbol",
+      "tag": "Q188A",
+      "viewport": "vp-plan"
+    }
+  ],
+  "generator": {
+    "created": "2026-04-17T14:05:33Z",
+    "name": "planlabel-infer",
+    "version": "0.1.0"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 8,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "inferred",
+  "sheet": {
+    "date": "2025-11-28",
+    "discipline": "structure",
+    "drawingType": "bewehrungsplan",
+    "id": "TWP-305",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "A",
+    "scale": 10,
+    "status": "Ausführung",
+    "title": "Bewehrungsplan Decke über EG",
+    "titleBlockBBox": [
+      651,
+      12,
+      829,
+      182
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Untere Lage",
+      "paperBBox": [
+        28,
+        196,
+        624,
+        566
+      ],
+      "scale": 10
+    }
+  ]
+}

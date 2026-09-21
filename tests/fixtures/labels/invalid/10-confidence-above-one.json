@@ -1,0 +1,224 @@
+{
+  "annotations": [
+    {
+      "id": "a-north",
+      "paperBBox": [
+        572,
+        500,
+        608,
+        548
+      ],
+      "provenance": "authored",
+      "type": "northArrow"
+    },
+    {
+      "id": "a-scalebar",
+      "paperBBox": [
+        40,
+        150,
+        200,
+        166
+      ],
+      "provenance": "authored",
+      "text": "0        5       10 m",
+      "type": "scaleBar"
+    },
+    {
+      "id": "a-note-mep",
+      "paperBBox": [
+        40,
+        100,
+        400,
+        140
+      ],
+      "provenance": "authored",
+      "text": "Kanalmaße als lichte Innenmaße in mm.",
+      "type": "text"
+    },
+    {
+      "confidence": 0.35,
+      "id": "a-hatch-shaft",
+      "paperBBox": [
+        452,
+        460,
+        500,
+        520
+      ],
+      "provenance": "inferred",
+      "text": "Schacht",
+      "type": "hatch",
+      "viewport": "vp-mep"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-duct-01",
+      "ifcClass": "IfcDuctSegment",
+      "ifcGuid": "2WSusE0VuA25WDn9Uy_rDL",
+      "name": "Zuluft ZU-01 400x200",
+      "paperBBox": [
+        60,
+        304,
+        540,
+        308
+      ],
+      "predefinedType": "RIGIDSEGMENT",
+      "properties": {
+        "Pset_DuctSegmentTypeCommon": {
+          "NominalWidth": 400,
+          "Shape": "RECTANGULAR"
+        }
+      },
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "ZU-01",
+      "viewport": "vp-mep"
+    },
+    {
+      "id": "e-duct-fit-01",
+      "ifcClass": "IfcDuctFitting",
+      "ifcGuid": "1AUhFcrX$zz5xqw7dfdGE_",
+      "paperBBox": [
+        540,
+        300,
+        564,
+        324
+      ],
+      "predefinedType": "BEND",
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-mep"
+    },
+    {
+      "id": "e-air-term-04",
+      "ifcClass": "IfcAirTerminal",
+      "ifcGuid": "0pqcnbU5BI$TQ2ezFSA41X",
+      "name": "Deckendurchlass DD-04",
+      "paperBBox": [
+        200,
+        296,
+        216,
+        316
+      ],
+      "predefinedType": "DIFFUSER",
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "DD-04",
+      "viewport": "vp-mep"
+    },
+    {
+      "confidence": 1.4,
+      "id": "e-pipe-legacy-01",
+      "ifcClass": "IfcPipeSegment",
+      "name": "Heizungsvorlauf",
+      "paperBBox": [
+        60,
+        420,
+        380,
+        426
+      ],
+      "provenance": "inferred",
+      "representation": "projection",
+      "viewport": "vp-mep"
+    },
+    {
+      "confidence": 0.39,
+      "id": "e-san-legacy-02",
+      "ifcClass": "IfcSanitaryTerminal",
+      "paperBBox": [
+        392,
+        414,
+        412,
+        434
+      ],
+      "provenance": "inferred",
+      "representation": "symbol",
+      "viewport": "vp-mep"
+    }
+  ],
+  "generator": {
+    "created": "2026-05-06T11:02:41Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-tga.ifc",
+    "lengthUnit": "mm",
+    "schema": "IFC4",
+    "sha256": "f2e60bc35768cd6ad3030271384d406ef510aa04b8c623a75f4cc6c22af38be9"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 1,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "mixed",
+  "sheet": {
+    "author": "T. Keller",
+    "date": "2026-05-06",
+    "discipline": "mep",
+    "documentId": "LIN-ZZ-02-DR-M-0104",
+    "drawingType": "plan",
+    "id": "TGA-104",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "B",
+    "scale": 100,
+    "status": "Ausführungsplanung",
+    "title": "Lüftung 1. Obergeschoss",
+    "titleBlockBBox": [
+      651,
+      10,
+      831,
+      180
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 2400,
+      "id": "vp-mep",
+      "kind": "plan",
+      "name": "Lüftung 1.OG",
+      "paperBBox": [
+        30,
+        180,
+        620,
+        560
+      ],
+      "paperToPlane": [
+        100,
+        0,
+        0,
+        100,
+        -3000,
+        -18000
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          5750
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 100,
+      "storey": {
+        "elevation": 3350,
+        "ifcGuid": "2bzrcPAxMguxpeK4AnXu8s",
+        "name": "1. OG"
+      }
+    }
+  ]
+}

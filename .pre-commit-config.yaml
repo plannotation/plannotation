@@ -54,6 +54,20 @@ repos:
       - id: check-github-workflows
         args: [--verbose]
 
+      # Phase 1 onwards: the positive fixtures are checked against the schema they
+      # are fixtures for, so a schema edit that invalidates them fails at commit
+      # time rather than in CI. The invalid/ fixtures are deliberately NOT listed:
+      # failing is their whole job, and tests/test_fixtures.py asserts that they
+      # fail for the one reason their manifest claims.
+      - id: check-jsonschema
+        name: valid label fixtures conform to planlabel-0.1
+        files: ^tests/fixtures/labels/valid/.*\.json$
+        args: [--schemafile, planlabel/schema/planlabel-0.1.json]
+      - id: check-jsonschema
+        name: valid index fixtures conform to planlabel-index-0.1
+        files: ^tests/fixtures/index/valid/.*\.json$
+        args: [--schemafile, planlabel/schema/planlabel-index-0.1.json]
+
   # ------------------------------------------------------- local (uv-backed)
   # mypy and uv run from the project's own locked environment. A mirrors-mypy
   # hook would need every runtime dependency duplicated into

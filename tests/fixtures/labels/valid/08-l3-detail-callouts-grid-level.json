@@ -1,0 +1,278 @@
+{
+  "annotations": [
+    {
+      "axis": "A",
+      "geometry": [
+        [
+          120,
+          100
+        ],
+        [
+          120,
+          277
+        ]
+      ],
+      "id": "g-ax-a",
+      "paperBBox": [
+        114,
+        96,
+        126,
+        285
+      ],
+      "provenance": "authored",
+      "text": "A",
+      "type": "grid",
+      "viewport": "vp-det-1"
+    },
+    {
+      "elevation": -1.2,
+      "id": "a-lvl-uk",
+      "paperBBox": [
+        170,
+        102,
+        234,
+        118
+      ],
+      "provenance": "authored",
+      "text": "UK Fundament -1,200",
+      "type": "level",
+      "unit": "m",
+      "value": -1.2,
+      "viewport": "vp-det-1"
+    },
+    {
+      "geometry": [
+        [
+          56,
+          110
+        ],
+        [
+          56,
+          140
+        ]
+      ],
+      "id": "a-dim-01",
+      "measures": [
+        "e-foot-01",
+        "e-wall-01"
+      ],
+      "paperBBox": [
+        48,
+        106,
+        64,
+        146
+      ],
+      "provenance": "authored",
+      "text": "300",
+      "type": "dimension",
+      "unit": "mm",
+      "value": 300,
+      "viewport": "vp-det-1"
+    },
+    {
+      "id": "a-call-src",
+      "paperBBox": [
+        300,
+        200,
+        340,
+        240
+      ],
+      "provenance": "authored",
+      "target": {
+        "detail": "D-03",
+        "pdfPage": 4,
+        "sheetId": "TWP-202",
+        "viewportId": "vp-plan"
+      },
+      "text": "D-03",
+      "type": "callout",
+      "viewport": "vp-key"
+    },
+    {
+      "id": "a-call-rebar",
+      "paperBBox": [
+        24,
+        270,
+        96,
+        282
+      ],
+      "provenance": "authored",
+      "target": {
+        "pdfPage": 8,
+        "sheetId": "TWP-305"
+      },
+      "text": "Bewehrung siehe TWP-305",
+      "type": "callout",
+      "viewport": "vp-det-1"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-foot-01",
+      "ifcClass": "IfcFooting",
+      "ifcGuid": "1D_7IXtZR1lY4neyqvhGC0",
+      "name": "Streifenfundament F-1",
+      "paperBBox": [
+        70,
+        110,
+        170,
+        140
+      ],
+      "predefinedType": "STRIP_FOOTING",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. 41",
+      "viewport": "vp-det-1"
+    },
+    {
+      "id": "e-wall-01",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "2GmKzSMgsMd5$CHrn5MaB6",
+      "name": "Kellerwand KW-01",
+      "paperBBox": [
+        96,
+        140,
+        144,
+        270
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. 32",
+      "viewport": "vp-det-1"
+    },
+    {
+      "id": "e-bar-41",
+      "ifcClass": "IfcReinforcingBar",
+      "ifcGuid": "3WzsbjS5YJdJyqtlJOzYEd",
+      "paperBBox": [
+        80,
+        116,
+        160,
+        120
+      ],
+      "predefinedType": "MAIN",
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "Pos. 41.1",
+      "viewport": "vp-det-1"
+    },
+    {
+      "id": "e-ins-01",
+      "ifcClass": "IfcCovering",
+      "ifcGuid": "2C_zNqrZLV7B0unC6og4jk",
+      "name": "Perimeterdämmung 120 mm",
+      "paperBBox": [
+        144,
+        140,
+        156,
+        270
+      ],
+      "predefinedType": "INSULATION",
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-det-1"
+    }
+  ],
+  "generator": {
+    "created": "2026-03-25T13:20:05Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-tragwerk.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "fa8d382f78065e81fce348247f7a98eff9b0faa0aa8bff92aeeae4ba5a568d69"
+  },
+  "page": {
+    "heightMm": 297,
+    "index": 11,
+    "widthMm": 420
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "K. Brandt",
+    "date": "2026-03-25",
+    "discipline": "structure",
+    "documentId": "LIN-ZZ-XX-DR-S-0501",
+    "drawingType": "detail",
+    "id": "TWP-501",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "B",
+    "scale": 10,
+    "status": "Ausführungsplanung",
+    "title": "Details Gründung",
+    "titleBlockBBox": [
+      230,
+      10,
+      410,
+      80
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-det-1",
+      "kind": "detail",
+      "name": "D-03 Streifenfundament",
+      "paperBBox": [
+        20,
+        85,
+        235,
+        285
+      ],
+      "paperToPlane": [
+        0.01,
+        0,
+        0,
+        0.01,
+        -1.2,
+        -2.3
+      ],
+      "plane": {
+        "origin": [
+          0,
+          6.75,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 10
+    },
+    {
+      "id": "vp-key",
+      "kind": "plan",
+      "name": "Schlüsselplan",
+      "paperBBox": [
+        240,
+        150,
+        400,
+        280
+      ],
+      "scale": 200
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        230,
+        10,
+        410,
+        80
+      ]
+    }
+  ]
+}

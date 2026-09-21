@@ -1,0 +1,648 @@
+{
+  "annotations": [
+    {
+      "axis": "B",
+      "geometry": [
+        [
+          274,
+          300
+        ],
+        [
+          274,
+          800
+        ]
+      ],
+      "id": "g-ax-b",
+      "paperBBox": [
+        268,
+        290,
+        280,
+        812
+      ],
+      "provenance": "authored",
+      "text": "B",
+      "type": "grid",
+      "viewport": "vp-plan"
+    },
+    {
+      "axis": "C",
+      "geometry": [
+        [
+          388,
+          300
+        ],
+        [
+          388,
+          800
+        ]
+      ],
+      "id": "g-ax-c",
+      "paperBBox": [
+        382,
+        290,
+        394,
+        812
+      ],
+      "provenance": "authored",
+      "text": "C",
+      "type": "grid",
+      "viewport": "vp-plan"
+    },
+    {
+      "geometry": [
+        [
+          274,
+          276
+        ],
+        [
+          388,
+          276
+        ]
+      ],
+      "id": "a-dim-01",
+      "measures": [
+        "g-ax-b",
+        "g-ax-c"
+      ],
+      "paperBBox": [
+        274,
+        268,
+        388,
+        284
+      ],
+      "provenance": "authored",
+      "text": "5700",
+      "type": "dimension",
+      "unit": "mm",
+      "value": 5700,
+      "viewport": "vp-plan"
+    },
+    {
+      "geometry": [
+        [
+          240,
+          404.5
+        ],
+        [
+          240,
+          469.5
+        ]
+      ],
+      "id": "a-dim-02",
+      "measures": [
+        "e-wall-a01",
+        "e-col-b2"
+      ],
+      "paperBBox": [
+        232,
+        400.5,
+        248,
+        473.5
+      ],
+      "provenance": "authored",
+      "text": "3250",
+      "type": "dimension",
+      "unit": "mm",
+      "value": 3250,
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-tag-01",
+      "paperBBox": [
+        360,
+        640,
+        432,
+        654
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-slab-d01",
+        "property": "Tag"
+      },
+      "text": "Pos. 1",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-tag-02",
+      "paperBBox": [
+        396,
+        576,
+        486,
+        590
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-beam-uz2",
+        "property": "Pset_BeamCommon.Span"
+      },
+      "text": "l = 5,70 m",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-call-d03",
+      "paperBBox": [
+        593.5,
+        595,
+        643.5,
+        645
+      ],
+      "provenance": "authored",
+      "target": {
+        "detail": "D-03",
+        "pdfPage": 4,
+        "sheetId": "TWP-202",
+        "viewportId": "vp-det-1"
+      },
+      "text": "D-03",
+      "type": "callout",
+      "viewport": "vp-plan"
+    },
+    {
+      "geometry": [
+        [
+          60,
+          525
+        ],
+        [
+          690,
+          525
+        ]
+      ],
+      "id": "a-sec-aa",
+      "paperBBox": [
+        60,
+        512,
+        690,
+        538
+      ],
+      "provenance": "authored",
+      "target": {
+        "pdfPage": 4,
+        "sheetId": "TWP-202",
+        "viewportId": "vp-sec-a"
+      },
+      "text": "A-A",
+      "type": "sectionMark",
+      "viewport": "vp-plan"
+    },
+    {
+      "geometry": [
+        [
+          756,
+          667
+        ],
+        [
+          756,
+          672
+        ]
+      ],
+      "id": "a-dim-thk",
+      "measures": [
+        "e-sec-slab"
+      ],
+      "paperBBox": [
+        744,
+        663,
+        768,
+        676
+      ],
+      "provenance": "authored",
+      "text": "d = 25 cm",
+      "type": "dimension",
+      "unit": "cm",
+      "value": 25,
+      "viewport": "vp-sec-a"
+    },
+    {
+      "elevation": 3.35,
+      "id": "a-lvl-okrd",
+      "paperBBox": [
+        820,
+        664,
+        900,
+        680
+      ],
+      "provenance": "authored",
+      "text": "OKRD +3,350",
+      "type": "level",
+      "unit": "m",
+      "value": 3.35,
+      "viewport": "vp-sec-a"
+    },
+    {
+      "confidence": 0.62,
+      "id": "a-note-01",
+      "paperBBox": [
+        40,
+        268,
+        250,
+        284
+      ],
+      "provenance": "inferred",
+      "text": "Alle Maße in mm, sofern nicht anders angegeben.",
+      "type": "text"
+    },
+    {
+      "confidence": 0.41,
+      "id": "a-hatch-01",
+      "paperBBox": [
+        810,
+        310,
+        870,
+        350
+      ],
+      "provenance": "inferred",
+      "text": "Ortbeton C30/37",
+      "type": "hatch",
+      "viewport": "vp-det-1"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-slab-d01",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "0cJ$MvKZKh4M1denpewrx2",
+      "name": "Decke über EG, d = 25 cm",
+      "paperBBox": [
+        92.5,
+        398.5,
+        618.5,
+        694.5
+      ],
+      "paperOutlines": [
+        [
+          [
+            92.5,
+            398.5
+          ],
+          [
+            618.5,
+            398.5
+          ],
+          [
+            618.5,
+            694.5
+          ],
+          [
+            92.5,
+            694.5
+          ],
+          [
+            92.5,
+            398.5
+          ]
+        ]
+      ],
+      "predefinedType": "FLOOR",
+      "properties": {
+        "Pset_ConcreteElementGeneral": {
+          "ConcreteCover": 0.03,
+          "ExposureClass": "XC1",
+          "StrengthClass": "C30/37"
+        },
+        "Pset_SlabCommon": {
+          "FireRating": "REI 90",
+          "IsExternal": false,
+          "LoadBearing": true,
+          "Reference": "D25"
+        },
+        "Qto_SlabBaseQuantities": {
+          "Depth": 0.25,
+          "GrossArea": 389.24
+        }
+      },
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. 1",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-wall-a01",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "2PYoFq8P2MSyl8xDMPSqCG",
+      "name": "Außenwand WA-02",
+      "paperBBox": [
+        92.5,
+        398.5,
+        618.5,
+        404.5
+      ],
+      "predefinedType": "SOLIDWALL",
+      "properties": {
+        "Pset_WallCommon": {
+          "FireRating": "REI 90",
+          "IsExternal": true,
+          "LoadBearing": true
+        }
+      },
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. 31",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-beam-uz2",
+      "ifcClass": "IfcBeam",
+      "ifcGuid": "3QkI9GVI43B6Kq7XWDyrqQ",
+      "name": "Unterzug UZ-02",
+      "paperBBox": [
+        274,
+        560,
+        388,
+        572
+      ],
+      "predefinedType": "BEAM",
+      "properties": {
+        "Pset_BeamCommon": {
+          "LoadBearing": true,
+          "Reference": "UZ-02",
+          "Span": 5.7
+        }
+      },
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. 22",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-col-b2",
+      "ifcClass": "IfcColumn",
+      "ifcGuid": "1CilqF5ndaDd6Yt5SwPxlS",
+      "name": "Stütze St-07",
+      "paperBBox": [
+        268,
+        469.5,
+        280,
+        481.5
+      ],
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. 14",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-open-01",
+      "ifcClass": "IfcOpeningElement",
+      "ifcGuid": "1tMFUV_5wgVVZ2C5FXqmzK",
+      "name": "Aussparung A-04",
+      "paperBBox": [
+        300,
+        600,
+        360,
+        640
+      ],
+      "paperOutlines": [
+        [
+          [
+            300,
+            600
+          ],
+          [
+            360,
+            600
+          ],
+          [
+            360,
+            640
+          ],
+          [
+            300,
+            640
+          ],
+          [
+            300,
+            600
+          ]
+        ]
+      ],
+      "provenance": "authored",
+      "representation": "symbol",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-sec-slab",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "25PlwCtT$eLxH_R2wzwasA",
+      "name": "Decke über EG",
+      "paperBBox": [
+        770,
+        667,
+        1110,
+        672
+      ],
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-sec-a"
+    },
+    {
+      "id": "e-det-corbel",
+      "ifcClass": "IfcBuildingElementProxy",
+      "ifcGuid": "3JS2qpyWpPO483Dbmz8fZW",
+      "name": "Konsole K-1",
+      "paperBBox": [
+        810,
+        310,
+        870,
+        350
+      ],
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-det-1"
+    }
+  ],
+  "extensions": {
+    "x-bonsai": {
+      "drawingGuid": "3R9$rqarEILM2zp$_btL_F",
+      "pset": "EPset_Drawing",
+      "target_view": "PLAN_VIEW"
+    },
+    "x-lindenhof-review": {
+      "checkedBy": "M. Hoffmann",
+      "checkedOn": "2026-03-19"
+    }
+  },
+  "generator": {
+    "created": "2026-03-19T16:45:10Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-tragwerk.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "fa8d382f78065e81fce348247f7a98eff9b0faa0aa8bff92aeeae4ba5a568d69"
+  },
+  "page": {
+    "heightMm": 841,
+    "index": 4,
+    "rotation": 0,
+    "widthMm": 1189
+  },
+  "planlabel": "0.1",
+  "provenance": "mixed",
+  "sheet": {
+    "author": "K. Brandt",
+    "checker": "M. Hoffmann",
+    "date": "2026-03-19",
+    "discipline": "structure",
+    "documentId": "LIN-ZZ-01-DR-S-0202",
+    "drawingType": "schalplan",
+    "id": "TWP-202",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "D",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Schalplan Decke über EG",
+    "titleBlockBBox": [
+      1009,
+      20,
+      1169,
+      200
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Schalplan Decke über EG",
+      "paperBBox": [
+        40,
+        260,
+        700,
+        820
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -4,
+        -19.5
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          1.2
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 50,
+      "storey": {
+        "elevation": 0,
+        "ifcGuid": "2nsALpn9jaFrwhSU_F581D",
+        "name": "EG"
+      }
+    },
+    {
+      "id": "vp-sec-a",
+      "kind": "section",
+      "name": "Schnitt A-A",
+      "paperBBox": [
+        740,
+        500,
+        1140,
+        800
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -38.5,
+        -30.25
+      ],
+      "plane": {
+        "origin": [
+          0,
+          6.75,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 50
+    },
+    {
+      "id": "vp-det-1",
+      "kind": "detail",
+      "name": "Detail D-03 Deckenrand",
+      "paperBBox": [
+        740,
+        230,
+        1000,
+        470
+      ],
+      "paperToPlane": [
+        0.01,
+        0,
+        0,
+        0.01,
+        -8.7,
+        -3.5
+      ],
+      "plane": {
+        "origin": [
+          26.925,
+          11.5,
+          3.35
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 10
+    },
+    {
+      "id": "vp-legend",
+      "kind": "legend",
+      "name": "Legende",
+      "paperBBox": [
+        40,
+        40,
+        320,
+        260
+      ]
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        1009,
+        20,
+        1169,
+        200
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "generator": {
+    "created": "2026-02-11T08:30:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "page": {
+    "heightMm": 841,
+    "index": 0,
+    "rotation": 90,
+    "widthMm": 594
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "S. Weiss",
+    "date": "2026-02-11",
+    "discipline": "civil",
+    "drawingType": "lageplan",
+    "id": "L-001",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "B",
+    "scale": 500,
+    "status": "Genehmigungsplanung",
+    "title": "Lageplan Bauteil A",
+    "titleBlockBBox": [
+      404,
+      20,
+      574,
+      190
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-site",
+      "kind": "plan",
+      "name": "Lageplan",
+      "paperBBox": [
+        40,
+        220,
+        554,
+        800
+      ],
+      "scale": 500
+    }
+  ]
+}

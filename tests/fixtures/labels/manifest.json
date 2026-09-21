@@ -1,0 +1,324 @@
+{
+  "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
+  "description": "Fixtures for the PlanLabel 0.1 page-label schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided.",
+  "invalid": [
+    {
+      "derivedFrom": "valid/01-minimal-l1.json",
+      "description": "Minimal label announcing version 0.2, which no 0.1 reader may accept.",
+      "errorPath": "$.planlabel",
+      "file": "invalid/01-wrong-planlabel-const.json",
+      "keyword": "const",
+      "schemaPointer": "#/properties/planlabel/const",
+      "validatorSchemaPath": "#/properties/planlabel/const",
+      "violates": "properties.planlabel.const — the version token must be exactly \"0.1\""
+    },
+    {
+      "derivedFrom": "valid/11-l2-section-rotated-270.json",
+      "description": "A section label that forgets the mandatory top-level sheet object.",
+      "errorPath": "$",
+      "file": "invalid/02-missing-required-sheet.json",
+      "keyword": "required",
+      "schemaPointer": "#/required",
+      "validatorSchemaPath": "#/required",
+      "violates": "required — the top-level object must carry planlabel, provenance, page and sheet"
+    },
+    {
+      "derivedFrom": "valid/04-l3-schalplan-multi-viewport.json",
+      "description": "An element invents a 'material' key instead of using properties.",
+      "errorPath": "$.elements[0]",
+      "file": "invalid/03-additional-property-on-element.json",
+      "keyword": "additionalProperties",
+      "schemaPointer": "#/$defs/element/additionalProperties",
+      "validatorSchemaPath": "#/properties/elements/items/additionalProperties",
+      "violates": "$defs.element.additionalProperties — element objects are closed"
+    },
+    {
+      "derivedFrom": "valid/12-l3-section-annotation-spread.json",
+      "description": "A GlobalId of the right length written in base64url, so it contains '-'.",
+      "errorPath": "$.elements[0].ifcGuid",
+      "file": "invalid/04-malformed-ifc-guid.json",
+      "keyword": "pattern",
+      "schemaPointer": "#/$defs/ifcGuid/pattern",
+      "validatorSchemaPath": "#/properties/elements/items/properties/ifcGuid/pattern",
+      "violates": "$defs.ifcGuid.pattern — 22 characters from the IFC base64 alphabet [0-9A-Za-z_$]"
+    },
+    {
+      "derivedFrom": "valid/05-l3-bewehrungsplan-inferred.json",
+      "description": "An inferred leader whose confidence is a negative score.",
+      "errorPath": "$.annotations[3].confidence",
+      "file": "invalid/05-confidence-below-zero.json",
+      "keyword": "minimum",
+      "schemaPointer": "#/$defs/confidence/minimum",
+      "validatorSchemaPath": "#/properties/annotations/items/properties/confidence/minimum",
+      "violates": "$defs.confidence.minimum — confidence lies in the closed interval 0..1"
+    },
+    {
+      "derivedFrom": "valid/03-l2-positionsplan-authored.json",
+      "description": "An element typed IFCWALL in STEP spelling rather than the IfcWall class name.",
+      "errorPath": "$.elements[4].ifcClass",
+      "file": "invalid/06-ifc-class-not-ifc-prefixed.json",
+      "keyword": "pattern",
+      "schemaPointer": "#/$defs/element/properties/ifcClass/pattern",
+      "validatorSchemaPath": "#/properties/elements/items/properties/ifcClass/pattern",
+      "violates": "properties of $defs.element: ifcClass.pattern ^Ifc[A-Za-z0-9]+$"
+    },
+    {
+      "derivedFrom": "valid/08-l3-detail-callouts-grid-level.json",
+      "description": "A paperBBox of three numbers, as if the top edge had been dropped.",
+      "errorPath": "$.elements[0].paperBBox",
+      "file": "invalid/07-bbox-wrong-arity.json",
+      "keyword": "minItems",
+      "schemaPointer": "#/$defs/bbox/minItems",
+      "validatorSchemaPath": "#/properties/elements/items/properties/paperBBox/minItems",
+      "violates": "$defs.bbox.minItems — a bbox is exactly [x0, y0, x1, y1]"
+    },
+    {
+      "derivedFrom": "valid/07-l1-multi-viewport-sheet.json",
+      "description": "A page width exported as the string \"1189\" rather than as a number.",
+      "errorPath": "$.page.widthMm",
+      "file": "invalid/08-page-width-not-a-number.json",
+      "keyword": "type",
+      "schemaPointer": "#/properties/page/properties/widthMm/type",
+      "validatorSchemaPath": "#/properties/page/properties/widthMm/type",
+      "violates": "properties.page.widthMm.type — a page size is a JSON number, never a numeric string"
+    },
+    {
+      "derivedFrom": "valid/02-l1-lageplan-rotated-page.json",
+      "description": "A page declaring a width of zero millimetres.",
+      "errorPath": "$.page.widthMm",
+      "file": "invalid/09-page-width-not-positive.json",
+      "keyword": "exclusiveMinimum",
+      "schemaPointer": "#/properties/page/properties/widthMm/exclusiveMinimum",
+      "validatorSchemaPath": "#/properties/page/properties/widthMm/exclusiveMinimum",
+      "violates": "properties.page.widthMm.exclusiveMinimum — page width must be greater than 0"
+    },
+    {
+      "derivedFrom": "valid/06-l2-mep-mixed-provenance.json",
+      "description": "An inferred element whose confidence is a raw score of 1.4.",
+      "errorPath": "$.elements[3].confidence",
+      "file": "invalid/10-confidence-above-one.json",
+      "keyword": "maximum",
+      "schemaPointer": "#/$defs/confidence/maximum",
+      "validatorSchemaPath": "#/properties/elements/items/properties/confidence/maximum",
+      "violates": "$defs.confidence.maximum — confidence lies in the closed interval 0..1"
+    },
+    {
+      "derivedFrom": "valid/09-l2-property-sets-extensions.json",
+      "description": "An extensions entry that drops the mandatory x- prefix.",
+      "errorPath": "$.extensions",
+      "file": "invalid/11-extension-key-missing-prefix.json",
+      "keyword": "pattern",
+      "schemaPointer": "#/properties/extensions/propertyNames/pattern",
+      "validatorSchemaPath": "#/properties/extensions/propertyNames/pattern",
+      "violates": "properties.extensions.propertyNames.pattern ^x- — extension keys are namespaced"
+    },
+    {
+      "derivedFrom": "valid/10-l3-lageplan-site-rotated-180.json",
+      "description": "A German drawing type outside the enumerated vocabulary.",
+      "errorPath": "$.sheet.drawingType",
+      "file": "invalid/12-unknown-drawing-type.json",
+      "keyword": "enum",
+      "schemaPointer": "#/properties/sheet/properties/drawingType/enum",
+      "validatorSchemaPath": "#/properties/sheet/properties/drawingType/enum",
+      "violates": "properties.sheet.drawingType.enum — drawingType is a closed vocabulary"
+    }
+  ],
+  "schema": "planlabel/schema/planlabel-0.1.json",
+  "valid": [
+    {
+      "covers": [
+        "minimal document",
+        "required top-level keys only",
+        "provenance authored",
+        "A3 page"
+      ],
+      "description": "The smallest legal label: the four required top-level keys and nothing else.",
+      "file": "valid/01-minimal-l1.json",
+      "level": "L1"
+    },
+    {
+      "covers": [
+        "L1",
+        "page rotation 90",
+        "drawingType lageplan",
+        "discipline civil",
+        "generator block",
+        "sheet.titleBlockBBox",
+        "single viewport"
+      ],
+      "description": "Site plan on a portrait A1 media box shown landscape via rotation 90, one viewport, no elements.",
+      "file": "valid/02-l1-lageplan-rotated-page.json",
+      "level": "L1"
+    },
+    {
+      "covers": [
+        "L2",
+        "drawingType positionsplan",
+        "discipline structure",
+        "provenance authored",
+        "model block with sha256",
+        "viewport plane",
+        "viewport paperToPlane",
+        "viewport storey",
+        "cutHeight",
+        "element tags",
+        "representation cut and projection",
+        "page rotation 0 stated explicitly"
+      ],
+      "description": "Authored member-position plan with a model reference and a viewport carrying plane, paperToPlane and storey.",
+      "file": "valid/03-l2-positionsplan-authored.json",
+      "level": "L2"
+    },
+    {
+      "covers": [
+        "L3",
+        "drawingType schalplan",
+        "multi-viewport sheet",
+        "viewport kinds plan section detail legend titleblock",
+        "provenance mixed",
+        "inferred annotations with confidence",
+        "element properties with IFC property sets",
+        "paperOutlines",
+        "dimension measures",
+        "tag shows",
+        "callout target",
+        "sectionMark target",
+        "grid axis",
+        "level elevation",
+        "unit cm",
+        "extensions with x- keys"
+      ],
+      "description": "A0 formwork plan with five viewports, property sets, outlines, the full annotation link spread and mixed provenance.",
+      "file": "valid/04-l3-schalplan-multi-viewport.json",
+      "level": "L3"
+    },
+    {
+      "covers": [
+        "L3",
+        "drawingType bewehrungsplan",
+        "provenance inferred",
+        "confidence on every item",
+        "no model block",
+        "viewport without paperToPlane",
+        "measures with a single id",
+        "tag shows",
+        "leader geometry",
+        "keynote",
+        "non-integer paper coordinates",
+        "viewport scale 1:10"
+      ],
+      "description": "Reinforcement plan reconstructed from a legacy PDF: every element and annotation is inferred and carries a confidence.",
+      "file": "valid/05-l3-bewehrungsplan-inferred.json",
+      "level": "L3"
+    },
+    {
+      "covers": [
+        "L2",
+        "discipline mep",
+        "provenance mixed",
+        "authored and inferred elements side by side",
+        "model lengthUnit mm",
+        "paperToPlane in millimetres",
+        "annotations without links",
+        "northArrow",
+        "scaleBar"
+      ],
+      "description": "Building-services plan mixing authored and inferred elements; its annotations carry no link, so the label stops at L2.",
+      "file": "valid/06-l2-mep-mixed-provenance.json",
+      "level": "L2"
+    },
+    {
+      "covers": [
+        "L1",
+        "multi-viewport sheet",
+        "all eight viewport kinds",
+        "drawingType other",
+        "two storeys on one sheet",
+        "north elevation whose plane xAxis is -x",
+        "detail viewport at 1:20"
+      ],
+      "description": "Composite general-arrangement A0 sheet: nine viewports covering all eight viewport kinds, no elements, and drawingType other because no single type describes it.",
+      "file": "valid/07-l1-multi-viewport-sheet.json",
+      "level": "L1"
+    },
+    {
+      "covers": [
+        "L3",
+        "drawingType detail",
+        "callout target with sheetId viewportId detail pdfPage",
+        "callout target with sheetId and pdfPage only",
+        "grid axis",
+        "level elevation negative",
+        "dimension measures between two elements",
+        "A3 page"
+      ],
+      "description": "A3 foundation-detail sheet whose callouts point back to another sheet and PDF page.",
+      "file": "valid/08-l3-detail-callouts-grid-level.json",
+      "level": "L3"
+    },
+    {
+      "covers": [
+        "L2",
+        "discipline architecture",
+        "element properties with Pset and Qto sets",
+        "extensions with x- keys",
+        "IfcSpace and IfcStair",
+        "no annotations"
+      ],
+      "description": "Architectural floor plan whose elements carry IFC property sets and base quantities, plus two namespaced extensions.",
+      "file": "valid/09-l2-property-sets-extensions.json",
+      "level": "L2"
+    },
+    {
+      "covers": [
+        "L3",
+        "drawingType lageplan",
+        "discipline landscape",
+        "page rotation 180",
+        "IFC4X3 classes IfcPavement IfcKerb IfcGeographicElement",
+        "level elevation above sea level",
+        "tag shows",
+        "dimension measures",
+        "unit deg",
+        "northArrow",
+        "scaleBar"
+      ],
+      "description": "Upside-down site plan using the IFC4X3 site vocabulary, with a site level and a tag that shows an element property.",
+      "file": "valid/10-l3-lageplan-site-rotated-180.json",
+      "level": "L3"
+    },
+    {
+      "covers": [
+        "L2",
+        "page rotation 270",
+        "drawingType section",
+        "A3 portrait page",
+        "paperToPlane carrying a 90 degree rotation, so the drawing reads upright once the page is rotated",
+        "viewport scale 1:100 on a sheet of the same scale",
+        "representation cut projection hidden symbol",
+        "two cut slabs one storey apart",
+        "footing below the model datum"
+      ],
+      "description": "Section on a rotated A3 portrait page: the paperToPlane turns the drawing a quarter turn in the media box so that page rotation 270 shows it upright, and the two cut slabs are the ones ARC-301 cuts, at the same size.",
+      "file": "valid/11-l2-section-rotated-270.json",
+      "level": "L2"
+    },
+    {
+      "covers": [
+        "L3",
+        "drawingType section",
+        "annotation types grid level dimension tag callout revisionCloud leader hatch symbol text",
+        "annotation ifcGuid link",
+        "dimension measures",
+        "unit pct",
+        "tag shows",
+        "callout target",
+        "level elevation zero",
+        "titleblock viewport"
+      ],
+      "description": "Building section exercising the annotation vocabulary at full spread, including an annotation linked by ifcGuid.",
+      "file": "valid/12-l3-section-annotation-spread.json",
+      "level": "L3"
+    }
+  ]
+}

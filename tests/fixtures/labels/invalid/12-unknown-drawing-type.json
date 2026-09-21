@@ -1,0 +1,315 @@
+{
+  "annotations": [
+    {
+      "id": "a-north",
+      "paperBBox": [
+        572,
+        490,
+        608,
+        548
+      ],
+      "provenance": "authored",
+      "type": "northArrow"
+    },
+    {
+      "id": "a-scalebar",
+      "paperBBox": [
+        40,
+        140,
+        240,
+        160
+      ],
+      "provenance": "authored",
+      "text": "0        10        20 m",
+      "type": "scaleBar"
+    },
+    {
+      "elevation": 112.45,
+      "id": "a-lvl-gok",
+      "paperBBox": [
+        300,
+        466,
+        392,
+        482
+      ],
+      "provenance": "authored",
+      "text": "GOK +112,45 üNN",
+      "type": "level",
+      "unit": "m",
+      "value": 112.45,
+      "viewport": "vp-site"
+    },
+    {
+      "id": "a-tag-tree",
+      "paperBBox": [
+        376,
+        206,
+        408,
+        222
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-tree-07",
+        "property": "Tag"
+      },
+      "text": "B-07",
+      "type": "tag",
+      "viewport": "vp-site"
+    },
+    {
+      "geometry": [
+        [
+          420,
+          246
+        ],
+        [
+          435,
+          246
+        ]
+      ],
+      "id": "a-dim-setback",
+      "measures": [
+        "e-bldg-a",
+        "e-site-01"
+      ],
+      "paperBBox": [
+        416,
+        236,
+        439,
+        256
+      ],
+      "provenance": "authored",
+      "text": "3,00",
+      "type": "dimension",
+      "unit": "m",
+      "value": 3,
+      "viewport": "vp-site"
+    },
+    {
+      "geometry": [
+        [
+          64,
+          210
+        ],
+        [
+          100,
+          210
+        ],
+        [
+          100,
+          222
+        ]
+      ],
+      "id": "a-dim-angle",
+      "measures": [
+        "e-kerb-01",
+        "e-site-01"
+      ],
+      "paperBBox": [
+        60,
+        186,
+        130,
+        226
+      ],
+      "provenance": "authored",
+      "text": "87,5°",
+      "type": "dimension",
+      "unit": "deg",
+      "value": 87.5,
+      "viewport": "vp-site"
+    },
+    {
+      "id": "a-txt-parcel",
+      "paperBBox": [
+        40,
+        100,
+        400,
+        132
+      ],
+      "provenance": "authored",
+      "text": "Flurstück 112/4, Gemarkung Lindenau, Größe 5.688 m².",
+      "type": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-site-01",
+      "ifcClass": "IfcSite",
+      "ifcGuid": "0N6PYTLAzUywOWH4rBDvpc",
+      "name": "Flurstück 112/4",
+      "paperBBox": [
+        40,
+        190,
+        435,
+        550
+      ],
+      "properties": {
+        "Pset_LandRegistration": {
+          "LandID": "112/4",
+          "LandTitleID": "Lindenau"
+        }
+      },
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-bldg-a",
+      "ifcClass": "IfcBuilding",
+      "ifcGuid": "12f0nuOHdQQekx$QSH1hOv",
+      "name": "Bauteil A",
+      "paperBBox": [
+        180,
+        260,
+        420,
+        460
+      ],
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-pav-01",
+      "ifcClass": "IfcPavement",
+      "ifcGuid": "0J38dZaxZ6JEChALRqke$p",
+      "name": "Zufahrt, Betonpflaster",
+      "paperBBox": [
+        60,
+        210,
+        180,
+        330
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-kerb-01",
+      "ifcClass": "IfcKerb",
+      "ifcGuid": "019dH8axMNTu0zr3QZbjPl",
+      "name": "Bordstein Tiefbord",
+      "paperBBox": [
+        60,
+        206,
+        180,
+        210
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-tree-07",
+      "ifcClass": "IfcGeographicElement",
+      "ifcGuid": "0q38FV30fdwDeUCTEIOIG2",
+      "name": "Bestandsbaum, Linde",
+      "paperBBox": [
+        340,
+        200,
+        372,
+        232
+      ],
+      "predefinedType": "VEGETATION",
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "B-07",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-wall-ret",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "25Kl8yNZr8VU05uqVZtbU_",
+      "name": "Stützmauer, h = 1,20 m",
+      "paperBBox": [
+        424,
+        260,
+        430,
+        460
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-site"
+    }
+  ],
+  "generator": {
+    "created": "2026-02-27T15:10:44Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-freianlagen.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4X3_ADD2",
+    "sha256": "f0bca0ba7b0446334dd34806dd217a6d7e2cd2c70ff6879077c4e4ef69c0fa15"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 1,
+    "rotation": 180,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "P. Vogel",
+    "date": "2026-02-27",
+    "discipline": "landscape",
+    "documentId": "LIN-ZZ-00-DR-L-0101",
+    "drawingType": "freianlagenplan",
+    "id": "FRE-101",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "A",
+    "scale": 200,
+    "status": "Entwurfsplanung",
+    "title": "Lageplan Freianlagen",
+    "titleBlockBBox": [
+      651,
+      10,
+      831,
+      180
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-site",
+      "kind": "plan",
+      "name": "Lageplan 1:200",
+      "paperBBox": [
+        30,
+        180,
+        620,
+        560
+      ],
+      "paperToPlane": [
+        0.2,
+        0,
+        0,
+        0.2,
+        -6,
+        -36
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          112.45
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 200
+    }
+  ]
+}

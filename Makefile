@@ -34,8 +34,8 @@ endif
 # One expanded line, so make 3.81 handles it without .ONESHELL.
 not_yet = @printf '\nmake %s is not implemented yet: it arrives in Phase %s.\nSee the design brief, section %s.\n\n' '$(1)' '$(2)' '$(3)' >&2; exit 2
 
-.PHONY: help install lock sync fmt fmt-check lint typecheck test check cov \
-        licenses samples bench docs inspector hooks precommit build clean \
+.PHONY: help install lock sync fmt fmt-check lint typecheck test fixtures check \
+        cov licenses samples bench docs inspector hooks precommit build clean \
         distclean version
 
 help: ## Show this help
@@ -71,7 +71,15 @@ typecheck: ## Type-check both distributions under --strict
 test: ## Run the test suite
 	$(RUN) pytest -q
 
-check: fmt-check lint typecheck test ## The gate: format, lint, types, tests
+# Schema validity is the floor, not the bar. This also checks that a dimension's
+# value matches the length it draws at its viewport's scale, that a level agrees
+# with its own paperToPlane, that no transform mirrors a view, and that
+# plane.origin == storey.elevation + cutHeight. The first fixture set passed every
+# schema check and was still physically impossible.
+fixtures: ## Check the fixture corpus for geometric and canonical coherence
+	$(RUN) python tools/check_fixtures.py
+
+check: fmt-check lint typecheck test fixtures ## The gate: format, lint, types, tests, fixtures
 	@printf '\nmake check: green\n'
 
 cov: ## Tests with the two coverage thresholds of the design brief section 15

@@ -1,0 +1,439 @@
+{
+  "annotations": [
+    {
+      "axis": "2",
+      "geometry": [
+        [
+          132,
+          300
+        ],
+        [
+          132,
+          490
+        ]
+      ],
+      "id": "g-ax-2",
+      "paperBBox": [
+        126,
+        290,
+        138,
+        498
+      ],
+      "provenance": "authored",
+      "text": "2",
+      "type": "grid",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "elevation": 0,
+      "id": "a-lvl-eg",
+      "paperBBox": [
+        496,
+        317,
+        600,
+        333
+      ],
+      "provenance": "authored",
+      "text": "±0,00 = 112,45 üNN",
+      "type": "level",
+      "unit": "m",
+      "value": 0,
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "elevation": 3.35,
+      "id": "a-lvl-og",
+      "paperBBox": [
+        496,
+        384,
+        600,
+        400
+      ],
+      "provenance": "authored",
+      "text": "+3,350",
+      "type": "level",
+      "unit": "m",
+      "value": 3.35,
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "geometry": [
+        [
+          486,
+          325
+        ],
+        [
+          486,
+          392
+        ]
+      ],
+      "id": "a-dim-gh",
+      "measures": [
+        "e-slab-eg",
+        "e-slab-og"
+      ],
+      "paperBBox": [
+        476,
+        319,
+        496,
+        398
+      ],
+      "provenance": "authored",
+      "text": "3350",
+      "type": "dimension",
+      "unit": "mm",
+      "value": 3350,
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "geometry": [
+        [
+          104,
+          477
+        ],
+        [
+          256,
+          477
+        ]
+      ],
+      "id": "a-dim-fall",
+      "measures": [
+        "e-roof-01"
+      ],
+      "paperBBox": [
+        100,
+        473,
+        260,
+        491
+      ],
+      "provenance": "authored",
+      "text": "Gefälle 2 %",
+      "type": "dimension",
+      "unit": "pct",
+      "value": 2,
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "a-tag-roof",
+      "paperBBox": [
+        510,
+        455,
+        566,
+        471
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-roof-01",
+        "property": "Tag"
+      },
+      "text": "D-02",
+      "type": "tag",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "a-call-d07",
+      "paperBBox": [
+        455,
+        425,
+        505,
+        475
+      ],
+      "provenance": "authored",
+      "target": {
+        "detail": "D-07",
+        "pdfPage": 21,
+        "sheetId": "ARC-501"
+      },
+      "text": "D-07",
+      "type": "callout",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "a-rev-c1",
+      "paperBBox": [
+        120,
+        337,
+        146,
+        377
+      ],
+      "provenance": "authored",
+      "text": "C",
+      "type": "revisionCloud",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "geometry": [
+        [
+          280,
+          465
+        ],
+        [
+          330,
+          481
+        ],
+        [
+          356,
+          481
+        ]
+      ],
+      "id": "a-leader-01",
+      "paperBBox": [
+        276,
+        461,
+        360,
+        485
+      ],
+      "provenance": "authored",
+      "type": "leader",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "a-hatch-erd",
+      "paperBBox": [
+        40,
+        200,
+        490,
+        319
+      ],
+      "provenance": "authored",
+      "text": "Erdreich",
+      "type": "hatch",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "a-sym-insulation",
+      "ifcGuid": "09pfxstY1QTZmMtlMz4j8A",
+      "paperBBox": [
+        364,
+        473,
+        454,
+        489
+      ],
+      "provenance": "authored",
+      "text": "Wärmedämmung WLG 035",
+      "type": "symbol",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "a-txt-note",
+      "paperBBox": [
+        40,
+        100,
+        520,
+        132
+      ],
+      "provenance": "authored",
+      "text": "Höhenangaben in Metern, übrige Maße in Millimetern.",
+      "type": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-slab-eg",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "3pgRnTSoq0YCBg3l0GaDX1",
+      "name": "Bodenplatte",
+      "paperBBox": [
+        60,
+        319,
+        470,
+        325
+      ],
+      "predefinedType": "FLOOR",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "D-00",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "e-slab-og",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "2F_7bU6O_mlM$QJfflT$pt",
+      "name": "Decke über EG",
+      "paperBBox": [
+        60,
+        387,
+        470,
+        392
+      ],
+      "predefinedType": "FLOOR",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "D-01",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "e-cov-screed",
+      "ifcClass": "IfcCovering",
+      "ifcGuid": "06pDKeQXUG2k0IXIxAp7mV",
+      "name": "Zementestrich 60 mm",
+      "paperBBox": [
+        72,
+        325,
+        458,
+        326.2
+      ],
+      "predefinedType": "FLOORING",
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "e-wall-ax2",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "3j2SCsUQ59lUzziWwPVgBI",
+      "name": "Außenwand 36,5 cm",
+      "paperBBox": [
+        128.35,
+        325,
+        135.65,
+        471
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "AW-01",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "e-window-05",
+      "ifcClass": "IfcWindow",
+      "ifcGuid": "1ZaJwKPw2Ej_sqtTuy3y5R",
+      "name": "Fenster F-05",
+      "paperBBox": [
+        128.35,
+        343,
+        135.65,
+        370.6
+      ],
+      "predefinedType": "WINDOW",
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "F-05",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "e-stair-01",
+      "ifcClass": "IfcStair",
+      "ifcGuid": "0Gg6oF1H$_ePJLM$xawqaD",
+      "name": "Treppe TR-01",
+      "paperBBox": [
+        200,
+        325,
+        295.2,
+        392
+      ],
+      "predefinedType": "STRAIGHT_RUN_STAIR",
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-sec-bb"
+    },
+    {
+      "id": "e-roof-01",
+      "ifcClass": "IfcRoof",
+      "ifcGuid": "2khuNH8dq46J9DeP_gtc14",
+      "name": "Flachdach",
+      "paperBBox": [
+        50,
+        459,
+        480,
+        471
+      ],
+      "predefinedType": "FLAT_ROOF",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "D-02",
+      "viewport": "vp-sec-bb"
+    }
+  ],
+  "generator": {
+    "created": "2026-04-09T17:26:02Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-architektur.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "f11100ea29b511f63bba85ce58be117b44f94d9f1809de5803f3c3b0211d5cc6"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 6,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "A. Neumann",
+    "checker": "S. Weiss",
+    "date": "2026-04-09",
+    "discipline": "architecture",
+    "documentId": "LIN-ZZ-XX-DR-A-0301",
+    "drawingType": "section",
+    "id": "ARC-301",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "C",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Schnitt B-B",
+    "titleBlockBBox": [
+      651,
+      10,
+      831,
+      180
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-sec-bb",
+      "kind": "section",
+      "name": "Schnitt B-B",
+      "paperBBox": [
+        30,
+        150,
+        620,
+        560
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -4.5,
+        -16.25
+      ],
+      "plane": {
+        "origin": [
+          0,
+          6.75,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 50
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        651,
+        10,
+        831,
+        180
+      ]
+    }
+  ]
+}

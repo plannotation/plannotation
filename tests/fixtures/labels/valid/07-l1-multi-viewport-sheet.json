@@ -1,0 +1,286 @@
+{
+  "generator": {
+    "created": "2026-01-22T07:55:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-architektur.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "f11100ea29b511f63bba85ce58be117b44f94d9f1809de5803f3c3b0211d5cc6"
+  },
+  "page": {
+    "heightMm": 841,
+    "index": 0,
+    "rotation": 0,
+    "widthMm": 1189
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "A. Neumann",
+    "checker": "S. Weiss",
+    "date": "2026-01-22",
+    "discipline": "architecture",
+    "documentId": "LIN-ZZ-XX-DR-A-0100",
+    "drawingType": "other",
+    "id": "ARC-100",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "A",
+    "scale": 100,
+    "status": "Vorabzug",
+    "title": "Übersichtsplan Bauteil A",
+    "titleBlockBBox": [
+      1009,
+      20,
+      1169,
+      200
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan-eg",
+      "kind": "plan",
+      "name": "Grundriss EG",
+      "paperBBox": [
+        40,
+        420,
+        560,
+        800
+      ],
+      "paperToPlane": [
+        0.1,
+        0,
+        0,
+        0.1,
+        -6,
+        -48
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          1.2
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 100,
+      "storey": {
+        "elevation": 0,
+        "ifcGuid": "2fdlI8oX4dNoBu70Kq5n2Z",
+        "name": "EG"
+      }
+    },
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan-og",
+      "kind": "plan",
+      "name": "Grundriss 1. OG",
+      "paperBBox": [
+        600,
+        420,
+        1120,
+        800
+      ],
+      "paperToPlane": [
+        0.1,
+        0,
+        0,
+        0.1,
+        -62,
+        -48
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          4.55
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 100,
+      "storey": {
+        "elevation": 3.35,
+        "ifcGuid": "2PqrRz_G1Jum_29TEQrsX7",
+        "name": "1. OG"
+      }
+    },
+    {
+      "id": "vp-sec-aa",
+      "kind": "section",
+      "name": "Schnitt A-A",
+      "paperBBox": [
+        40,
+        220,
+        400,
+        400
+      ],
+      "paperToPlane": [
+        0.1,
+        0,
+        0,
+        0.1,
+        -6,
+        -23.5
+      ],
+      "plane": {
+        "origin": [
+          0,
+          6.75,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 100
+    },
+    {
+      "id": "vp-elev-north",
+      "kind": "elevation",
+      "name": "Ansicht Nord",
+      "paperBBox": [
+        420,
+        220,
+        780,
+        400
+      ],
+      "paperToPlane": [
+        0.1,
+        0,
+        0,
+        0.1,
+        -76,
+        -23.5
+      ],
+      "plane": {
+        "origin": [
+          0,
+          13.5,
+          0
+        ],
+        "xAxis": [
+          -1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 100
+    },
+    {
+      "id": "vp-det-01",
+      "kind": "detail",
+      "name": "Detail Attika",
+      "paperBBox": [
+        800,
+        220,
+        1000,
+        400
+      ],
+      "paperToPlane": [
+        0.02,
+        0,
+        0,
+        0.02,
+        -13.6,
+        3.6
+      ],
+      "plane": {
+        "origin": [
+          2.4,
+          13.5,
+          9.8
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 20
+    },
+    {
+      "id": "vp-3d",
+      "kind": "3d",
+      "name": "Isometrie",
+      "paperBBox": [
+        40,
+        30,
+        300,
+        200
+      ]
+    },
+    {
+      "id": "vp-legend",
+      "kind": "legend",
+      "name": "Legende",
+      "paperBBox": [
+        320,
+        30,
+        600,
+        200
+      ]
+    },
+    {
+      "id": "vp-schedule",
+      "kind": "schedule",
+      "name": "Fensterliste",
+      "paperBBox": [
+        620,
+        30,
+        990,
+        200
+      ]
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        1009,
+        20,
+        1169,
+        200
+      ]
+    }
+  ]
+}

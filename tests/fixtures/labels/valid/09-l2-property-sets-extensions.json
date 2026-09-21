@@ -1,0 +1,257 @@
+{
+  "elements": [
+    {
+      "id": "e-wall-ext-01",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "3JPefX8JlMvKqJ39neSguA",
+      "name": "Außenwand 36,5 cm",
+      "paperBBox": [
+        62.5,
+        232.5,
+        588.5,
+        239.8
+      ],
+      "predefinedType": "SOLIDWALL",
+      "properties": {
+        "Pset_WallCommon": {
+          "FireRating": "REI 90",
+          "IsExternal": true,
+          "LoadBearing": true,
+          "Reference": "AW-01",
+          "ThermalTransmittance": 0.18
+        },
+        "Qto_WallBaseQuantities": {
+          "Height": 3.1,
+          "Length": 26.3,
+          "Width": 0.365
+        }
+      },
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "AW-01",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-wall-int-07",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "1xaQRtRyKWi3dDreA_QYIe",
+      "name": "Innenwand 17,5 cm",
+      "paperBBox": [
+        280.5,
+        239.8,
+        284,
+        470.5
+      ],
+      "predefinedType": "SOLIDWALL",
+      "properties": {
+        "Pset_WallCommon": {
+          "FireRating": "EI 30",
+          "IsExternal": false,
+          "LoadBearing": true
+        }
+      },
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "IW-07",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-door-12",
+      "ifcClass": "IfcDoor",
+      "ifcGuid": "14oKMVQuiwyvSHWdnfELsN",
+      "name": "Tür T-12",
+      "paperBBox": [
+        280.5,
+        300.5,
+        284,
+        320.5
+      ],
+      "predefinedType": "DOOR",
+      "properties": {
+        "Pset_DoorCommon": {
+          "AcousticRating": "32 dB",
+          "FireRating": "EI2 30-C",
+          "IsExternal": false,
+          "Reference": "T-12"
+        }
+      },
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "T-12",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-window-05",
+      "ifcClass": "IfcWindow",
+      "ifcGuid": "1KW7YMnEjVb2u2Ju_QrIRY",
+      "name": "Fenster F-05 1,26/1,38",
+      "paperBBox": [
+        180.5,
+        232.5,
+        205.7,
+        239.8
+      ],
+      "predefinedType": "WINDOW",
+      "properties": {
+        "Pset_WindowCommon": {
+          "IsExternal": true,
+          "Reference": "F-05",
+          "ThermalTransmittance": 0.95
+        }
+      },
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "F-05",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-space-eg-03",
+      "ifcClass": "IfcSpace",
+      "ifcGuid": "33BTxq_1nXz4h0CYIMcyKM",
+      "name": "Wohnen/Essen",
+      "paperBBox": [
+        284,
+        239.8,
+        588.5,
+        470.5
+      ],
+      "predefinedType": "INTERNAL",
+      "properties": {
+        "Pset_SpaceCommon": {
+          "IsExternal": false,
+          "PubliclyAccessible": false
+        },
+        "Qto_SpaceBaseQuantities": {
+          "GrossFloorArea": 36.1,
+          "NetFloorArea": 34.56
+        }
+      },
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "EG.03",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-stair-01",
+      "ifcClass": "IfcStair",
+      "ifcGuid": "2SVupZ6Okh7rkSJiVanEGU",
+      "name": "Treppe TR-01",
+      "paperBBox": [
+        62.5,
+        300.5,
+        150.5,
+        400.5
+      ],
+      "predefinedType": "STRAIGHT_RUN_STAIR",
+      "properties": {
+        "Pset_StairCommon": {
+          "FireRating": "R 90",
+          "NumberOfRiser": 18,
+          "RiserHeight": 0.186,
+          "TreadLength": 0.28
+        }
+      },
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "TR-01",
+      "viewport": "vp-plan"
+    }
+  ],
+  "extensions": {
+    "x-lindenhof-room-book": {
+      "roomBookVersion": "2026-01",
+      "roomCount": 9
+    },
+    "x-planlabel-export": {
+      "authoringTool": "Allplan 2026",
+      "exportProfile": "TWP-Standard",
+      "layerSet": "AR_EG"
+    }
+  },
+  "generator": {
+    "created": "2026-01-30T10:41:18Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-architektur.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "f11100ea29b511f63bba85ce58be117b44f94d9f1809de5803f3c3b0211d5cc6"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 2,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "A. Neumann",
+    "checker": "S. Weiss",
+    "date": "2026-01-30",
+    "discipline": "architecture",
+    "documentId": "LIN-ZZ-01-DR-A-0201",
+    "drawingType": "plan",
+    "id": "ARC-201",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "C",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Grundriss Erdgeschoss",
+    "titleBlockBBox": [
+      651,
+      10,
+      831,
+      180
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Grundriss EG",
+      "paperBBox": [
+        30,
+        200,
+        620,
+        560
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -2.5,
+        -11.2
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          1.2
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 50,
+      "storey": {
+        "elevation": 0,
+        "ifcGuid": "08HxwrBu0q6EUU5rYv3Lbd",
+        "name": "EG"
+      }
+    }
+  ]
+}

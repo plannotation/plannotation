@@ -1,0 +1,179 @@
+{
+  "elements": [
+    {
+      "id": "e-slab-eg",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "3pgRnTSoq0YCBg3l0GaDX1",
+      "name": "Bodenplatte",
+      "paperBBox": [
+        129,
+        95,
+        132,
+        300
+      ],
+      "predefinedType": "FLOOR",
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-sec-cc"
+    },
+    {
+      "id": "e-slab-og",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "2F_7bU6O_mlM$QJfflT$pt",
+      "name": "Decke über EG",
+      "paperBBox": [
+        163,
+        95,
+        165.5,
+        300
+      ],
+      "predefinedType": "FLOOR",
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-sec-cc"
+    },
+    {
+      "id": "e-wall-ax2",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "3vYoXZ18MPVeIkeVHDaEo9",
+      "name": "Treppenhauswand",
+      "paperBBox": [
+        132,
+        242.6,
+        205,
+        245
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "viewport": "vp-sec-cc"
+    },
+    {
+      "id": "e-stair-01",
+      "ifcClass": "IfcStair",
+      "ifcGuid": "0Gg6oF1H$_ePJLM$xawqaD",
+      "name": "Treppe TR-01",
+      "paperBBox": [
+        132,
+        195,
+        165.5,
+        242.6
+      ],
+      "predefinedType": "STRAIGHT_RUN_STAIR",
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-sec-cc"
+    },
+    {
+      "id": "e-foot-01",
+      "ifcClass": "IfcFooting",
+      "ifcGuid": "0J8esqyrhxNEH44pq3ynPV",
+      "name": "Streifenfundament F-1",
+      "paperBBox": [
+        120,
+        239.6,
+        129,
+        248
+      ],
+      "predefinedType": "STRIP_FOOTING",
+      "provenance": "authored",
+      "representation": "hidden",
+      "viewport": "vp-sec-cc"
+    },
+    {
+      "id": "e-san-wc",
+      "ifcClass": "IfcSanitaryTerminal",
+      "ifcGuid": "1JBaQC$EMlEoxQDiP0YSap",
+      "name": "WC",
+      "paperBBox": [
+        132,
+        271,
+        136.2,
+        275
+      ],
+      "predefinedType": "WCSEAT",
+      "provenance": "authored",
+      "representation": "symbol",
+      "viewport": "vp-sec-cc"
+    }
+  ],
+  "generator": {
+    "created": "2026-04-02T09:03:27Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "lindenhof-architektur.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "f11100ea29b511f63bba85ce58be117b44f94d9f1809de5803f3c3b0211d5cc6"
+  },
+  "page": {
+    "heightMm": 420,
+    "index": 5,
+    "rotation": 270,
+    "widthMm": 297
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "A. Neumann",
+    "date": "2026-04-02",
+    "discipline": "architecture",
+    "drawingType": "section",
+    "id": "ARC-302",
+    "project": {
+      "name": "Wohnanlage Lindenhof",
+      "number": "2024-118"
+    },
+    "revision": "A",
+    "scale": 100,
+    "status": "Ausführungsplanung",
+    "title": "Schnitt C-C Treppenhaus",
+    "titleBlockBBox": [
+      107,
+      10,
+      287,
+      60
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-sec-cc",
+      "kind": "section",
+      "name": "Schnitt C-C",
+      "paperBBox": [
+        115,
+        90,
+        212,
+        305
+      ],
+      "paperToPlane": [
+        0,
+        0.1,
+        -0.1,
+        0,
+        28.5,
+        -13.2
+      ],
+      "plane": {
+        "origin": [
+          0,
+          5.2,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 100
+    }
+  ]
+}
