@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://srtgn.github.io/planlabel/schema/0.1/planlabel-index.schema.json",
+  "title": "PlanLabel index 0.1",
+  "description": "Document-level index of the labelled pages in one PDF. Embedded once per document as planlabel-index.json so that a reader can see what is labelled, and at which conformance level, without opening every page attachment. This schema is deliberately self-contained: a third-party reader must be able to validate an index without also fetching the page-label schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["planlabel", "pages"],
+  "properties": {
+    "planlabel": { "const": "0.1" },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "created": { "type": "string", "format": "date-time" }
+      }
+    },
+    "provenance": {
+      "type": "string",
+      "enum": ["authored", "inferred", "mixed"],
+      "description": "aggregate over every page in the document"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "the source model the labels were written from, if there was one",
+      "properties": {
+        "file": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "schema": { "type": "string", "examples": ["IFC4", "IFC4X3_ADD2"] },
+        "lengthUnit": { "type": "string", "enum": ["m", "mm", "cm"] }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "description": "one entry per labelled page; unlabelled pages are simply absent",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pageIndex", "sheetId", "level"],
+        "properties": {
+          "pageIndex": { "type": "integer", "minimum": 0, "description": "0-based PDF page index" },
+          "sheetId": { "type": "string", "description": "sheet number as printed, e.g. TWP-101" },
+          "title": { "type": "string" },
+          "revision": { "type": "string" },
+          "level": {
+            "type": "string",
+            "enum": ["L1", "L2", "L3"],
+            "description": "conformance level this page's label reaches"
+          },
+          "file": {
+            "type": "string",
+            "description": "name of the embedded label file, e.g. planlabel-p0000.json"
+          }
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": { "pattern": "^x-" },
+      "description": "namespaced extras; never required by readers"
+    }
+  }
+}
