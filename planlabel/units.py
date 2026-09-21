@@ -10,14 +10,41 @@ Paper coordinates are **millimetres**, with the origin at the **bottom-left corn
 of the page** and **y increasing upwards**. This matches the PDF user-space
 convention and differs from SVG.
 
+The page in question is the **CropBox**, falling back to the MediaBox when no
+CropBox is present. The CropBox is the page as displayed and printed, and the
+governing principle makes the page as seen the leading document -- so a label
+measures the page a person measures.
+
+``page.widthMm`` and ``page.heightMm`` are that box's dimensions, and paper
+coordinates are **unrotated**: they are expressed in the page's own space before
+``/Rotate`` is applied, exactly like every other position in a PDF (MediaBox,
+CropBox, annotation rectangles, the content stream). ``page.rotation`` is recorded
+only so that a reader can reproduce the displayed orientation. A label in
+post-rotation space would be the one thing in the file needing conversion before
+it could be compared with anything else.
+
 A ``bbox`` is ``[x0, y0, x1, y1]`` in paper millimetres with ``x0 <= x1`` and
 ``y0 <= y1``.
 
 PDF user space
 --------------
-PDF user space is measured in points, where ``1 pt = 1/72 inch``. Conversions use
-:data:`MM_PER_PT` and :data:`PT_PER_MM`; the origin and axis directions already
-agree, so only a scale factor is involved.
+PDF user space is measured in points, where ``1 pt = 1/72 inch``, and its axes
+already agree with paper coordinates. Two things nonetheless stand between a point
+and a millimetre, and ignoring either corrupts an entire label silently:
+
+* **The box origin.** A CropBox whose lower-left corner is not at the user-space
+  origin must be subtracted. Large-format drawings routinely have one.
+* **/UserUnit.** A page may scale user space by ``/UserUnit`` (default 1). It is
+  common on large-format construction drawings -- the very drawings PlanLabel
+  targets -- and omitting it scales every coordinate in the label.
+
+So the conversion is::
+
+    x_mm = (x_pt - cropBox.x0) * userUnit * MM_PER_PT
+    y_mm = (y_pt - cropBox.y0) * userUnit * MM_PER_PT
+
+:data:`MM_PER_PT` and :data:`PT_PER_MM` carry only the unit factor; the offset and
+``/UserUnit`` are properties of the page and must be supplied by the caller.
 
 SVG
 ---
