@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlanLabel inspector</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #fff; --ink: #1a1a18; --muted: #6b6b66;
+    --line: #d8d8d2; --accent: #1d6fa5; --warn: #9a5b00;
+    --element: #1d6fa5; --annotation: #9a5b00; --viewport: #3f7d3f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17171a; --panel: #1f1f23; --ink: #e8e8e4; --muted: #9a9a94;
+      --line: #34343a; --accent: #6ab7e8; --warn: #e0a24a;
+      --element: #6ab7e8; --annotation: #e0a24a; --viewport: #7fc77f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17171a; --panel: #1f1f23; --ink: #e8e8e4; --muted: #9a9a94;
+    --line: #34343a; --accent: #6ab7e8; --warn: #e0a24a;
+    --element: #6ab7e8; --annotation: #e0a24a; --viewport: #7fc77f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+    position: sticky; top: 0; z-index: 2;
+  }
+  h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 600; letter-spacing: -0.01em; }
+  .muted { color: var(--muted); }
+  button, select, label.file {
+    font: inherit; padding: 5px 10px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer;
+  }
+  button:hover, label.file:hover { border-color: var(--accent); }
+  input[type=file] { display: none; }
+  main { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; align-items: flex-start; }
+  #stage { position: relative; background: var(--panel); border: 1px solid var(--line);
+           border-radius: 8px; line-height: 0; overflow: auto; max-width: 100%; }
+  #paper, #overlay { display: block; }
+  #overlay { position: absolute; inset: 0; }
+  aside { flex: 1 1 320px; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+             color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toggles label { display: inline-flex; gap: 5px; align-items: center;
+                   border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  .toggles input { margin: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover, tbody tr.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  #tip { position: fixed; pointer-events: none; z-index: 9; max-width: 320px; display: none;
+         background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 7px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+  .empty { color: var(--muted); padding: 20px; text-align: center; }
+  code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PlanLabel inspector</h1>
+  <label class="file">Open a labelled PDF<input type="file" id="file" accept="application/pdf"></label>
+  <button id="prev">&larr;</button>
+  <span id="pager" class="muted">no document</span>
+  <button id="next">&rarr;</button>
+  <select id="zoom">
+    <option value="1">100%</option><option value="1.5" selected>150%</option>
+    <option value="2">200%</option><option value="3">300%</option>
+  </select>
+  <button id="copy">Copy JSON</button>
+  <button id="csv">Export CSV</button>
+</header>
+
+<main>
+  <div id="stage">
+    <canvas id="paper"></canvas>
+    <canvas id="overlay"></canvas>
+  </div>
+  <aside>
+    <div class="card">
+      <h2>Sheet</h2>
+      <dl id="sheet"><dd class="muted" style="grid-column:1/-1">Open a labelled PDF to begin.</dd></dl>
+    </div>
+    <div class="card">
+      <h2>Show</h2>
+      <div class="toggles" id="toggles"></div>
+    </div>
+    <div class="card">
+      <h2>On this page</h2>
+      <table><thead><tr><th>id</th><th>what</th><th>provenance</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="3" class="empty">nothing yet</td></tr></tbody></table>
+    </div>
+  </aside>
+</main>
+<div id="tip"></div>
+
+<script type="module">
+// pdf.js is loaded from a CDN on first use and then works from disk. The inspector is
+// one file on purpose: a drawing office can keep it next to the drawings.
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs";
+const WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+
+const el = (id) => document.getElementById(id);
+const state = { doc: null, page: 1, labels: new Map(), scale: 1.5, hit: [], selected: null };
+const KINDS = [
+  ["element", "elements", "--element"],
+  ["annotation", "annotations", "--annotation"],
+  ["viewport", "viewports", "--viewport"],
+];
+const shown = new Set(KINDS.map(([k]) => k));
+
+for (const [kind, label, varName] of KINDS) {
+  const wrap = document.createElement("label");
+  wrap.innerHTML = `<input type="checkbox" checked data-kind="${kind}">
+    <span class="swatch" style="background:var(${varName})"></span>${label}`;
+  wrap.querySelector("input").addEventListener("change", (e) => {
+    e.target.checked ? shown.add(kind) : shown.delete(kind);
+    draw();
+  });
+  el("toggles").append(wrap);
+}
+
+let pdfjs = null;
+async function library() {
+  if (!pdfjs) {
+    pdfjs = await import(PDFJS);
+    pdfjs.GlobalWorkerOptions.workerSrc = WORKER;
+  }
+  return pdfjs;
+}
+
+el("file").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const lib = await library();
+  const data = new Uint8Array(await file.arrayBuffer());
+  state.doc = await lib.getDocument({ data }).promise;
+  state.labels = await readLabels(state.doc);
+  state.page = 1;
+  await render();
+});
+
+// A page label travels as an attachment named planlabel-pNNNN.json. pdf.js exposes
+// the EmbeddedFiles name tree through getAttachments(), which is why PlanLabel
+// registers every file there as well as on the page's /AF.
+async function readLabels(doc) {
+  const found = new Map();
+  const attachments = (await doc.getAttachments()) || {};
+  for (const [name, entry] of Object.entries(attachments)) {
+    const match = /^planlabel-p(\d+)\.json$/.exec(name);
+    if (!match) continue;
+    try {
+      found.set(Number(match[1]) + 1, JSON.parse(new TextDecoder().decode(entry.content)));
+    } catch { /* a label that will not parse is a label that is absent */ }
+  }
+  return found;
+}
+
+el("prev").onclick = () => { if (state.page > 1) { state.page--; render(); } };
+el("next").onclick = () => { if (state.doc && state.page < state.doc.numPages) { state.page++; render(); } };
+el("zoom").onchange = (e) => { state.scale = Number(e.target.value); render(); };
+
+async function render() {
+  if (!state.doc) return;
+  const page = await state.doc.getPage(state.page);
+  const viewport = page.getViewport({ scale: state.scale });
+  for (const canvas of [el("paper"), el("overlay")]) {
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    canvas.style.width = `${viewport.width}px`; canvas.style.height = `${viewport.height}px`;
+  }
+  await page.render({ canvasContext: el("paper").getContext("2d"), viewport }).promise;
+  el("pager").textContent = `page ${state.page} of ${state.doc.numPages}` +
+    (state.labels.has(state.page) ? "" : " — no label");
+  describe();
+  draw();
+}
+
+// Paper is millimetres, y up from the bottom left; a canvas is pixels, y down from the
+// top. One function does the flip, so nothing else has to remember it.
+function toCanvas(x, y, label, canvas) {
+  const w = label.page.widthMm, h = label.page.heightMm;
+  return [x / w * canvas.width, (h - y) / h * canvas.height];
+}
+
+function draw() {
+  const canvas = el("overlay"), ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  state.hit = [];
+  const label = state.labels.get(state.page);
+  if (!label) return;
+  const paint = (items, kind, colour) => {
+    if (!shown.has(kind)) return;
+    for (const item of items || []) {
+      const stroke = getComputedStyle(document.documentElement).getPropertyValue(colour).trim();
+      const box = item.paperBBox;
+      if (!box) continue;
+      const [x0, y0] = toCanvas(box[0], box[1], label, canvas);
+      const [x1, y1] = toCanvas(box[2], box[3], label, canvas);
+      const rect = [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = state.selected === item.id ? 2.5 : 1;
+      ctx.setLineDash(kind === "viewport" ? [6, 4] : []);
+      ctx.globalAlpha = state.selected && state.selected !== item.id ? 0.35 : 1;
+      ctx.strokeRect(...rect);
+      if (kind === "element" && item.paperOutlines) {
+        for (const outline of item.paperOutlines) {
+          ctx.beginPath();
+          outline.forEach(([px, py], index) => {
+            const [cx, cy] = toCanvas(px, py, label, canvas);
+            index ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
+          });
+          ctx.stroke();
+        }
+      }
+      if (kind === "annotation" && item.geometry) {
+        ctx.beginPath();
+        item.geometry.forEach(([px, py], index) => {
+          const [cx, cy] = toCanvas(px, py, label, canvas);
+          index ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
+        });
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      state.hit.push({ rect, item, kind });
+    }
+  };
+  paint(label.viewports, "viewport", "--viewport");
+  paint(label.elements, "element", "--element");
+  paint(label.annotations, "annotation", "--annotation");
+}
+
+function describe() {
+  const label = state.labels.get(state.page);
+  const sheet = el("sheet"), rows = el("rows");
+  if (!label) {
+    sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no PlanLabel label.</dd>`;
+    rows.innerHTML = `<tr><td colspan="3" class="empty">nothing to show</td></tr>`;
+    return;
+  }
+  const level = conformance(label);
+  const pairs = [
+    ["sheet", label.sheet?.id], ["title", label.sheet?.title],
+    ["revision", label.sheet?.revision], ["scale", label.sheet?.scale ? `1:${label.sheet.scale}` : null],
+    ["type", label.sheet?.drawingType], ["discipline", label.sheet?.discipline],
+    ["page", `${label.page.widthMm} × ${label.page.heightMm} mm`],
+    ["provenance", label.provenance], ["level", level],
+    ["model", label.model?.file], ["schema", label.planlabel],
+  ].filter(([, value]) => value != null && value !== "");
+  sheet.innerHTML = pairs.map(([k, v]) => `<dt>${k}</dt><dd>${escape(String(v))}</dd>`).join("");
+
+  const items = [
+    ...(label.viewports || []).map((i) => [i, "viewport", i.kind || "viewport"]),
+    ...(label.elements || []).map((i) => [i, "element", i.ifcClass + (i.tag ? ` · ${i.tag}` : "")]),
+    ...(label.annotations || []).map((i) => [i, "annotation", i.type + (i.text ? ` · ${i.text}` : "")]),
+  ];
+  rows.innerHTML = items.length
+    ? items.map(([item, kind, what]) =>
+        `<tr data-id="${escape(item.id)}"><td><code>${escape(item.id)}</code></td>` +
+        `<td><span class="swatch" style="background:var(--${kind})"></span>${escape(what)}</td>` +
+        `<td class="muted">${escape(item.provenance || label.provenance)}` +
+        `${item.confidence != null ? ` ${item.confidence}` : ""}</td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">nothing on this page</td></tr>`;
+  for (const row of rows.querySelectorAll("tr[data-id]")) {
+    row.onclick = () => {
+      state.selected = state.selected === row.dataset.id ? null : row.dataset.id;
+      for (const other of rows.querySelectorAll("tr")) other.classList.remove("on");
+      if (state.selected) row.classList.add("on");
+      draw();
+    };
+  }
+}
+
+// The levels of SPEC 4.1, computed here so the inspector can say what it is looking at
+// without asking anything else.
+function conformance(label) {
+  const linked = (a) => a.measures?.length || a.shows?.element || a.target?.sheetId ||
+    a.target?.pdfPage != null || a.axis || a.ifcGuid;
+  if (!label.elements?.length) return "L1";
+  return (label.annotations || []).some(linked) ? "L3" : "L2";
+}
+
+const escape = (value) => String(value).replace(/[&<>"]/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+el("overlay").addEventListener("mousemove", (event) => {
+  const box = el("overlay").getBoundingClientRect();
+  const x = event.clientX - box.left, y = event.clientY - box.top;
+  const under = state.hit.filter(({ rect: [rx, ry, rw, rh] }) =>
+    x >= rx && x <= rx + rw && y >= ry && y <= ry + rh);
+  const tip = el("tip");
+  if (!under.length) { tip.style.display = "none"; return; }
+  const { item, kind } = under[under.length - 1];
+  const lines = [`<strong>${escape(item.id)}</strong> <span class="muted">${kind}</span>`];
+  for (const key of ["ifcClass", "type", "kind", "name", "tag", "text", "axis", "value", "unit",
+                     "ifcGuid", "provenance", "confidence", "elevation"]) {
+    if (item[key] != null && item[key] !== "") lines.push(`${key}: ${escape(item[key])}`);
+  }
+  tip.innerHTML = lines.join("<br>");
+  tip.style.display = "block";
+  tip.style.left = `${Math.min(event.clientX + 14, innerWidth - 340)}px`;
+  tip.style.top = `${event.clientY + 14}px`;
+});
+el("overlay").addEventListener("mouseleave", () => { el("tip").style.display = "none"; });
+
+el("copy").onclick = async () => {
+  const label = state.labels.get(state.page);
+  if (!label) return;
+  await navigator.clipboard.writeText(JSON.stringify(label, null, 2));
+  el("copy").textContent = "Copied";
+  setTimeout(() => (el("copy").textContent = "Copy JSON"), 1200);
+};
+
+el("csv").onclick = () => {
+  const label = state.labels.get(state.page);
+  if (!label) return;
+  const cell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const rows = [["kind", "id", "class_or_type", "name_or_text", "tag", "ifcGuid",
+                 "provenance", "confidence", "x0", "y0", "x1", "y1"].join(",")];
+  const add = (kind, items, classOf, nameOf) => {
+    for (const item of items || []) {
+      rows.push([kind, item.id, classOf(item), nameOf(item), item.tag, item.ifcGuid,
+                 item.provenance ?? label.provenance, item.confidence,
+                 ...(item.paperBBox || ["", "", "", ""])].map(cell).join(","));
+    }
+  };
+  add("viewport", label.viewports, (i) => i.kind, (i) => i.name);
+  add("element", label.elements, (i) => i.ifcClass, (i) => i.name);
+  add("annotation", label.annotations, (i) => i.type, (i) => i.text);
+  const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+  const link = Object.assign(document.createElement("a"),
+    { href: url, download: `${label.sheet?.id || "planlabel"}-page${state.page}.csv` });
+  link.click();
+  URL.revokeObjectURL(url);
+};
+</script>
+</body>
+</html>

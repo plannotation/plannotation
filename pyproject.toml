@@ -236,7 +236,10 @@ required-imports = ["from __future__ import annotations"]
 # Typer expresses every flag as a boolean parameter, so the boolean-trap rules
 # cannot be satisfied without abandoning the framework. They stay on everywhere
 # else, where they genuinely help for `attach(..., incremental=True)` APIs.
-"planlabel/cli.py" = ["FBT001", "FBT002"]
+# Typer expresses a flag as a boolean parameter, and a link description is a lookup
+# over the five link kinds the format defines -- one return each, which reads better
+# than nesting them five deep.
+"planlabel/cli.py" = ["FBT001", "FBT002", "PLR0911"]
 "planlabel_mcp/planlabel_mcp/server.py" = ["FBT001", "FBT002"]
 "tests/**" = [
   "S101",     # assert is the point

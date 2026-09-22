@@ -62,6 +62,7 @@ from planlabel import __version__
 from planlabel.constants import SCHEMA_VERSION, SPEC_URI
 from planlabel.errors import PlanLabelError, ValidatorError
 from planlabel.model import (
+    Annotation,
     Generator,
     LabelIndex,
     PageLabel,
@@ -800,3 +801,148 @@ def samples_build(
     for path in written:
         console.print(f"[green]built[/green] {path}")
     console.print(f"\n{len(written)} sample set(s) in {out}")
+
+
+@app.command()
+def inspect(
+    source: Annotated[
+        Path,
+        typer.Argument(help="A labelled PDF, a sidecar, or a labels file.", exists=True),
+    ],
+    page: Annotated[
+        int | None,
+        typer.Option("--page", help="Show one page by its zero-based index."),
+    ] = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit the labels as JSON instead of a table.")
+    ] = False,
+) -> None:
+    """Show what a labelled document says, as a table.
+
+    The same information the single-file inspector draws over the page, for a terminal
+    and for a pipe. Where the browser shows where things are, this shows what they are.
+
+    Raises:
+        typer.Exit: With 2 when the document cannot be read.
+    """
+    # Read leniently, so that one unreadable label among several does not hide the
+    # rest (SPEC 4.3 (2)). But a document that yields nothing at all may be a document
+    # with no labels or one this reader could not parse, and those are different
+    # answers: the strict read is what tells them apart.
+    try:
+        found = embed.read(source, strict=False)
+        if not found.pages:
+            embed.read(source, strict=True)
+    except PlanLabelError as exc:
+        errors.print(f"[bold red]error[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+
+    pages = dict(sorted(found.pages.items()))
+    if page is not None:
+        pages = {index: label for index, label in pages.items() if index == page}
+        if not pages:
+            errors.print(f"[bold red]error[/bold red] page {page} carries no label")
+            raise typer.Exit(2)
+
+    if json_output:
+        _echo_json(
+            {
+                "source": str(source),
+                "pages": {
+                    str(index): json.loads(canonical_json(label)) for index, label in pages.items()
+                },
+            }
+        )
+        return
+
+    if not pages:
+        console.print("[yellow]no PlanLabel labels found[/yellow]")
+        return
+
+    for index, label in pages.items():
+        _print_page(index, label)
+
+
+def _print_page(index: int, label: PageLabel) -> None:
+    """Print one page label as a set of tables.
+
+    Args:
+        index: The zero-based page index.
+        label: The label to print.
+    """
+    sheet = label.sheet
+    scale = f"1:{sheet.scale:.0f}" if sheet.scale else "—"
+    console.print(
+        f"\n[bold]page {index}[/bold]  "
+        f"[cyan]{sheet.sheet_id}[/cyan] {sheet.title or ''}  "
+        f"[dim]{scale} - {label.page.width_mm:g} x {label.page.height_mm:g} mm - "
+        f"{conformance_level(label).value} - {label.provenance.value}[/dim]"
+    )
+    for title, rows, columns in (
+        (
+            "viewports",
+            [
+                (vp.local_id, vp.kind, f"1:{vp.scale:.0f}" if vp.scale else "—", vp.name or "")
+                for vp in label.viewports or []
+            ],
+            ("id", "kind", "scale", "name"),
+        ),
+        (
+            "elements",
+            [
+                (el.local_id, el.ifc_class, el.tag or "", el.name or "", el.ifc_guid or "")
+                for el in label.elements or []
+            ],
+            ("id", "ifcClass", "tag", "name", "GlobalId"),
+        ),
+        (
+            "annotations",
+            [
+                (
+                    an.local_id,
+                    an.annotation_type,
+                    an.text or "",
+                    _link_of(an),
+                )
+                for an in label.annotations or []
+            ],
+            ("id", "type", "text", "links to"),
+        ),
+    ):
+        if not rows:
+            continue
+        table = Table(
+            title=title, title_justify="left", title_style="bold dim", box=None, pad_edge=False
+        )
+        for column in columns:
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            table.add_row(*row)
+        console.print(table)
+
+
+def _link_of(annotation: Annotation) -> str:
+    """Describe what an annotation points at, in one phrase.
+
+    Args:
+        annotation: The annotation.
+
+    Returns:
+        A short description of its link, or an empty string when it has none.
+    """
+    if annotation.measures:
+        return "measures " + ", ".join(annotation.measures)
+    if annotation.shows and annotation.shows.element:
+        suffix = f".{annotation.shows.property_name}" if annotation.shows.property_name else ""
+        return f"shows {annotation.shows.element}{suffix}"
+    if annotation.target:
+        target = annotation.target
+        if target.sheet_id:
+            return f"sheet {target.sheet_id}"
+        if target.pdf_page is not None:
+            return f"page {target.pdf_page}"
+    if annotation.axis:
+        return f"axis {annotation.axis}"
+    if annotation.ifc_guid:
+        return f"guid {annotation.ifc_guid}"
+    return ""
