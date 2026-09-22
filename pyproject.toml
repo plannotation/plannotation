@@ -242,6 +242,7 @@ required-imports = ["from __future__ import annotations"]
   "S101",     # assert is the point
   "PLR2004",  # magic values are fine in expectations
   "SLF001",   # tests may reach into private members
+  "PLC0415",  # a test for an optional extra must import it inside the test
 ]
 "tools/**" = ["INP001", "T201"]  # standalone maintenance scripts, not a package
 "bench/**" = ["T201"]
