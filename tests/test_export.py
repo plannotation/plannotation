@@ -451,3 +451,145 @@ class TestTheSampleModel:
         lengths = sorted(round(max(pair), 3) for pair in measured)
         assert thicknesses == [0.24, 0.24, 0.24, 0.24]
         assert lengths == [6.0, 6.0, 8.0, 8.0]
+
+
+@needs_ifc
+@needs_cairo
+class TestTheSampleSets:
+    """Design brief section 9: three sets, reproducible, and every one L3 and clean.
+
+    These are slow -- three models built, drawn, converted and labelled -- and they are
+    the only tests that exercise the whole chain at once. Everything later in the
+    project points at them: the inspector renders them, the MCP server serves them, the
+    inference pass is measured against them stripped, and the benchmark asks questions
+    whose answers came from the models.
+    """
+
+    @staticmethod
+    def _build(root: Path) -> list[Path]:
+        """Build every sample set into a directory.
+
+        Args:
+            root: Where to build them.
+
+        Returns:
+            The labelled PDFs.
+        """
+        from planlabel.export.samples import build_samples
+
+        return build_samples(root, mod_date=datetime(2024, 1, 1, tzinfo=UTC), version="0.0.0-test")
+
+    def test_three_sets_are_built(self, tmp_path: Path) -> None:
+        """A floor plan, a position plan and a section."""
+        assert len(self._build(tmp_path)) == 3
+
+    def test_each_set_has_every_file(self, tmp_path: Path) -> None:
+        """A sample without its model or its ground truth is not a sample."""
+        self._build(tmp_path)
+        for name in ("floorplan", "positionsplan", "section"):
+            present = {path.name for path in (tmp_path / name).iterdir()}
+            assert present == {
+                "model.ifc",
+                "sheet.svg",
+                "sheet.pdf",
+                "sheet.labelled.pdf",
+                "labels.json",
+                "groundtruth.jsonl",
+            }
+
+    def test_every_sample_validates_with_no_findings(self, tmp_path: Path) -> None:
+        """The exporter's output must satisfy the validator this project ships.
+
+        Not merely "no errors": no warnings either. A sample is what a reader learns
+        the format from, and a warning in it teaches that warnings are normal.
+        """
+        from planlabel.validate import validate
+
+        for labelled in self._build(tmp_path):
+            report = validate(labelled)
+            assert list(report.findings) == [], (
+                f"{labelled.parent.name}: {[f.code for f in report.findings]}"
+            )
+
+    def test_every_sample_reaches_l3(self, tmp_path: Path) -> None:
+        """Section 9's gate. L3 needs elements and a linked annotation on every sheet."""
+        from planlabel.validate import validate
+
+        for labelled in self._build(tmp_path):
+            assert [page.level.value for page in validate(labelled).pages] == ["L3"]
+
+    def test_a_rebuild_is_byte_identical(self, tmp_path: Path) -> None:
+        """Section 9: reproducible. Every file, not just the deterministic-looking ones.
+
+        The IFC writer alone defeated this twice -- once with a wall-clock stamp in the
+        header, once with IFC set attributes whose member order varied per run.
+        """
+        first, second = tmp_path / "one", tmp_path / "two"
+        self._build(first)
+        self._build(second)
+        for path in sorted(first.rglob("*")):
+            if path.is_file():
+                twin = second / path.relative_to(first)
+                assert path.read_bytes() == twin.read_bytes(), f"{path.name} differs"
+
+    def test_the_labelled_pdf_looks_the_same_as_the_plain_one(self, tmp_path: Path) -> None:
+        """The project's central claim, on the project's own drawings."""
+        from planlabel.pdf.render import assert_same_appearance
+
+        self._build(tmp_path)
+        for name in ("floorplan", "positionsplan", "section"):
+            assert_same_appearance(
+                tmp_path / name / "sheet.pdf", tmp_path / name / "sheet.labelled.pdf"
+            )
+
+    def test_the_ground_truth_answers_come_from_the_model(self, tmp_path: Path) -> None:
+        """Every question has an answer, and the wall count is the model's wall count."""
+        import json as json_module
+
+        self._build(tmp_path)
+        lines = (tmp_path / "groundtruth.jsonl").read_text("utf-8").splitlines()
+        questions = [json_module.loads(line) for line in lines]
+        assert questions
+        assert all(q["answer"] is not None for q in questions)
+        assert {q["category"] for q in questions} >= {"count", "dimension", "callout", "grid"}
+
+    def test_the_callouts_form_a_cycle(self, tmp_path: Path) -> None:
+        """Each sheet points at the next, so the set is one document and not three.
+
+        It also gives the validator's cross-sheet reference rules something real to
+        resolve, and the benchmark a question whose answer is on another drawing.
+        """
+        import json as json_module
+
+        self._build(tmp_path)
+        targets = {}
+        for name in ("floorplan", "positionsplan", "section"):
+            label = json_module.loads((tmp_path / name / "labels.json").read_text("utf-8"))
+            callout = next(a for a in label["annotations"] if a["type"] == "callout")
+            targets[label["sheet"]["id"]] = callout["target"]["sheetId"]
+        assert targets == {"ARC-101": "TWP-201", "TWP-201": "ARC-301", "ARC-301": "ARC-101"}
+
+    def test_building_one_set_by_name_builds_only_it(self, tmp_path: Path) -> None:
+        """So that iterating on one drawing does not cost the other two."""
+        from planlabel.export.samples import build_samples
+
+        written = build_samples(
+            tmp_path,
+            mod_date=datetime(2024, 1, 1, tzinfo=UTC),
+            version="0.0.0-test",
+            only="section",
+        )
+        assert len(written) == 1
+        assert not (tmp_path / "floorplan").exists()
+
+    def test_an_unknown_sample_name_is_refused(self, tmp_path: Path) -> None:
+        """And says which names there are."""
+        from planlabel.export.samples import build_samples
+
+        with pytest.raises(KeyError, match="floorplan"):
+            build_samples(
+                tmp_path,
+                mod_date=datetime(2024, 1, 1, tzinfo=UTC),
+                version="0.0.0-test",
+                only="nonesuch",
+            )

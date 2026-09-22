@@ -28,6 +28,17 @@ from planlabel.errors import MissingExtraError
 if TYPE_CHECKING:
     from pathlib import Path
 
+#: Attributes IFC declares as sets, whose order therefore carries no meaning and
+#: varies between runs. Each is sorted before a model is written.
+_UNORDERED_SETS: tuple[tuple[str, str], ...] = (
+    ("IfcUnitAssignment", "Units"),
+    ("IfcRelContainedInSpatialStructure", "RelatedElements"),
+    ("IfcRelAggregates", "RelatedObjects"),
+    ("IfcRelAssociatesMaterial", "RelatedObjects"),
+    ("IfcRelDefinesByProperties", "RelatedObjects"),
+    ("IfcRelDefinesByType", "RelatedObjects"),
+)
+
 #: The IFC base64 alphabet, in the order the standard defines it.
 _GUID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$"
 
@@ -102,6 +113,26 @@ def reseed_guids(model: Any, seed: str) -> None:  # noqa: ANN401 - ifcopenshell 
 FIXED_TIMESTAMP = "2024-01-01T00:00:00"
 
 
+def normalise(model: Any) -> None:  # noqa: ANN401 - ifcopenshell is untyped here
+    """Put a model's unordered collections into a stable order.
+
+    Several IFC attributes are declared as sets, and the API builds them from Python
+    sets, so their order varies between runs and two otherwise identical models differ
+    by a handful of bytes. The order carries no meaning -- a set of units is a set, and
+    so is the list of products a storey contains -- so sorting them changes nothing
+    about the model, and it is what lets every label, drawing and answer derived from
+    the model be reproducible too.
+
+    Args:
+        model: The ``ifcopenshell.file`` to normalise in place.
+    """
+    for entity_type, attribute in _UNORDERED_SETS:
+        for entity in model.by_type(entity_type):
+            members = getattr(entity, attribute, None)
+            if members:
+                setattr(entity, attribute, tuple(sorted(members, key=lambda item: item.id())))
+
+
 def write_model(model: Any, out: Path) -> Path:  # noqa: ANN401 - ifcopenshell is untyped here
     """Write a model with a fixed header timestamp.
 
@@ -117,6 +148,7 @@ def write_model(model: Any, out: Path) -> Path:  # noqa: ANN401 - ifcopenshell i
     Returns:
         The path written.
     """
+    normalise(model)
     model.write(str(out))
     text = out.read_text(encoding="utf-8")
     start = text.find("FILE_NAME(")
@@ -243,3 +275,178 @@ def _placed(numpy: Any, x: float, y: float, degrees: float) -> Any:  # noqa: ANN
     matrix[1, 0], matrix[1, 1] = sin, cos
     matrix[0, 3], matrix[1, 3] = x, y
     return matrix
+
+
+def build_positionsplan(out: Path, *, seed: str = "positionsplan") -> BuiltModel:
+    """Build a structural position plan: a grid of columns carrying beams.
+
+    A *Positionsplan* numbers every structural member so that the schedule and the
+    drawing can refer to the same thing. That is what makes it the interesting sample
+    for tags: every element has a mark, and the mark is a property of the model rather
+    than a caption on a picture.
+
+    Args:
+        out: Where to write the IFC file.
+        seed: The seed for the GlobalId sequence.
+
+    Returns:
+        The model, and what a drawing of it needs to know.
+
+    Raises:
+        MissingExtraError: If ifcopenshell is not installed.
+    """
+    return _structure(out, seed)
+
+
+def build_section(out: Path, *, seed: str = "section") -> BuiltModel:
+    """Build a two-storey model, for a drawing that carries levels.
+
+    Args:
+        out: Where to write the IFC file.
+        seed: The seed for the GlobalId sequence.
+
+    Returns:
+        The model, and what a drawing of it needs to know.
+
+    Raises:
+        MissingExtraError: If ifcopenshell is not installed.
+    """
+    return _two_storeys(out, seed)
+
+
+def _setup(model: Any, name: str) -> tuple[Any, Any]:  # noqa: ANN401 - ifcopenshell is untyped
+    """Create the project, units, contexts and spatial tree a model needs.
+
+    Args:
+        model: The ``ifcopenshell.file`` to populate.
+        name: The project name.
+
+    Returns:
+        The body context and the ground-floor storey.
+    """
+    api_root = _require("ifcopenshell.api.root")
+    api_unit = _require("ifcopenshell.api.unit")
+    api_context = _require("ifcopenshell.api.context")
+    api_geometry = _require("ifcopenshell.api.geometry")
+    api_aggregate = _require("ifcopenshell.api.aggregate")
+    numpy = _require("numpy")
+
+    project = api_root.create_entity(model, ifc_class="IfcProject", name=name)
+    api_unit.assign_unit(model)
+    parent = api_context.add_context(model, context_type="Model")
+    body = api_context.add_context(
+        model,
+        context_type="Model",
+        context_identifier="Body",
+        target_view="MODEL_VIEW",
+        parent=parent,
+    )
+    site = api_root.create_entity(model, ifc_class="IfcSite", name="Grundstück")
+    building = api_root.create_entity(model, ifc_class="IfcBuilding", name="Haus A")
+    storey = api_root.create_entity(model, ifc_class="IfcBuildingStorey", name="Erdgeschoss")
+    for child, holder in ((site, project), (building, site), (storey, building)):
+        api_aggregate.assign_object(model, products=[child], relating_object=holder)
+    api_geometry.edit_object_placement(model, product=storey, matrix=numpy.eye(4), is_si=True)
+    return body, storey
+
+
+def _structure(out: Path, seed: str) -> BuiltModel:
+    """Build the position-plan model.
+
+    Args:
+        out: Where to write the IFC file.
+        seed: The GlobalId seed.
+
+    Returns:
+        The built model.
+    """
+    ifcopenshell = _require("ifcopenshell")
+    api_root = _require("ifcopenshell.api.root")
+    api_geometry = _require("ifcopenshell.api.geometry")
+    api_spatial = _require("ifcopenshell.api.spatial")
+    numpy = _require("numpy")
+
+    model = ifcopenshell.file(schema="IFC4")
+    body, storey = _setup(model, "Wohnanlage Lindenhof")
+
+    # Four columns on a 5.70 by 4.80 metre grid, with beams spanning between them.
+    for index, (x, y) in enumerate(((0.0, 0.0), (5.7, 0.0), (0.0, 4.8), (5.7, 4.8))):
+        column = api_root.create_entity(
+            model, ifc_class="IfcColumn", name=f"Stütze St-{index + 1:02d}"
+        )
+        shape = api_geometry.add_wall_representation(
+            model, context=body, length=0.3, height=3.0, thickness=0.3
+        )
+        api_geometry.assign_representation(model, product=column, representation=shape)
+        api_geometry.edit_object_placement(
+            model, product=column, matrix=_placed(numpy, x, y, 0.0), is_si=True
+        )
+        api_spatial.assign_container(model, products=[column], relating_structure=storey)
+
+    for index, (x, y, length, rotation) in enumerate(((0.0, 0.0, 5.7, 0.0), (0.0, 4.8, 5.7, 0.0))):
+        beam = api_root.create_entity(model, ifc_class="IfcBeam", name=f"Unterzug UZ-{index + 1}")
+        shape = api_geometry.add_wall_representation(
+            model, context=body, length=length, height=0.5, thickness=0.3
+        )
+        api_geometry.assign_representation(model, product=beam, representation=shape)
+        api_geometry.edit_object_placement(
+            model, product=beam, matrix=_placed(numpy, x, y, rotation), is_si=True
+        )
+        api_spatial.assign_container(model, products=[beam], relating_structure=storey)
+
+    reseed_guids(model, seed)
+    write_model(model, out)
+    # Cut low, at 400 mm. The beams here are ground beams spanning between the column
+    # bases, so a plan cut at the usual 1.2 m would pass above them and the drawing
+    # would show four columns with nothing to carry -- a Positionsplan that numbers
+    # half of its members.
+    return BuiltModel(path=out, seed=seed, storey_elevation=0.0, cut_height=0.4, length_unit="m")
+
+
+def _two_storeys(out: Path, seed: str) -> BuiltModel:
+    """Build the two-storey model a section is drawn from.
+
+    Args:
+        out: Where to write the IFC file.
+        seed: The GlobalId seed.
+
+    Returns:
+        The built model.
+    """
+    ifcopenshell = _require("ifcopenshell")
+    api_root = _require("ifcopenshell.api.root")
+    api_geometry = _require("ifcopenshell.api.geometry")
+    api_spatial = _require("ifcopenshell.api.spatial")
+    api_aggregate = _require("ifcopenshell.api.aggregate")
+    numpy = _require("numpy")
+
+    model = ifcopenshell.file(schema="IFC4")
+    body, ground = _setup(model, "Wohnanlage Lindenhof")
+    building = model.by_type("IfcBuilding")[0]
+    upper = api_root.create_entity(model, ifc_class="IfcBuildingStorey", name="1. Obergeschoss")
+    api_aggregate.assign_object(model, products=[upper], relating_object=building)
+    upper_matrix = numpy.eye(4)
+    upper_matrix[2, 3] = 3.35
+    api_geometry.edit_object_placement(model, product=upper, matrix=upper_matrix, is_si=True)
+
+    for storey, elevation in ((ground, 0.0), (upper, 3.35)):
+        for index, (name, length, position, rotation) in enumerate(
+            (
+                ("Außenwand Süd", 7.2, (0.0, 0.0), 0.0),
+                ("Außenwand Nord", 7.2, (7.2, 5.4), 180.0),
+            )
+        ):
+            wall = api_root.create_entity(model, ifc_class="IfcWall", name=f"{name} {storey.Name}")
+            shape = api_geometry.add_wall_representation(
+                model, context=body, length=length, height=3.0, thickness=0.365
+            )
+            api_geometry.assign_representation(model, product=wall, representation=shape)
+            matrix = _placed(numpy, position[0], position[1], rotation)
+            matrix[2, 3] = elevation
+            api_geometry.edit_object_placement(model, product=wall, matrix=matrix, is_si=True)
+            api_spatial.assign_container(model, products=[wall], relating_structure=storey)
+            del index
+
+    reseed_guids(model, seed)
+    write_model(model, out)
+    return BuiltModel(path=out, seed=seed, storey_elevation=0.0, cut_height=1.2, length_unit="m")

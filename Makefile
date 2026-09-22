@@ -35,8 +35,8 @@ endif
 not_yet = @printf '\nmake %s is not implemented yet: it arrives in Phase %s.\nSee the design brief, section %s.\n\n' '$(1)' '$(2)' '$(3)' >&2; exit 2
 
 .PHONY: help install lock sync fmt fmt-check lint typecheck test fixtures check \
-        cov licenses samples bench docs inspector hooks precommit build clean \
-        distclean version
+        cov licenses samples samples-check bench docs inspector hooks precommit \
+        build clean distclean version
 
 help: ## Show this help
 	@printf 'PlanLabel targets:\n\n'
@@ -93,12 +93,17 @@ cov: ## Tests with the two coverage thresholds of the design brief section 15
 licenses: ## Audit dependency licences against the policy; rewrite THIRD_PARTY_LICENSES.md
 	$(RUN) python tools/audit_licenses.py --write THIRD_PARTY_LICENSES.md
 
-samples: ## Build the three reference sample sets (Phase 4)
-	@if [ -f $(PKG)/export/ifc_svg_pdf.py ] && grep -q 'def build' $(PKG)/export/ifc_svg_pdf.py 2>/dev/null; then \
-	  $(RUN) planlabel samples build --out $(SAMPLES_DIR); \
-	else \
-	  printf '\nmake samples is not implemented yet: it arrives in Phase 4.\nSee the design brief, section 9.\nIt needs the svg and ifc extras: make install\n\n' >&2; exit 2; \
-	fi
+# Needs the svg and ifc extras, which `make install` provides. The output is
+# reproducible: rebuilding writes byte-identical files.
+samples: ## Build the three reference sample sets
+	$(RUN) planlabel samples build --out $(SAMPLES_DIR)
+
+samples-check: samples ## Build the samples and validate every one of them
+	@for name in floorplan positionsplan section; do \
+	  printf '%-16s' "$$name"; \
+	  $(RUN) planlabel validate $(SAMPLES_DIR)/$$name/sheet.labelled.pdf >/dev/null \
+	    && echo "valid" || exit 1; \
+	done
 
 bench: ## Run the labelled-vs-plain benchmark (Phase 8)
 	@if [ -f bench/runner.py ]; then \

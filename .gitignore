@@ -81,15 +81,11 @@ docs/_build/
 site/
 _site/
 
-# Generated sample sets. `make samples` rebuilds these, and the PDFs and IFCs
-# exceed the 200 kB limit on committed binaries. Uncomment in Phase 4 if the
-# decision is not to commit them; samples/README.md stays either way.
-# samples/*/model.ifc
-# samples/*/sheet.svg
-# samples/*/sheet.pdf
-# samples/*/sheet.labelled.pdf
-# samples/*/labels.json
-# samples/*/groundtruth.jsonl
+# Generated sample sets. `make samples` rebuilds them byte-identically from the
+# models, so committing them would only let the drawings drift from the code that
+# draws them. samples/README.md is written by hand and stays.
+samples/*/
+samples/groundtruth.jsonl
 
 # ------------------------------------------------------------------ misc ----
 *.log

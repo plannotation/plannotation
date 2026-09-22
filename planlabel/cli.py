@@ -50,7 +50,7 @@ import logging
 import os
 from datetime import UTC, datetime
 from enum import StrEnum
-from pathlib import Path  # noqa: TC003 - typer resolves annotations at run time
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Final
 
 import typer
@@ -735,3 +735,68 @@ def validate(
 
 if __name__ == "__main__":  # pragma: no cover
     app()
+
+
+samples_app = typer.Typer(
+    name="samples",
+    help="Build the reference sample drawings from their IFC models.",
+    no_args_is_help=True,
+)
+app.add_typer(samples_app)
+
+
+@samples_app.command("build")
+def samples_build(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Directory to write the sample sets into."),
+    ] = Path("samples"),
+    only: Annotated[
+        str | None,
+        typer.Option("--only", help="Build one set by name instead of all three."),
+    ] = None,
+    mod_date: Annotated[
+        str,
+        typer.Option(
+            "--mod-date",
+            help=(
+                "The timestamp to stamp into everything written, ISO 8601. Fixed by "
+                "default so that two builds produce the same bytes."
+            ),
+        ),
+    ] = "2024-01-01T00:00:00+00:00",
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Report what was written as JSON.")
+    ] = False,
+) -> None:
+    """Build the sample drawings: model, sheet, PDF, labels and ground truth.
+
+    Each set is written from its IFC model every time, so the drawings cannot drift
+    from the code that makes them. The output is reproducible: rebuild it tomorrow and
+    the bytes are the same.
+
+    Raises:
+        typer.Exit: With 2 when a sample cannot be built, which includes the optional
+            extras being absent.
+    """
+    # Imported here: the exporter needs the ifc and svg extras, and importing it
+    # at module scope would make every other command depend on them too.
+    from planlabel.export.samples import build_samples  # noqa: PLC0415
+
+    try:
+        written = build_samples(
+            out,
+            mod_date=datetime.fromisoformat(mod_date),
+            version=__version__,
+            only=only,
+        )
+    except (KeyError, PlanLabelError, ValueError) as exc:
+        errors.print(f"[bold red]error[/bold red] {str(exc).strip(chr(39))}")
+        raise typer.Exit(2) from exc
+
+    if json_output:
+        console.print_json(data={"written": [str(path) for path in written], "out": str(out)})
+        return
+    for path in written:
+        console.print(f"[green]built[/green] {path}")
+    console.print(f"\n{len(written)} sample set(s) in {out}")
