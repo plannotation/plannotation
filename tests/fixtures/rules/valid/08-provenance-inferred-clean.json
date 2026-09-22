@@ -1,0 +1,140 @@
+{
+  "annotations": [
+    {
+      "confidence": 0.52,
+      "geometry": [
+        [
+          44,
+          50
+        ],
+        [
+          124,
+          50
+        ]
+      ],
+      "id": "a-dim-1",
+      "measures": [
+        "e-wall-2",
+        "e-door-3"
+      ],
+      "paperBBox": [
+        36,
+        42,
+        132,
+        58
+      ],
+      "provenance": "inferred",
+      "text": "8,00",
+      "type": "dimension",
+      "unit": "m",
+      "value": 8,
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.37,
+      "id": "a-tag-1",
+      "paperBBox": [
+        116,
+        70,
+        132,
+        82
+      ],
+      "provenance": "inferred",
+      "shows": {
+        "element": "e-door-3"
+      },
+      "text": "T 3",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.3,
+      "id": "a-txt-1",
+      "paperBBox": [
+        300,
+        20,
+        400,
+        32
+      ],
+      "provenance": "inferred",
+      "text": "Bestand M 1:100",
+      "type": "text"
+    }
+  ],
+  "elements": [
+    {
+      "confidence": 0.68,
+      "id": "e-wall-1",
+      "ifcClass": "IfcWall",
+      "paperBBox": [
+        40,
+        60,
+        380,
+        64
+      ],
+      "provenance": "inferred",
+      "representation": "cut",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.64,
+      "id": "e-wall-2",
+      "ifcClass": "IfcWall",
+      "paperBBox": [
+        40,
+        60,
+        44,
+        250
+      ],
+      "provenance": "inferred",
+      "representation": "cut",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.41,
+      "id": "e-door-3",
+      "ifcClass": "IfcDoor",
+      "paperBBox": [
+        118,
+        60,
+        130,
+        64
+      ],
+      "provenance": "inferred",
+      "representation": "cut",
+      "viewport": "vp-plan"
+    }
+  ],
+  "generator": {
+    "created": "2026-06-03T14:48:00Z",
+    "name": "planlabel-infer",
+    "version": "0.1.0"
+  },
+  "page": {
+    "heightMm": 297,
+    "index": 0,
+    "widthMm": 420
+  },
+  "planlabel": "0.1",
+  "provenance": "inferred",
+  "sheet": {
+    "discipline": "architecture",
+    "drawingType": "plan",
+    "id": "A-12",
+    "scale": 100,
+    "title": "Erdgeschoß"
+  },
+  "viewports": [
+    {
+      "id": "vp-plan",
+      "kind": "plan",
+      "paperBBox": [
+        20,
+        40,
+        400,
+        270
+      ],
+      "scale": 100
+    }
+  ]
+}

@@ -1,0 +1,323 @@
+{
+  "annotations": [
+    {
+      "axis": "B",
+      "geometry": [
+        [
+          380,
+          190
+        ],
+        [
+          380,
+          450
+        ]
+      ],
+      "id": "g-ax-b",
+      "paperBBox": [
+        374,
+        184,
+        386,
+        456
+      ],
+      "provenance": "authored",
+      "text": "B",
+      "type": "grid",
+      "viewport": "vp-plan"
+    },
+    {
+      "geometry": [
+        [
+          146,
+          180
+        ],
+        [
+          380,
+          180
+        ]
+      ],
+      "id": "a-dim-raum",
+      "measures": [
+        "e-wall-202",
+        "e-col-12"
+      ],
+      "paperBBox": [
+        138,
+        172,
+        388,
+        188
+      ],
+      "provenance": "authored",
+      "text": "11,700",
+      "type": "dimension",
+      "unit": "m",
+      "value": 11.7,
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-tag-t21",
+      "paperBBox": [
+        270,
+        190,
+        294,
+        202
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-door-21",
+        "property": "Tag"
+      },
+      "text": "T-21",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-north",
+      "paperBBox": [
+        600,
+        470,
+        630,
+        510
+      ],
+      "provenance": "authored",
+      "text": "N",
+      "type": "northArrow",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-scale",
+      "paperBBox": [
+        440,
+        150,
+        560,
+        166
+      ],
+      "provenance": "authored",
+      "text": "1:50",
+      "type": "scaleBar",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-rev-c",
+      "paperBBox": [
+        700,
+        540,
+        740,
+        570
+      ],
+      "provenance": "authored",
+      "text": "C",
+      "type": "revisionCloud"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-wall-201",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "1FycQA0xTM5eHBQ43nI$IC",
+      "name": "Außenwand Nord",
+      "paperBBox": [
+        140,
+        434,
+        620,
+        440
+      ],
+      "paperOutlines": [
+        [
+          [
+            140,
+            434
+          ],
+          [
+            620,
+            434
+          ],
+          [
+            620,
+            440
+          ],
+          [
+            140,
+            440
+          ],
+          [
+            140,
+            434
+          ]
+        ]
+      ],
+      "predefinedType": "SOLIDWALL",
+      "properties": {
+        "Pset_WallCommon": {
+          "FireRating": "REI 90",
+          "IsExternal": true,
+          "LoadBearing": true
+        }
+      },
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. W1",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-wall-202",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "39TFhZuOnRdggTADzho25S",
+      "name": "Außenwand West",
+      "paperBBox": [
+        140,
+        200,
+        146,
+        440
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. W2",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-spc-104",
+      "ifcClass": "IfcSpace",
+      "ifcGuid": "14P1GF8jHIt8XxbyhErq3q",
+      "name": "Klassenraum 1.04",
+      "paperBBox": [
+        146,
+        206,
+        380,
+        434
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-door-21",
+      "ifcClass": "IfcDoor",
+      "ifcGuid": "1cz$iZXULJ_Q1FlpU_1Ql8",
+      "name": "Tür 1,01/2,135",
+      "paperBBox": [
+        240,
+        200,
+        260.2,
+        206
+      ],
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "T-21",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-col-12",
+      "ifcClass": "IfcColumn",
+      "ifcGuid": "2KqSiHcuXL889G7leoIwC$",
+      "name": "Stütze St-12",
+      "paperBBox": [
+        377,
+        317,
+        383,
+        323
+      ],
+      "predefinedType": "COLUMN",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. St-12",
+      "viewport": "vp-plan"
+    }
+  ],
+  "generator": {
+    "created": "2026-05-08T16:05:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 3,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "T. Bergmann",
+    "checker": "L. Vogt",
+    "date": "2026-05-08",
+    "discipline": "architecture",
+    "documentId": "NOR-ZZ-01-DR-A-0201",
+    "drawingType": "plan",
+    "id": "ARC-201",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "C",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Grundriss 1. Obergeschoss",
+    "titleBlockBBox": [
+      670,
+      20,
+      831,
+      190
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Grundriss 1. OG",
+      "paperBBox": [
+        40,
+        120,
+        660,
+        560
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -7,
+        -10
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          3.5
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 50,
+      "storey": {
+        "elevation": 3.5,
+        "ifcGuid": "2WHJdc_zLMJgyMUc8MmL$F",
+        "name": "1. OG"
+      }
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        670,
+        20,
+        831,
+        190
+      ]
+    }
+  ]
+}

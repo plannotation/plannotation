@@ -1,0 +1,231 @@
+{
+  "annotations": [
+    {
+      "axis": "2",
+      "geometry": [
+        [
+          152,
+          80
+        ],
+        [
+          152,
+          300
+        ]
+      ],
+      "id": "g-ax-2",
+      "paperBBox": [
+        146,
+        74,
+        158,
+        306
+      ],
+      "provenance": "authored",
+      "text": "2",
+      "type": "grid",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.6,
+      "geometry": [
+        [
+          52,
+          310
+        ],
+        [
+          152,
+          310
+        ]
+      ],
+      "id": "a-dim-bestand",
+      "measures": [
+        "e-wall-a2",
+        "e-wall-i3"
+      ],
+      "paperBBox": [
+        44,
+        302,
+        160,
+        318
+      ],
+      "provenance": "inferred",
+      "text": "10,00",
+      "type": "dimension",
+      "unit": "m",
+      "value": 10,
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-north",
+      "paperBBox": [
+        380,
+        340,
+        410,
+        380
+      ],
+      "provenance": "authored",
+      "text": "N",
+      "type": "northArrow",
+      "viewport": "vp-plan"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-wall-a1",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "23PdfF9pbHIuy77$w1QHsH",
+      "name": "Außenwand Nord",
+      "paperBBox": [
+        50,
+        286,
+        350,
+        290
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "W-01",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-wall-a2",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "3M4_G5az5OUfygfOiMHF7o",
+      "name": "Außenwand West",
+      "paperBBox": [
+        50,
+        90,
+        54,
+        290
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "W-02",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.72,
+      "id": "e-wall-i3",
+      "ifcClass": "IfcWall",
+      "name": "Bestandswand, aufgemessen",
+      "paperBBox": [
+        150,
+        90,
+        154,
+        286
+      ],
+      "provenance": "inferred",
+      "representation": "cut",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.55,
+      "id": "e-door-i7",
+      "ifcClass": "IfcDoor",
+      "paperBBox": [
+        150,
+        180,
+        154,
+        190
+      ],
+      "provenance": "mixed",
+      "representation": "cut",
+      "viewport": "vp-plan"
+    }
+  ],
+  "generator": {
+    "created": "2026-02-17T09:25:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 420,
+    "index": 2,
+    "widthMm": 594
+  },
+  "planlabel": "0.1",
+  "provenance": "mixed",
+  "sheet": {
+    "author": "T. Bergmann",
+    "date": "2026-02-17",
+    "discipline": "architecture",
+    "documentId": "NOR-ZZ-00-DR-A-0105",
+    "drawingType": "plan",
+    "id": "ARC-105",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "A",
+    "scale": 100,
+    "status": "Bestandsaufnahme",
+    "title": "Bestandsplan Erdgeschoss",
+    "titleBlockBBox": [
+      440,
+      15,
+      579,
+      145
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Bestand EG",
+      "paperBBox": [
+        30,
+        60,
+        430,
+        390
+      ],
+      "paperToPlane": [
+        0.1,
+        0,
+        0,
+        0.1,
+        -5,
+        -9
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          1.2
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 100,
+      "storey": {
+        "elevation": 0,
+        "ifcGuid": "0z0gDUpkzGB8_pt8cYjXBc",
+        "name": "EG"
+      }
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        440,
+        15,
+        579,
+        145
+      ]
+    }
+  ]
+}

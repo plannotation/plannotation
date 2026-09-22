@@ -1,0 +1,253 @@
+{
+  "annotations": [
+    {
+      "axis": "C",
+      "geometry": [
+        [
+          160,
+          120
+        ],
+        [
+          160,
+          300
+        ]
+      ],
+      "id": "g-ax-c",
+      "paperBBox": [
+        154,
+        114,
+        166,
+        306
+      ],
+      "provenance": "authored",
+      "text": "C",
+      "type": "grid",
+      "viewport": "vp-plan"
+    },
+    {
+      "geometry": [
+        [
+          80,
+          110
+        ],
+        [
+          160,
+          110
+        ]
+      ],
+      "id": "a-dim-feld",
+      "measures": [
+        "e-wall-31",
+        "e-col-21"
+      ],
+      "paperBBox": [
+        72,
+        102,
+        168,
+        118
+      ],
+      "provenance": "authored",
+      "text": "4,000",
+      "type": "dimension",
+      "unit": "m",
+      "value": 4,
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-tag-uz31",
+      "paperBBox": [
+        200,
+        216,
+        254,
+        228
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-beam-31",
+        "property": "Tag"
+      },
+      "text": "Pos. UZ-31",
+      "type": "tag",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-note-beton",
+      "paperBBox": [
+        440,
+        155,
+        579,
+        175
+      ],
+      "provenance": "authored",
+      "text": "Beton C30/37, Expositionsklasse XC1, Betondeckung c_nom = 30 mm",
+      "type": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-slab-11",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "1wfUKFwVXP_xNNb1Hym$4o",
+      "name": "Decke über 1. OG",
+      "paperBBox": [
+        80,
+        130,
+        360,
+        290
+      ],
+      "predefinedType": "FLOOR",
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. D2",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-beam-31",
+      "ifcClass": "IfcBeam",
+      "ifcGuid": "3bkVkN8GnIth6An$2MWVK8",
+      "name": "Unterzug UZ-31",
+      "paperBBox": [
+        80,
+        206,
+        360,
+        214
+      ],
+      "predefinedType": "BEAM",
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. UZ-31",
+      "viewport": "vp-plan"
+    },
+    {
+      "confidence": 0.78,
+      "id": "e-col-21",
+      "ifcClass": "IfcColumn",
+      "ifcGuid": "3nMRsN9hDMNQPzhJMDcRPm",
+      "name": "Stütze St-21",
+      "paperBBox": [
+        157,
+        207,
+        163,
+        213
+      ],
+      "predefinedType": "COLUMN",
+      "provenance": "inferred",
+      "representation": "cut",
+      "tag": "Pos. St-21",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-wall-31",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "3NltvoiUDGuuGOM8lYK7Nm",
+      "name": "Außenwand West",
+      "paperBBox": [
+        80,
+        130,
+        86,
+        290
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. W-31",
+      "viewport": "vp-plan"
+    }
+  ],
+  "generator": {
+    "created": "2026-05-19T10:02:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 420,
+    "index": 8,
+    "widthMm": 594
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "K. Brandt",
+    "checker": "M. Hoffmann",
+    "date": "2026-05-19",
+    "discipline": "structure",
+    "documentId": "NOR-ZZ-02-DR-S-0205",
+    "drawingType": "schalplan",
+    "id": "TWP-205",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "A",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Schalplan Decke über 1. OG",
+    "titleBlockBBox": [
+      440,
+      15,
+      579,
+      145
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Decke über 1. OG",
+      "paperBBox": [
+        30,
+        90,
+        430,
+        390
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -4,
+        -6.5
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          8.2
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 50,
+      "storey": {
+        "elevation": 7,
+        "ifcGuid": "3t1Ui69$nMTRsn_cNqEbIm",
+        "name": "2. OG"
+      }
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        440,
+        15,
+        579,
+        145
+      ]
+    }
+  ]
+}

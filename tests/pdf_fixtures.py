@@ -59,6 +59,7 @@ from planlabel.model import (
     Annotation,
     Element,
     Generator,
+    Model,
     Page,
     PageLabel,
     Plane,
@@ -1553,6 +1554,11 @@ def page_label(
         planlabel="0.1",
         generator=_GENERATOR,
         provenance=Provenance.AUTHORED,
+        # The viewport carries a paperToPlane, and SPEC 3.5 requires a label that does
+        # so to declare the unit its output is in: without it a derived number is not
+        # a length. The validator reports the omission as PL-GEO-013, which is how
+        # this was noticed.
+        model=Model(lengthUnit="mm"),
         page=Page(index=page_index, widthMm=width_mm, heightMm=height_mm, rotation=rotation),
         sheet=Sheet(
             id=sheet_id,

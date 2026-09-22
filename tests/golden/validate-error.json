@@ -1,0 +1,47 @@
+{
+  "carrier": "labels",
+  "counts": {
+    "error": 1,
+    "finding": 1,
+    "warning": 0
+  },
+  "exitCode": 1,
+  "findings": [
+    {
+      "code": "PL-GEO-002",
+      "message": "element 'e-col-12': bbox [383.0, 317.0, 377.0, 323.0] is not ordered x0 <= x1, y0 <= y1; a bbox is [x0, y0, x1, y1] with the lower-left corner first",
+      "path": "/elements/4/paperBBox",
+      "reference": "SPEC 3.4",
+      "rule": "every bbox is ordered x0 <= x1, y0 <= y1",
+      "severity": "error",
+      "source": "page 3"
+    }
+  ],
+  "notes": [
+    "the veraPDF pass (PL-PDF-001) was not run: it needs a PDF",
+    "target.pdfPage (PL-REF-006) and the page block against its page (PL-GEO-001) were not checked: there is no document to check them against",
+    "the model cross-check (PL-IFC-001 to PL-IFC-003) was not run; pass --ifc MODEL.ifc to run it"
+  ],
+  "pages": [
+    {
+      "counts": {
+        "annotations": 6,
+        "elements": 5,
+        "viewports": 2
+      },
+      "implemented": true,
+      "level": "L3",
+      "pageIndex": 3,
+      "planlabel": "0.1",
+      "sheetId": "ARC-201"
+    }
+  ],
+  "reportVersion": "1",
+  "source": "tests/fixtures/rules/invalid/13-bbox-reversed.json",
+  "strict": false,
+  "validator": {
+    "name": "planlabel",
+    "schema": "0.1",
+    "version": "0.1.0.dev0"
+  }
+}

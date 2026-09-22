@@ -1,0 +1,443 @@
+{
+  "annotations": [
+    {
+      "axis": "1",
+      "geometry": [
+        [
+          140,
+          188
+        ],
+        [
+          140,
+          420
+        ]
+      ],
+      "id": "g-ax-1",
+      "paperBBox": [
+        134,
+        182,
+        146,
+        426
+      ],
+      "provenance": "authored",
+      "text": "1",
+      "type": "grid",
+      "viewport": "vp-sec"
+    },
+    {
+      "axis": "4",
+      "geometry": [
+        [
+          500,
+          188
+        ],
+        [
+          500,
+          420
+        ]
+      ],
+      "id": "g-ax-4",
+      "paperBBox": [
+        494,
+        182,
+        506,
+        426
+      ],
+      "provenance": "authored",
+      "text": "4",
+      "type": "grid",
+      "viewport": "vp-sec"
+    },
+    {
+      "elevation": 0,
+      "id": "a-lvl-eg",
+      "ifcGuid": "0z0gDUpkzGB8_pt8cYjXBc",
+      "paperBBox": [
+        44,
+        194,
+        104,
+        206
+      ],
+      "provenance": "authored",
+      "text": "EG ±0,00",
+      "type": "level",
+      "unit": "m",
+      "value": 0,
+      "viewport": "vp-sec"
+    },
+    {
+      "elevation": 3.5,
+      "id": "a-lvl-og1",
+      "ifcGuid": "2WHJdc_zLMJgyMUc8MmL$F",
+      "paperBBox": [
+        44,
+        264,
+        104,
+        276
+      ],
+      "provenance": "authored",
+      "text": "1. OG +3,50",
+      "type": "level",
+      "unit": "m",
+      "value": 3.5,
+      "viewport": "vp-sec"
+    },
+    {
+      "geometry": [
+        [
+          120,
+          200
+        ],
+        [
+          120,
+          270
+        ]
+      ],
+      "id": "a-dim-geschoss",
+      "measures": [
+        "a-lvl-eg",
+        "a-lvl-og1"
+      ],
+      "paperBBox": [
+        112,
+        194,
+        128,
+        276
+      ],
+      "provenance": "authored",
+      "text": "3,500",
+      "type": "dimension",
+      "unit": "m",
+      "value": 3.5,
+      "viewport": "vp-sec"
+    },
+    {
+      "geometry": [
+        [
+          140,
+          436
+        ],
+        [
+          500,
+          436
+        ]
+      ],
+      "id": "a-dim-achsen",
+      "measures": [
+        "g-ax-1",
+        "g-ax-4"
+      ],
+      "paperBBox": [
+        132,
+        428,
+        508,
+        444
+      ],
+      "provenance": "authored",
+      "text": "18,000",
+      "type": "dimension",
+      "unit": "m",
+      "value": 18,
+      "viewport": "vp-sec"
+    },
+    {
+      "geometry": [
+        [
+          140,
+          460
+        ],
+        [
+          380,
+          460
+        ]
+      ],
+      "id": "a-dim-wand-stuetze",
+      "measures": [
+        "e-wall-01",
+        "e-col-07"
+      ],
+      "paperBBox": [
+        132,
+        452,
+        388,
+        468
+      ],
+      "provenance": "authored",
+      "text": "12,000",
+      "type": "dimension",
+      "unit": "m",
+      "value": 12,
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "a-tag-w1",
+      "paperBBox": [
+        152,
+        300,
+        200,
+        312
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-wall-01",
+        "property": "Tag"
+      },
+      "text": "Pos. W1",
+      "type": "tag",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "a-tag-brandschutz",
+      "paperBBox": [
+        152,
+        316,
+        200,
+        328
+      ],
+      "provenance": "authored",
+      "shows": {
+        "property": "Pset_WallCommon.FireRating"
+      },
+      "text": "REI 90",
+      "type": "tag",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "a-call-d07",
+      "paperBBox": [
+        540,
+        210,
+        640,
+        226
+      ],
+      "provenance": "authored",
+      "target": {
+        "detail": "D-07",
+        "pdfPage": 9,
+        "sheetId": "ARC-511",
+        "viewportId": "vp-det-1"
+      },
+      "text": "Sockeldetail D-07 siehe ARC-511",
+      "type": "callout",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "a-sec-key",
+      "paperBBox": [
+        690,
+        380,
+        710,
+        400
+      ],
+      "provenance": "authored",
+      "target": {
+        "sheetId": "ARC-301",
+        "viewportId": "vp-sec"
+      },
+      "text": "A",
+      "type": "sectionMark",
+      "viewport": "vp-key"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-slab-00",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "0czkJdlMLSgQc1WrTmQ24q",
+      "name": "Bodenplatte",
+      "paperBBox": [
+        140,
+        194,
+        620,
+        200
+      ],
+      "predefinedType": "BASESLAB",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. D0",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "e-slab-01",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "2ylG2L$SjGJ9PmDQb_kh5g",
+      "name": "Decke über EG",
+      "paperBBox": [
+        140,
+        265.2,
+        620,
+        270
+      ],
+      "predefinedType": "FLOOR",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. D1",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "e-wall-01",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "1VfN7MET1RkuphnEsHeAQS",
+      "name": "Außenwand Achse 1",
+      "paperBBox": [
+        140,
+        200,
+        147.2,
+        410
+      ],
+      "predefinedType": "SOLIDWALL",
+      "properties": {
+        "Pset_WallCommon": {
+          "FireRating": "REI 90",
+          "IsExternal": true,
+          "LoadBearing": true
+        }
+      },
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. W1",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "e-win-14",
+      "ifcClass": "IfcWindow",
+      "ifcGuid": "0Lh0ppVYnKaw20JP6O8UZb",
+      "name": "Fenster 1,26/1,51",
+      "paperBBox": [
+        200,
+        218,
+        225.2,
+        248.2
+      ],
+      "properties": {
+        "Pset_WindowCommon": {
+          "IsExternal": true,
+          "ThermalTransmittance": 0.95
+        }
+      },
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "F-14",
+      "viewport": "vp-sec"
+    },
+    {
+      "id": "e-col-07",
+      "ifcClass": "IfcColumn",
+      "ifcGuid": "2MCuuVjDzG5fU32IJL3okk",
+      "name": "Stütze St-07",
+      "paperBBox": [
+        377,
+        200,
+        383,
+        265.2
+      ],
+      "predefinedType": "COLUMN",
+      "provenance": "authored",
+      "representation": "cut",
+      "tag": "Pos. St-07",
+      "viewport": "vp-sec"
+    }
+  ],
+  "generator": {
+    "created": "2026-05-12T08:41:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 6,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "T. Bergmann",
+    "checker": "L. Vogt",
+    "date": "2026-05-12",
+    "discipline": "architecture",
+    "documentId": "NOR-ZZ-XX-DR-A-0301",
+    "drawingType": "section",
+    "id": "ARC-301",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "B",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Schnitt A-A",
+    "titleBlockBBox": [
+      670,
+      20,
+      831,
+      190
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-sec",
+      "kind": "section",
+      "name": "Schnitt A-A",
+      "paperBBox": [
+        40,
+        120,
+        660,
+        560
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -7,
+        -10
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 50
+    },
+    {
+      "id": "vp-key",
+      "kind": "plan",
+      "name": "Schlüsselplan",
+      "paperBBox": [
+        670,
+        300,
+        831,
+        470
+      ],
+      "scale": 500
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        670,
+        20,
+        831,
+        190
+      ]
+    }
+  ]
+}

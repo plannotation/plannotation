@@ -1,0 +1,97 @@
+{
+  "generator": {
+    "created": "2026-05-04T07:55:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 1,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "T. Bergmann",
+    "date": "2026-05-04",
+    "discipline": "architecture",
+    "documentId": "NOR-ZZ-00-DR-A-0101",
+    "drawingType": "plan",
+    "id": "ARC-101",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "A",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Grundriss Erdgeschoss",
+    "titleBlockBBox": [
+      670,
+      20,
+      831,
+      190
+    ]
+  },
+  "viewports": [
+    {
+      "cutHeight": 1.2,
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Grundriss EG",
+      "paperBBox": [
+        40,
+        120,
+        660,
+        560
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -7,
+        -10
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          1.2
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 50,
+      "storey": {
+        "elevation": 0,
+        "ifcGuid": "0z0gDUpkzGB8_pt8cYjXBc",
+        "name": "EG"
+      }
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        670,
+        20,
+        831,
+        190
+      ]
+    }
+  ]
+}

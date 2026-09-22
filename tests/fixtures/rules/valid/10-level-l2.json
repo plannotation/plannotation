@@ -1,0 +1,217 @@
+{
+  "annotations": [
+    {
+      "id": "a-north",
+      "paperBBox": [
+        600,
+        470,
+        630,
+        510
+      ],
+      "provenance": "authored",
+      "text": "N",
+      "type": "northArrow",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-scale",
+      "paperBBox": [
+        440,
+        150,
+        560,
+        166
+      ],
+      "provenance": "authored",
+      "text": "1:50",
+      "type": "scaleBar",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-hatch-sauber",
+      "paperBBox": [
+        140,
+        180,
+        620,
+        196
+      ],
+      "provenance": "authored",
+      "text": "Sauberkeitsschicht C8/10, d = 50 mm",
+      "type": "hatch",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "a-note-beton",
+      "paperBBox": [
+        670,
+        200,
+        831,
+        240
+      ],
+      "provenance": "authored",
+      "text": "Beton C30/37 XC2, Betonstahl B500B, c_nom = 40 mm",
+      "type": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-slab-00",
+      "ifcClass": "IfcSlab",
+      "ifcGuid": "0czkJdlMLSgQc1WrTmQ24q",
+      "name": "Bodenplatte",
+      "paperBBox": [
+        140,
+        200,
+        620,
+        440
+      ],
+      "predefinedType": "BASESLAB",
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. D0",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-bar-11",
+      "ifcClass": "IfcReinforcingBar",
+      "ifcGuid": "0NvpGbDe1Nh8FNUDrEqLos",
+      "paperBBox": [
+        150,
+        210,
+        610,
+        214
+      ],
+      "predefinedType": "MAIN",
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "Pos. 11",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-bar-12",
+      "ifcClass": "IfcReinforcingBar",
+      "ifcGuid": "3Z96TxXwrPYeZPMNYJDJWD",
+      "paperBBox": [
+        150,
+        226,
+        610,
+        230
+      ],
+      "predefinedType": "MAIN",
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "Pos. 12",
+      "viewport": "vp-plan"
+    },
+    {
+      "id": "e-mesh-21",
+      "ifcClass": "IfcReinforcingMesh",
+      "ifcGuid": "3zcZY9luDI9AlewAqCY6eH",
+      "name": "Q335A",
+      "paperBBox": [
+        150,
+        250,
+        610,
+        430
+      ],
+      "provenance": "authored",
+      "representation": "symbol",
+      "tag": "Pos. 21",
+      "viewport": "vp-plan"
+    }
+  ],
+  "generator": {
+    "created": "2026-05-26T15:12:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 594,
+    "index": 5,
+    "widthMm": 841
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "K. Brandt",
+    "checker": "M. Hoffmann",
+    "date": "2026-05-26",
+    "discipline": "structure",
+    "documentId": "NOR-ZZ-00-DR-S-0301",
+    "drawingType": "bewehrungsplan",
+    "id": "TWP-301",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "A",
+    "scale": 50,
+    "status": "Ausführungsplanung",
+    "title": "Bewehrungsplan Bodenplatte, untere Lage",
+    "titleBlockBBox": [
+      670,
+      20,
+      831,
+      190
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-plan",
+      "kind": "plan",
+      "name": "Bodenplatte",
+      "paperBBox": [
+        40,
+        120,
+        660,
+        560
+      ],
+      "paperToPlane": [
+        0.05,
+        0,
+        0,
+        0.05,
+        -7,
+        -10
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 50,
+      "storey": {
+        "elevation": 0,
+        "ifcGuid": "0z0gDUpkzGB8_pt8cYjXBc",
+        "name": "EG"
+      }
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        670,
+        20,
+        831,
+        190
+      ]
+    }
+  ]
+}

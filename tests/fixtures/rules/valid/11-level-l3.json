@@ -1,0 +1,191 @@
+{
+  "annotations": [
+    {
+      "elevation": 10.5,
+      "id": "a-lvl-attika",
+      "paperBBox": [
+        300,
+        189,
+        370,
+        201
+      ],
+      "provenance": "authored",
+      "text": "OK Attika +10,50",
+      "type": "level",
+      "unit": "m",
+      "value": 10.5,
+      "viewport": "vp-elev"
+    },
+    {
+      "id": "a-tag-f31",
+      "paperBBox": [
+        78,
+        120,
+        102,
+        132
+      ],
+      "provenance": "authored",
+      "shows": {
+        "element": "e-win-31",
+        "property": "Tag"
+      },
+      "text": "F-31",
+      "type": "tag",
+      "viewport": "vp-elev"
+    },
+    {
+      "id": "a-scale",
+      "paperBBox": [
+        440,
+        160,
+        560,
+        176
+      ],
+      "provenance": "authored",
+      "text": "1:100",
+      "type": "scaleBar"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-fac-01",
+      "ifcClass": "IfcWall",
+      "ifcGuid": "1843IbmZrKBhfZgNPCSXxB",
+      "name": "Fassade Nord",
+      "paperBBox": [
+        50,
+        90,
+        290,
+        195
+      ],
+      "predefinedType": "SOLIDWALL",
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. W-N",
+      "viewport": "vp-elev"
+    },
+    {
+      "id": "e-win-31",
+      "ifcClass": "IfcWindow",
+      "ifcGuid": "2Q6ifuPqHMn9MPsSqFampb",
+      "name": "Fenster 1,26/1,51",
+      "paperBBox": [
+        80,
+        100,
+        92.6,
+        115.1
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "F-31",
+      "viewport": "vp-elev"
+    },
+    {
+      "id": "e-roof-01",
+      "ifcClass": "IfcRoof",
+      "ifcGuid": "39xYkSZVbOouPf0tol2nx8",
+      "name": "Flachdach",
+      "paperBBox": [
+        48,
+        195,
+        292,
+        199
+      ],
+      "predefinedType": "FLAT_ROOF",
+      "provenance": "authored",
+      "representation": "projection",
+      "tag": "Pos. DA-01",
+      "viewport": "vp-elev"
+    }
+  ],
+  "generator": {
+    "created": "2026-06-10T09:07:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 420,
+    "index": 10,
+    "widthMm": 594
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "T. Bergmann",
+    "checker": "L. Vogt",
+    "date": "2026-06-10",
+    "discipline": "architecture",
+    "documentId": "NOR-ZZ-XX-DR-A-0402",
+    "drawingType": "elevation",
+    "id": "ARC-402",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "B",
+    "scale": 100,
+    "status": "Ausführungsplanung",
+    "title": "Ansicht Nord",
+    "titleBlockBBox": [
+      420,
+      15,
+      579,
+      145
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-elev",
+      "kind": "elevation",
+      "name": "Ansicht Nord",
+      "paperBBox": [
+        30,
+        60,
+        400,
+        230
+      ],
+      "paperToPlane": [
+        0.1,
+        0,
+        0,
+        0.1,
+        -5,
+        -9
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "xAxis": [
+          -1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          0,
+          1
+        ]
+      },
+      "scale": 100
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        420,
+        15,
+        579,
+        145
+      ]
+    }
+  ]
+}

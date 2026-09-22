@@ -1,0 +1,188 @@
+{
+  "annotations": [
+    {
+      "axis": "N 5 712 400",
+      "geometry": [
+        [
+          0,
+          400
+        ],
+        [
+          1189,
+          400
+        ]
+      ],
+      "id": "g-net-n",
+      "paperBBox": [
+        0,
+        400,
+        1189,
+        400
+      ],
+      "provenance": "authored",
+      "text": "N 5 712 400",
+      "type": "grid",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "a-north",
+      "paperBBox": [
+        1040,
+        700,
+        1080,
+        760
+      ],
+      "provenance": "authored",
+      "text": "N",
+      "type": "northArrow"
+    },
+    {
+      "id": "a-scale",
+      "paperBBox": [
+        1009,
+        190,
+        1169,
+        210
+      ],
+      "provenance": "authored",
+      "text": "1:500",
+      "type": "scaleBar"
+    }
+  ],
+  "elements": [
+    {
+      "id": "e-site-01",
+      "ifcClass": "IfcSite",
+      "ifcGuid": "1$uDqFf7TOmPiV_Q12E8Ux",
+      "name": "Flur 12, Flurstück 341",
+      "paperBBox": [
+        0,
+        0,
+        1189,
+        841
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-bldg-01",
+      "ifcClass": "IfcBuilding",
+      "ifcGuid": "0N3ujny3TN$R_kKbGJuNJv",
+      "name": "Schulzentrum Nordpark",
+      "paperBBox": [
+        300,
+        260,
+        700,
+        520
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-site"
+    },
+    {
+      "id": "e-pav-04",
+      "ifcClass": "IfcPavement",
+      "ifcGuid": "3IqV1SKcHGruZgC9Elu0sY",
+      "name": "Zufahrt Nordstraße",
+      "paperBBox": [
+        120,
+        120,
+        300,
+        320
+      ],
+      "provenance": "authored",
+      "representation": "projection",
+      "viewport": "vp-site"
+    }
+  ],
+  "generator": {
+    "created": "2026-04-02T11:30:00Z",
+    "name": "planlabel",
+    "version": "0.1.0"
+  },
+  "model": {
+    "file": "nordpark-gebaeude.ifc",
+    "lengthUnit": "m",
+    "schema": "IFC4",
+    "sha256": "b2f0a1d9c6e34b7a8f5d0c1e9a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+  },
+  "page": {
+    "heightMm": 841,
+    "index": 0,
+    "widthMm": 1189
+  },
+  "planlabel": "0.1",
+  "provenance": "authored",
+  "sheet": {
+    "author": "T. Bergmann",
+    "date": "2026-04-02",
+    "discipline": "civil",
+    "documentId": "NOR-ZZ-00-DR-C-0001",
+    "drawingType": "lageplan",
+    "id": "LAG-001",
+    "project": {
+      "name": "Schulzentrum Nordpark",
+      "number": "2025-042"
+    },
+    "revision": "A",
+    "scale": 500,
+    "status": "Genehmigungsplanung",
+    "title": "Lageplan",
+    "titleBlockBBox": [
+      1009,
+      20,
+      1169,
+      180
+    ]
+  },
+  "viewports": [
+    {
+      "id": "vp-site",
+      "kind": "plan",
+      "name": "Lageplan",
+      "paperBBox": [
+        0,
+        0,
+        1189,
+        841
+      ],
+      "paperToPlane": [
+        0.5,
+        0,
+        0,
+        0.5,
+        -100,
+        -60
+      ],
+      "plane": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "xAxis": [
+          1,
+          0,
+          0
+        ],
+        "yAxis": [
+          0,
+          1,
+          0
+        ]
+      },
+      "scale": 500
+    },
+    {
+      "id": "vp-title",
+      "kind": "titleblock",
+      "paperBBox": [
+        1009,
+        20,
+        1169,
+        180
+      ]
+    }
+  ]
+}
