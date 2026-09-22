@@ -53,7 +53,7 @@ def path_points(
     """
     points: list[tuple[float, float]] = []
     for segment in Path(d_attribute).segments():
-        for raw in _segment_points(segment):
+        for raw in segment_points(segment):
             x = raw[0] * scale + offset[0]
             y = raw[1] * scale + offset[1]
             paper = svg_to_paper(x, y, page_height_mm)
@@ -63,7 +63,7 @@ def path_points(
     return points
 
 
-def _segment_points(segment: object) -> list[tuple[float, float]]:
+def segment_points(segment: object) -> list[tuple[float, float]]:
     """Return the points of one path segment, flattening a curve if it is one.
 
     Args:

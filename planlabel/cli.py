@@ -8,6 +8,7 @@ Four verbs arrive with the PDF carrier in Phase 2, and the validator in Phase 3:
     planlabel strip out.pdf -o clean.pdf
     planlabel sidecar out.pdf
     planlabel validate file.pdf|labels.json [--ifc model.ifc] [--strict] [--report md|json]
+    planlabel from-svg sheet.svg sheet.pdf -o out.pdf --sheet-id A-101 [--ifc model.ifc]
 
 The rest arrive with the phases that implement them:
 
@@ -22,6 +23,7 @@ Command             Phase
 ``samples build``   4
 ``inspect``         5
 ``infer``           7
+``from-svg``        9
 ==================  =======
 
 Two output modes, and they are kept apart on purpose. Without ``--json`` the
@@ -484,6 +486,76 @@ def attach(
     console.print(
         f"  declaration {'added' if report.declaration_added else 'already present'}"
         f"; PDF {report.pdf_version}; /ModDate {embed.pdf_date(moment)}"
+    )
+
+
+class LengthUnitChoice(StrEnum):
+    """The length units ``from-svg --unit`` accepts."""
+
+    M = "m"
+    CM = "cm"
+    MM = "mm"
+
+
+@app.command("from-svg")
+def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not carry
+    svg: Annotated[Path, typer.Argument(help="The sheet SVG.", exists=True)],
+    pdf_in: Annotated[Path, typer.Argument(help="The PDF rendered from that SVG.", exists=True)],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the labelled PDF.")],
+    sheet_id: Annotated[str, typer.Option("--sheet-id", help="The sheet number.")],
+    title: Annotated[str | None, typer.Option("--title", help="The sheet title.")] = None,
+    ifc: Annotated[
+        Path | None,
+        typer.Option(
+            "--ifc",
+            help="The model: its unit, schema and marks. Needs the 'ifc' extra.",
+            exists=True,
+        ),
+    ] = None,
+    unit: Annotated[
+        LengthUnitChoice,
+        typer.Option("--unit", help="The model's length unit, when --ifc is not given."),
+    ] = LengthUnitChoice.M,
+    mod_date: Annotated[
+        str | None,
+        typer.Option("--mod-date", help="ISO 8601 timestamp; SOURCE_DATE_EPOCH, then now."),
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="Print the label as JSON.")] = False,
+) -> None:
+    """Label a PDF from the IfcOpenShell SVG it was rendered from.
+
+    Every product's GlobalId and class, and every view's paper-to-model transform, are
+    read from the markers IfcOpenShell's serializer already writes into the SVG, so the
+    label is authored, at level L2. This is what the Bonsai operator runs.
+
+    Raises:
+        typer.Exit: With 1 when the SVG cannot be read or does not match the PDF.
+    """
+    from planlabel.svg.label import (  # noqa: PLC0415 -- only this command needs it
+        SheetSource,
+        attach_from_svg,
+        source_from_ifc,
+    )
+
+    moment = _resolve_mod_date(mod_date)
+    try:
+        if ifc is not None:
+            source = source_from_ifc(ifc, sheet_id=sheet_id, title=title)
+        else:
+            scale = {"m": 1.0, "cm": 0.01, "mm": 0.001}[unit.value]
+            source = SheetSource(
+                sheet_id=sheet_id, unit_scale_to_m=scale, length_unit=unit.value, title=title
+            )
+        label = attach_from_svg(svg, pdf_in, out, source, mod_date=moment)
+    except (PlanLabelError, ValueError) as exc:
+        raise _fail(str(exc)) from exc
+    if as_json:
+        typer.echo(canonical_json(label), nl=False)
+        return
+    console.print(f"[bold green]labelled[/bold green] {out}")
+    console.print(
+        f"  {len(label.elements or [])} element(s) in {len(label.viewports or [])} viewport(s); "
+        f"level {conformance_level(label).value}"
     )
 
 
