@@ -9,8 +9,8 @@ canonical: https://srtgn.github.io/planlabel/spec/0.1
 
 **Status: draft.** This document is the normative specification for PlanLabel. It
 is written and ratified phase by phase. Sections 1 to 4 are normative as of
-Phase 1. Sections still marked *(stub)* are not yet normative and must not be
-relied upon.
+Phase 1, and sections 6 and 9 as of Phase 2. Sections still marked *(stub)* are not
+yet normative and must not be relied upon.
 
 The canonical location of this document is
 <https://srtgn.github.io/planlabel/spec/0.1>. The `conformsTo` value written into
@@ -1025,16 +1025,930 @@ This section is retained, rather than deleted and the rest renumbered, so that
 sections 6 to 9 keep the numbers the README and the cross-references in section 4
 already use.
 
-## 6. Carriers *(stub — Phase 2)*
+## 6. Carriers
 
-Three interchangeable carriers for the same payload:
+### 6.1 General
 
-1. **PDF** — page-level `/AF` with `/AFRelationship /Data`, a document-level index
-   file, registration in the `EmbeddedFiles` name tree, and an XMP PDF Declaration.
-2. **SVG** — IfcOpenShell-compatible; existing `id`/`class` values are never
-   renamed, data is added via `data-planlabel-*` attributes or a `<metadata>` block.
-3. **Sidecar JSON** — `X.planlabel.json`, for consumers that cannot read PDF
-   attachments.
+A *carrier* is a way of transporting a payload, not a kind of payload. The
+payload is what sections 1 to 4 define: page labels, and the index that lists
+them. It is the same payload in all three carriers, it means the same thing in
+all three, and every rule in sections 3 and 4 applies to it unchanged, however it
+arrived.
+
+| Carrier | Where the payload lives | Specified in |
+| --- | --- | --- |
+| PDF | Embedded files, associated with the pages and with the document | 6.2, 6.3 |
+| SVG | Data added to the SVG document | 6.4 (reserved at 0.1) |
+| Sidecar JSON | A separate file beside the document | 6.5 |
+
+**6.1.1 Support is declared, not assumed.** A reader states which carriers it
+supports. A reader that claims to support a carrier MUST accept any payload that
+reaches it through that carrier, and MUST NOT reject or discount a payload
+because of which carrier it came in. A reader MUST NOT require a particular
+carrier; there is no primary carrier from the payload's point of view, and a
+program that reads only sidecars is a conforming reader of PlanLabel.
+
+Supporting no carrier at all is also conforming, by 4.3: a reader that ignores
+labels entirely loses nothing but meaning.
+
+**6.1.2 The carriers are equal in authority.** No carrier makes a stronger claim
+than another. A page label embedded in a PDF and the same page label in a sidecar
+are the same statement about the same page, and a reader MUST treat them as
+equally authoritative. In particular, a reader MUST NOT treat a sidecar as a
+draft, a cache or a second-class copy.
+
+**6.1.3 Disagreement between carriers.** Equal authority is a statement about
+meaning, not a procedure for a defective document. Where a reader obtains
+payloads for the same page from more than one carrier and they are not identical,
+it MUST resolve the disagreement as follows.
+
+1. A reader MUST NOT merge payloads from two carriers. It selects one and uses it
+   whole. Merging would produce a label that no writer ever wrote, whose
+   provenance aggregate (4.6.4) no longer describes anything, and whose internal
+   references (4.5) may resolve across two documents that were never checked
+   against each other.
+2. A payload carried **inside the document** takes precedence over a payload
+   carried **beside it**. For a PDF, the embedded payload of 6.2 wins over a
+   sidecar; for an SVG, the in-document payload of 6.4 wins over a sidecar.
+3. A reader MUST make the disagreement visible to whoever or whatever consumes
+   its output. It MUST NOT resolve one silently.
+4. A reader MAY let its user choose the other carrier explicitly, and MUST then
+   report that it did so.
+
+The precedence rule is decided by what each carrier can and cannot be separated
+from. An embedded payload cannot be copied, mailed or archived without the
+document it describes, and it was necessarily written against the bytes it now
+sits inside. A sidecar is an ordinary file: it can be left behind, copied from a
+neighbouring revision, edited by hand, or paired with a document it was never
+written for. When the two have drifted apart, the one that travelled with the
+document is the one that is still attached to the thing it describes.
+
+The rule costs less than it appears to. In the case the sidecar exists for — a
+document that MUST NOT be modified, so that nothing could be embedded in it —
+there is no embedded payload and therefore no conflict. The case the rule
+actually decides is a document that was labelled, then re-labelled into a sidecar
+because it had since been signed. There the sidecar may well be the better
+payload, which is why 6.1.3 (3) and (4) exist: the reader must say that the two
+disagree, and its user may overrule it.
+
+**6.1.4 Disagreement within a payload** is not a carrier question and is settled
+elsewhere. Where the index and a page label disagree, the page label is correct
+(2.8). Where a label and the page it describes disagree, the page is correct
+(1.2 (6)). Both rules apply in every carrier.
+
+---
+
+### 6.2 The PDF carrier
+
+The PDF carrier embeds the payload as associated files: one file per labelled
+page, associated with that page, and one index file associated with the document.
+It is the carrier the rest of this specification was designed around, and it is
+the only carrier that a labelled document cannot be separated from.
+
+**6.2.1 What is written.** A conforming writer labelling a PDF:
+
+1. MUST embed, for each page it labels, one file containing the canonical bytes
+   (3.8) of that page's label, associated with **that page** with
+   `/AFRelationship /Data`;
+2. MUST embed exactly one file containing the canonical bytes of the index,
+   associated with the **document catalog** with `/AFRelationship /Data`;
+3. MUST register every file it embeds in the document's `EmbeddedFiles` name tree
+   (6.2.5);
+4. MUST write the XMP PDF Declaration of 6.3;
+5. MUST leave every page it does not label without any PlanLabel association.
+
+A writer MUST NOT associate a page label with the catalog, and MUST NOT associate
+the index with a page. The association is what says which page a label describes,
+and 4.5 makes it the fact that outranks the label's own `page.index`.
+
+**6.2.2 Names.** The embedded files are named:
+
+| File | Name |
+| --- | --- |
+| The label for page *n* | `planlabel-p` followed by *n* in decimal, left-padded with zeros to a minimum of four digits, followed by `.json` |
+| The index | `planlabel-index.json` |
+
+so page 0 is `planlabel-p0000.json`, page 42 is `planlabel-p0042.json`, and page
+12345 — a page index of four digits or more pads to nothing and keeps all its
+digits — is `planlabel-p12345.json`. The index *n* is the zero-based page index of
+2.2, not the number printed on the sheet and not the position a viewer displays.
+
+A reader MUST parse the digits as a decimal integer and MUST NOT assume exactly
+four of them. A name matching `^planlabel-p[0-9]{4,}\.json$` or equal to
+`planlabel-index.json` is a *PlanLabel name*; every other name is foreign, and
+6.2.6 says what a writer does when one collides.
+
+The name is a claim about which page a file describes. The association of 6.2.1
+is the fact. Where they disagree, 6.2.11 decides.
+
+**6.2.3 The file specification.** Each embedded file is described by a file
+specification dictionary carrying exactly these members:
+
+| Member | Value |
+| --- | --- |
+| `/Type` | `/Filespec` |
+| `/F` | the name from 6.2.2 |
+| `/UF` | the same name, as a text string |
+| `/Desc` | the description below |
+| `/AFRelationship` | `/Data` |
+| `/EF` | a dictionary whose `/F` and `/UF` both reference the one embedded-file stream |
+
+All six are REQUIRED. `/UF` is required by ISO 32000-2 and `/F` is retained for
+readers that predate it; a writer MUST write both and MUST give them the same
+value. `/EF` MUST carry both `/F` and `/UF`, and both MUST reference the **same**
+stream object, so that no reader can be handed two different files under one
+name.
+
+`/AFRelationship` MUST be `/Data`. The payload is data about the page, not a
+source for it, not an alternative to it and not a supplement to it; and the eight
+values ISO 32000-2 defines are the only ones permitted, so a PlanLabel-specific
+relationship name is not available and would not be wanted.
+
+`/Desc` MUST be present and non-empty. A conforming writer writes exactly
+`PlanLabel 0.1 label for page N`, with *N* the zero-based page index, for a page
+label, and exactly `PlanLabel 0.1 index` for the index. The number is zero-based
+so that the description agrees with the filename beside which a viewer displays
+it. `/Desc` is for a person reading an attachment pane: a reader MUST NOT derive
+any value from it, and MUST NOT use it to identify a file.
+
+**6.2.4 The embedded-file stream.** The stream referenced from `/EF` carries:
+
+| Member | Value |
+| --- | --- |
+| `/Type` | `/EmbeddedFile` |
+| `/Subtype` | the MIME type `application/json` as a PDF name |
+| `/Params` | `/Size`, `/CheckSum` and `/ModDate`, as below |
+
+`/Subtype` is REQUIRED. Because the solidus is a PDF delimiter it MUST be written
+with the number-sign escape — `/application#2Fjson` — in which the case of the
+hexadecimal digits is not significant.
+
+`/Params` is REQUIRED and MUST carry:
+
+- `/Size`, the length in bytes of the **decoded** file, before any stream filter;
+- `/CheckSum`, the 16-byte MD5 digest of those same decoded bytes, as defined by
+  ISO 32000-2;
+- `/ModDate`, a PDF date string.
+
+`/CreationDate` is OPTIONAL; a writer SHOULD omit it, because it duplicates
+`/ModDate` for a file that has only ever been written once and is one more value
+to keep deterministic (6.2.13).
+
+`/Size` and `/CheckSum` describe the payload, not the stream as stored. A writer
+MAY compress the stream with any standard filter, and MUST NOT recompute either
+value when it does: after compression `/Size` still reports the decoded length
+and `/CheckSum` still digests the decoded bytes. A writer MUST NOT alter the
+bytes of an embedded file after computing them. A validator MUST decode the
+stream and MUST report a `/Size` or a `/CheckSum` that does not match what it
+decoded.
+
+*Informative.* `/CheckSum` is an integrity check against accidental corruption
+and nothing more. MD5 is not a sound basis for authenticity, ISO 32000-2 fixes
+the algorithm so PlanLabel cannot improve on it, and a reader MUST NOT treat a
+matching `/CheckSum` as evidence that a label is genuine. Section 9 governs what
+a reader may conclude from attacker-supplied input.
+
+**6.2.5 The `EmbeddedFiles` name tree.** Every file a writer embeds MUST also
+appear in the document catalog's `/Names` `/EmbeddedFiles` name tree, under a key
+equal to the file's `/UF`, referencing the same file specification object as the
+`/AF` array does.
+
+This is not automatic and it is not optional. An associated file that is not in
+the name tree is invisible to every reader that enumerates attachments — a PDF
+viewer's attachment pane, `pdf.js`'s `getAttachments()`, `pikepdf`'s
+`attachments` mapping — and a name-tree entry that is associated with nothing
+breaks PDF/A, which requires every embedded file to be associated. Both
+directions are therefore required:
+
+- every PlanLabel file specification referenced from an `/AF` array MUST appear in
+  the name tree;
+- every PlanLabel file specification in the name tree MUST be referenced from
+  exactly one `/AF` array.
+
+The `/AF` entry and the name-tree entry MUST be one indirect object referenced
+twice, never two objects with equal contents. One object cannot disagree with
+itself, and duplication is the only way a document could offer two different
+labels for one page.
+
+Name-tree keys MUST be sorted as ISO 32000-2 requires, and a reader MUST walk the
+tree's `/Kids` rather than assuming a single `/Names` array: a document with many
+attachments will have a branching tree, and a reader that reads only the root
+node will silently miss labels.
+
+**6.2.6 Name collisions.** A document MAY already contain an embedded file whose
+name is a PlanLabel name. Assigning over it would destroy a file PlanLabel never
+owned, and a later strip (6.2.12) would then delete a third party's data.
+
+A writer MUST NOT overwrite an existing name-tree entry or embedded file whose
+name is a PlanLabel name unless **all** of the following hold, in which case the
+file is part of a PlanLabel payload this operation is replacing:
+
+1. the document carries the PlanLabel declaration of 6.3;
+2. the entry's `/AFRelationship` is `/Data`;
+3. the entry's embedded-file stream carries `/Subtype /application#2Fjson`.
+
+Where they do not all hold, the writer MUST fail, and its message MUST name the
+colliding file. A writer MUST NOT rename its own file to avoid the collision:
+the names in 6.2.2 are how a reader finds the payload, and a payload under a
+different name is not findable.
+
+Re-labelling a document that already carries a PlanLabel payload is otherwise
+unconstrained: a writer MAY replace the payload in place, and MAY instead remove
+it (6.2.12) and write a fresh one. Either way the result MUST satisfy every rule
+in this section, and MUST NOT leave a label for a page it did not label.
+
+**6.2.7 Associated-file arrays.** The `/AF` array of a page or of the catalog MUST
+be **appended to**, never assigned. Documents that already carry associated files
+are ordinary — an electronic invoice carries one on the catalog and often one on
+a page — and replacing the array would silently drop them while leaving them in
+the name tree, producing exactly the unassociated entry 6.2.5 forbids.
+
+- Where no `/AF` array is present, a writer creates one containing its entry.
+- Where one is present, a writer appends and MUST preserve the existing entries
+  and their order.
+- A writer MUST NOT append a file specification that the array already
+  references; attaching twice MUST NOT produce two entries for one file.
+- Where removing entries would leave an `/AF` array empty, a writer MUST delete
+  the `/AF` key rather than leave an empty array behind.
+
+A reader MUST tolerate a null entry in an `/AF` array. A tool that deleted an
+attachment without cleaning the arrays that referenced it leaves exactly that,
+and a reader that dereferences it blindly fails on a document it could otherwise
+have read.
+
+**6.2.8 The appearance guarantee.** 1.2 (1) states the guarantee. This paragraph
+states it as something a validator given both documents can check.
+
+Let *D* be the input document and *D′* the labelled output. A conforming writer
+MUST satisfy all of the following, and a validator given both MUST check all of
+them and MUST report each failure as an error.
+
+1. **Pages.** *D′* has the same number of pages as *D*, in the same order.
+2. **Content.** For every page, the decoded bytes of the page's content stream —
+   the concatenation, in order, where `/Contents` is an array — are identical in
+   *D* and *D′*. A writer SHOULD also leave the raw, encoded bytes identical, and
+   MUST NOT change the filter of a content stream it did not write.
+3. **Page dictionaries.** For every page, the members of the page dictionary are
+   identical in *D* and *D′*, compared after resolving indirect references, with
+   exactly one permitted difference: `/AF` MAY have been created or appended to
+   per 6.2.7. `/MediaBox`, `/CropBox`, `/Rotate`, `/UserUnit`, `/Resources`,
+   `/Annots`, `/Group` and `/Metadata` are therefore unchanged.
+4. **Annotations.** Every annotation of every page is present in *D′*, in the same
+   order, with the same subtype, rectangle, flags and appearance streams.
+5. **Rendering.** For every page, rendering *D* and rendering *D′* produce
+   identical images: the same renderer, the same build of it, the same process,
+   the same settings, at a resolution of not less than 150 dpi, with
+   anti-aliasing enabled. The comparison is **exact equality of every pixel**, not
+   a tolerance. A difference in image dimensions MUST be reported separately from
+   a difference in pixels, because it means the page's geometry or rotation
+   changed rather than its content.
+
+Rules 1 to 4 and rule 5 are both required because neither implies the other. A
+writer can rewrite every content stream without moving a single pixel —
+normalising whitespace and operator spelling does exactly that — so rule 5 alone
+would not enforce 1.2 (1)'s prohibition on touching content streams. And rules 1
+to 4 enumerate the mechanisms by which a page is usually damaged, while rule 5
+checks the result, and so catches damage done by a mechanism this list does not
+enumerate.
+
+Exact equality is specified rather than a tolerance, and anti-aliasing is
+required to be on, because together they are what gives the check its teeth: with
+anti-aliasing enabled, exact comparison detects a line displaced by about a
+hundredth of a point. A tolerance, or anti-aliasing switched off, would blunt
+precisely the class of difference the rule exists to forbid.
+
+**The guarantee is about the drawing, not about the file's bytes.** Writing a PDF
+rewrites it: object numbers are renumbered, the cross-reference table is rebuilt,
+the document `/ID` changes, and the output is never a byte-superset of the input.
+A validator MUST NOT test the guarantee by comparing files, and a reader MUST NOT
+expect a labelled document to contain its input.
+
+**6.2.9 What a writer MUST NOT do.** In addition to everything above, a
+conforming writer MUST NOT:
+
+1. modify any page's content streams, or add a mark of any kind that a renderer
+   would draw;
+2. remove, replace or alter any embedded file, annotation, form field, outline,
+   structure element or other content it did not itself write;
+3. alter any member of an existing XMP packet, or the document information
+   dictionary, other than by adding the declaration of 6.3 and, where 6.3.7
+   requires it, the extension schema that keeps that declaration legal — this
+   prohibition includes `pdf:Producer`, `xmp:MetadataDate` and `pdf:PDFVersion`,
+   each of which a naive metadata round-trip will rewrite;
+4. record any trace of itself outside the payload and the declaration: not in
+   `x:xmptk`, not in `pdf:Producer`, not in `/Info`, not in a custom key. After a
+   strip (6.2.12) the document must retain no evidence that PlanLabel touched it;
+5. overwrite an embedded file whose name collides with a PlanLabel name, except
+   as 6.2.6 permits;
+6. add, remove or change the document's encryption, or its permissions;
+7. lower the PDF header version (6.2.10);
+8. invalidate a digital signature silently (6.2.11).
+
+A writer SHOULD leave the document's structural properties as it found them —
+linearisation, object-stream mode, and the compression of streams it did not
+write. None of these is visible, and none is forbidden, but each is a change a
+downstream diff will show and none of them is PlanLabel's business.
+
+**6.2.10 The PDF header version.** Page-level associated files are a PDF 2.0
+feature: ISO 32000-2 defines `/AF` on a page dictionary, and ISO 32000-1 does not.
+A writer might therefore be tempted to raise the header version of every document
+it labels. It MUST NOT do so unconditionally.
+
+- A writer MUST NOT lower the header version, ever.
+- A writer MUST NOT change the header version of a document that identifies
+  itself as conforming to a standard that fixes it — any document whose XMP
+  carries `pdfaid:part`, or a comparable identification for PDF/UA, PDF/X or
+  PDF/E.
+- A writer SHOULD leave the header version unchanged in every other case.
+- Where a writer does raise it, it MUST raise it to exactly 2.0, MUST do so only
+  in the absence of such an identification, and MUST NOT alter `pdf:PDFVersion`
+  or any other XMP property to match — which, by 6.2.9 (3), it may not do anyway.
+
+The reason is PDF/A-3. A PDF/A-3 document is a PDF 1.7 document; PDF/A-3 is where
+associated files were introduced, so `/AF` is legitimate in it, and its XMP says
+`pdfaid:part` 3. Raising its header to 2.0 would contradict the conformance claim
+the document makes about itself, in order to describe a feature the document was
+already entitled to use. The cost of leaving the header alone is nil: to a reader
+that does not implement PDF 2.0, `/AF` is an unknown key, and an unknown key is
+ignored — which is 1.2 (5) working exactly as intended.
+
+**6.2.11 Signed documents.** A document may carry a digital signature, which
+covers a range of its bytes. Rewriting the document moves those bytes, and the
+signature no longer verifies.
+
+A conforming writer MUST NOT invalidate a signature silently. Specifically:
+
+1. **Detect.** Before modifying a document, a writer MUST determine whether it is
+   signed. It MUST examine the interactive form's `/SigFlags` for the
+   *SignaturesExist* bit, MUST walk the form's field tree — including `/Kids` —
+   for a field with `/FT /Sig` carrying a `/V`, and MUST examine the catalog's
+   `/Perms` for `/DocMDP` and `/UR3`. Any of these makes the document signed for
+   the purpose of this rule.
+2. **Refuse.** A writer MUST refuse, by default, to write a labelled copy of a
+   signed document. Its message MUST say that the document is signed and MUST
+   name the sidecar of 6.5 as the carrier for a signed document.
+3. **Never pretend.** A writer MUST NOT remove, alter or re-write a signature
+   dictionary, its `/ByteRange`, the interactive form or `/Perms` in order to
+   make a modified document appear valid, and MUST NOT report a signature as
+   intact after modifying the document.
+4. **An override says what it does.** A writer MAY offer a way to proceed. If it
+   does, the option MUST be explicit, MUST be given per invocation, and MUST be
+   named for its effect — that the signature is broken — and not for a mechanism.
+   The writer MUST warn when it is used.
+5. **Incremental updates are not a way round this.** A writer that can append a
+   true incremental update, leaving the signed bytes untouched, MAY do so; nothing
+   in this specification requires it, and it does not make the result safe. An
+   incremental update leaves the signature's digest verifiable but makes the
+   signed revision no longer the current one, which a verifier will say; and where
+   `/Perms` `/DocMDP` is present the permitted changes do not include adding
+   attachments, so a writer MUST NOT make an incremental update to a document
+   carrying `/DocMDP`.
+
+The sidecar is not a consolation prize here. A signed document is the leading
+document of 1.2 in its strongest form — a document whose bytes someone has
+undertaken not to change — and a carrier that does not touch it is the right
+answer rather than a fallback.
+
+The same rules govern removing a payload: stripping a signed document is
+modifying it, and 6.2.13 does not exempt it.
+
+**6.2.12 Reading.** A reader MUST look for the payload in both places, in this
+order.
+
+1. **Page-level `/AF` first.** For each page, scan the `/AF` array for a file
+   specification whose `/UF` — or `/F`, where `/UF` is absent — is a page-label
+   name. For the index, scan the catalog's `/AF` for `planlabel-index.json`.
+2. **The name tree as a fallback.** For a page with no such entry, look up the
+   page's name from 6.2.2 in the `EmbeddedFiles` name tree; likewise for the
+   index.
+
+Both paths are required. A producer may have written only one of them, or a
+downstream tool may have dropped one, and a reader that implements a single path
+will report a labelled document as unlabelled.
+
+Having found a candidate, a reader:
+
+- MUST validate it against the page-label or index schema before using any value
+  in it, and MUST treat it as absent if it fails — 4.3 (1) and (2);
+- MUST treat the association as the fact and `page.index` as a claim, where a
+  label found on page *i* declares a different index — 4.5;
+- MUST treat the label as absent, and a validator MUST report an error, where a
+  label found **only** through the name tree has a `page.index` that disagrees
+  with the index encoded in its filename. There the filename and the label are two
+  claims and there is no fact to prefer;
+- MUST treat a page's label as absent, and a validator MUST report an error,
+  where a page's `/AF` array references more than one page-label file. Two labels
+  for one page is a defect, and a reader has no basis for choosing between them;
+- MUST NOT require the declaration of 6.3 to be present in order to read a payload
+  it has found. A missing declaration is a writer's error (6.6) and not a reason
+  to withhold a valid label from a user.
+
+**6.2.13 Removing a payload.** A writer MAY remove a PlanLabel payload from a
+document. When it does, it MUST remove exactly:
+
+- every embedded file whose name is a PlanLabel name and which satisfies 6.2.6
+  (1) to (3);
+- those files' entries in every `/AF` array, deleting an array that becomes empty
+  rather than leaving it empty (6.2.7);
+- those files' entries in the `EmbeddedFiles` name tree;
+- the PlanLabel declaration, and nothing else in the XMP packet (6.3.6).
+
+and MUST NOT remove anything else. In particular a foreign attachment, a foreign
+`/AF` entry and a foreign PDF Declaration MUST all survive.
+
+**Removal is reversible in the only sense that matters.** Where *D* is a document,
+removing the payload from a labelled copy of *D* MUST produce a document
+equivalent to *D*: the same page count, the same decoded content streams, the
+same annotations, the same document information dictionary, an XMP packet with
+the same properties and the same bytes for every property *D* had, the same
+embedded files with the same bytes, and renderings identical under 6.2.8 (5). The
+files will not be byte-identical, for the reason given at the end of 6.2.8. A
+validator MUST check this equivalence where it is given both documents.
+
+**6.2.14 Determinism.** Two runs of one writer over the same input document, the
+same payload and the same supplied timestamps MUST produce byte-identical output.
+
+Every timestamp a writer records — `/Params` `/ModDate`, `pdfd:claimDate` (6.3.4),
+`generator.created` — MUST be taken from the writer's inputs. A conforming writer
+MUST NOT read the system clock while labelling. A writer SHOULD derive the
+document `/ID` from the output's content rather than from a clock or a random
+source, so that the requirement above is achievable at all.
+
+Determinism is what makes a labelled document diffable, cacheable and testable,
+and it is cheap: the only values that would otherwise vary are the three named
+above.
+
+**6.2.15 Example.** The objects a writer adds to a two-page document, with a
+third party's attachment (`9 0 R`) and a third party's page-level associated file
+already present. Whitespace and object numbers are illustrative; object numbers
+are assigned by the writer and mean nothing.
+
+```
+2 0 obj                                    % the document catalog
+<< /Type    /Catalog
+   /Pages   4 0 R
+   /AF      [ 9 0 R 14 0 R ]               % the third party's, then the index
+   /Names   << /EmbeddedFiles << /Names [
+                 (planlabel-index.json) 14 0 R
+                 (planlabel-p0000.json) 12 0 R
+                 (site-notes.txt)        9 0 R ] >> >>
+   /Metadata 3 0 R                         % carries the declaration of 6.3
+>>
+endobj
+
+5 0 obj                                    % page 0
+<< /Type      /Page
+   /Parent    4 0 R
+   /MediaBox  [ 0 0 1190.5512 841.8898 ]
+   /Contents  6 0 R
+   /AF        [ 10 0 R 12 0 R ]            % appended to, not replaced
+>>
+endobj
+
+12 0 obj                                   % the file specification
+<< /Type            /Filespec
+   /F               (planlabel-p0000.json)
+   /UF              (planlabel-p0000.json)
+   /Desc            (PlanLabel 0.1 label for page 0)
+   /AFRelationship  /Data
+   /EF              << /F 13 0 R /UF 13 0 R >>
+>>
+endobj
+
+13 0 obj                                   % the embedded file
+<< /Type     /EmbeddedFile
+   /Subtype  /application#2Fjson
+   /Params   << /Size     3573
+                /CheckSum <1cd6fcfbe30a10ecb788b4c9194a6a5d>
+                /ModDate  (D:20240101000000Z) >>
+   /Filter   /FlateDecode
+   /Length   612
+>>
+stream
+…
+endstream
+endobj
+```
+
+`/Size` is 3573 — the length of the canonical JSON — while `/Length` is 612,
+the length of the compressed stream, and `/CheckSum` digests the 3573 plaintext
+bytes. That is 6.2.4 working as specified, not an inconsistency.
+
+---
+
+### 6.3 The XMP PDF Declaration
+
+A PDF Declaration is an XMP mechanism, published by the PDF Association, by which
+a document states that it conforms to a specification outside ISO 32000. PlanLabel
+uses it for one purpose: so that a reader can tell, from the document's metadata
+alone, that the document claims to carry a PlanLabel 0.1 payload.
+
+PDF Association, *PDF Declarations* (2019), listed in the normative references,
+defines the mechanism. This subsection specifies what PlanLabel writes into it,
+what it must leave alone, and what a reader may conclude from it.
+
+**6.3.1 The claim.** A labelled PDF MUST carry exactly one PlanLabel declaration:
+one Declaration structure whose `pdfd:conformsTo` is exactly
+
+```
+https://srtgn.github.io/planlabel/spec/0.1
+```
+
+which is the canonical URI of this specification, without a trailing slash and
+without a fragment. The value is matched as a string. A writer MUST NOT write a
+second declaration with that value, and a validator MUST report more than one as
+an error; a reader that nevertheless finds two MUST treat the document as
+carrying one.
+
+**6.3.2 Where it goes.** The declaration MUST be written into the document
+catalog's `/Metadata` XMP packet, where it is a claim about the document as a
+whole.
+
+The PDF Declarations specification also permits a declaration in an individual
+object's `/Metadata`, scoped to that object, and the symmetry with PlanLabel's
+page-level associated files is tempting. PlanLabel 0.1 does not use it: the claim
+being made is that this document carries a PlanLabel payload, which is a fact
+about the document, and a per-page declaration would multiply the bytes and the
+ways to be wrong without telling a reader anything the payload does not. A writer
+MUST NOT write a PlanLabel declaration into a page's or any other object's
+`/Metadata`.
+
+**6.3.3 Namespace and structure.** The XMP namespace is
+
+```
+http://pdfa.org/declarations/
+```
+
+with the preferred prefix `pdfd`. The scheme is `http`, not `https`, and the
+trailing slash is part of the URI. XMP namespaces are matched as strings and are
+never normalised, so both details are load-bearing. A reader SHOULD also
+recognise the `https` spelling on input, which appears in some published
+examples, and a writer MUST write only the `http` form.
+
+The schema has one top-level property:
+
+- **`pdfd:declarations`** — REQUIRED. An unordered array (`rdf:Bag`) of
+  Declaration structures.
+
+Each Declaration structure carries:
+
+- **`pdfd:conformsTo`** — REQUIRED. A URI identifying the specification or
+  profile the document claims to conform to.
+- **`pdfd:claimData`** — OPTIONAL. An unordered array (`rdf:Bag`) of ClaimData
+  structures.
+
+Each ClaimData structure carries, all OPTIONAL:
+
+- **`pdfd:claimBy`** — the organisation, individual or software making the claim;
+- **`pdfd:claimDate`** — when the claim was made;
+- **`pdfd:claimCredentials`** — the claimant's credentials;
+- **`pdfd:claimReport`** — a URL to a report about the claim.
+
+There are no other properties. A writer MUST NOT invent one: a level, an issuer, a
+severity or a version has nowhere to go here, and anything PlanLabel needs to say
+beyond the claim belongs in the payload.
+
+Both arrays are serialised as `rdf:Bag`, and each member as an `rdf:li` with
+`rdf:parseType="Resource"`. A declarations property serialised as an `rdf:Seq`, or
+whose members are plain text rather than structures, is not a declaration; a
+validator MUST report it as an error rather than interpret it.
+
+**6.3.4 What PlanLabel writes.** A writer:
+
+- MUST write `pdfd:conformsTo` with the value of 6.3.1;
+- MAY write one ClaimData structure whose `pdfd:claimBy` identifies the writing
+  program — but SHOULD NOT, and the reference implementation does not. A
+  declaration whose bytes never vary can be removed by byte comparison, which is
+  what lets a writer restore a third party's packet exactly (6.3.6) and lets a
+  document written by one release be stripped cleanly by another. A `claimBy`
+  carrying a version number trades that away for an identity the payload's
+  `generator` (4.2) already records, in a place a reader is already looking;
+- MUST omit `pdfd:claimDate` unless the date was supplied to it, and MUST NOT read
+  the system clock for it (6.2.14);
+- SHOULD NOT write `pdfd:claimCredentials` or `pdfd:claimReport` at 0.1. Neither
+  has a defined meaning for PlanLabel, and a value a reader cannot interpret is
+  worse than an absent one.
+
+**6.3.5 A complete packet.** A document that had no XMP packet at all, after
+labelling:
+
+```xml
+<?xpacket begin="&#xFEFF;" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:pdfd="http://pdfa.org/declarations/">
+   <pdfd:declarations>
+    <rdf:Bag>
+     <rdf:li rdf:parseType="Resource">
+      <pdfd:conformsTo>https://srtgn.github.io/planlabel/spec/0.1</pdfd:conformsTo>
+      <pdfd:claimData>
+       <rdf:Bag>
+        <rdf:li rdf:parseType="Resource">
+         <pdfd:claimBy>PlanLabel 0.1.0</pdfd:claimBy>
+        </rdf:li>
+       </rdf:Bag>
+      </pdfd:claimData>
+     </rdf:li>
+    </rdf:Bag>
+   </pdfd:declarations>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+```
+
+Note that `x:xmptk` is absent. It names the toolkit that wrote the packet, and a
+document that has been stripped must carry no trace of PlanLabel (6.2.9 (4)); a
+writer MUST NOT set it, and MUST NOT alter it where a packet already has one.
+
+Where the document already has an XMP packet, the writer adds a self-contained
+`rdf:Description` of the shape above — declaring its own `xmlns:pdfd` — and MUST
+leave every other byte of the packet as it found it. It MUST NOT re-serialise the
+packet, reorder attributes, reindent, re-encode, or add, remove or modify any
+other property. A packet belongs to whoever wrote it, and 1.2 (2) does not make
+an exception for reformatting.
+
+**6.3.6 Other declarations.** A document MAY carry declarations that have nothing
+to do with PlanLabel — accessibility claims, well-tagged PDF claims, a
+publisher's own. They share the one `pdfd:declarations` array.
+
+A writer MUST add its declaration to that array rather than replace it, MUST NOT
+alter another declaration, and, when removing PlanLabel's, MUST remove only the
+Declaration structure whose `pdfd:conformsTo` is PlanLabel's. It MUST remove the
+`pdfd:declarations` property, and the `rdf:Description` that carried it, only when
+removing that structure leaves the array empty.
+
+Where removing the declaration would leave a packet that the writer itself
+created and that now holds no properties at all, the writer SHOULD remove the
+`/Metadata` stream, so that a stripped document is left as it was found. It MUST
+NOT remove a packet that holds any other property.
+
+**6.3.7 PDF/A.** PDF/A-1, PDF/A-2 and PDF/A-3 require that any XMP property in a
+namespace the standard does not know be described by a PDF/A extension schema in
+the same packet. The `pdfd` namespace is such a namespace. Therefore, where the
+document identifies itself as `pdfaid:part` 1, 2 or 3, a writer MUST ensure the
+packet describes the `pdfd` namespace — adding the PDF Association's published
+extension schema for it where the packet does not already contain one, and MUST
+at minimum report the risk to its caller when it does not. Without
+it, the declaration itself invalidates the document's conformance claim, which
+would make labelling a PDF/A-3 document a destructive act.
+
+PDF/A-4 (ISO 19005-4) removed the extension-schema requirement, keeping only that
+the XMP conform to ISO 16684-1. Where the document identifies itself as
+`pdfaid:part` 4, a writer SHOULD NOT add an extension schema.
+
+Adding an extension schema is the one case in which a conforming writer adds a
+property to a packet other than the declaration. It is permitted because it is
+additive and because it is the only way to satisfy 1.2 (2)'s requirement not to
+damage what it found: a writer that added the declaration alone would have
+silently broken the document's conformance.
+
+**6.3.8 What the declaration does and does not mean.** The declaration is a claim
+that this document carries a PlanLabel 0.1 payload. It is not a validation
+result, it says nothing about the payload's conformance level, and a reader MUST
+NOT treat it as evidence that any label in the document is valid — 4.3 (1) still
+requires the reader to validate what it finds.
+
+A declaration with no payload is a claim the document does not support. A
+validator MUST report it as an error. A payload with no declaration is a writer's
+failure to make the claim; a validator MUST report it as an error, and a reader
+MUST still read the payload (6.2.12).
+
+---
+
+### 6.4 The SVG carrier
+
+An SVG carrier is defined in outline here and its encoding is reserved. PlanLabel
+0.1 specifies no SVG payload: a writer MUST NOT claim PlanLabel 0.1 conformance
+for an SVG document, and a reader MUST NOT infer one. The constraints in this
+subsection are normative now, because they are what the encoding will have to
+satisfy and because a writer experimenting ahead of the specification should not
+break the documents it experiments on.
+
+**6.4.1 Compatibility.** The SVG documents PlanLabel cares about are produced by
+IfcOpenShell's serialiser, which carries IFC identity in the markup already:
+product groups take `id="product-<GlobalId>"`, IFC classes appear as `class`
+values, and view information is carried in attributes of its own.
+
+A writer MUST NOT rename, renumber or remove an existing `id` or `class` value,
+and MUST NOT alter any existing attribute. Those values are another tool's
+identifiers, other documents reference them, and PlanLabel gains nothing by
+owning them. Where an `id` encodes an IFC GlobalId, a writer SHOULD read
+`element.ifcGuid` from it and MUST NOT rewrite it.
+
+**6.4.2 Where PlanLabel data goes.** PlanLabel data is carried in a `<metadata>`
+element, or in attributes whose names begin `data-planlabel-`, and nowhere else.
+Both are inert: `<metadata>` is not rendered, and a `data-` attribute changes
+nothing about how an element is drawn, so the appearance guarantee of 1.2 (1)
+holds by construction rather than by inspection.
+
+A writer MUST NOT add a rendered element, MUST NOT add or alter a presentation
+attribute, style rule or transform, and MUST NOT reorder elements.
+
+**6.4.3 Coordinates.** SVG is y-down and paper coordinates are y-up. Every
+coordinate crossing the boundary between an SVG document and a label MUST be
+flipped as 3.3 requires, after conversion to millimetres and after removal of any
+offset between the SVG's root coordinate system and the page corner. This is the
+single most likely error in an SVG implementation, and 3.3 explains why it is
+invisible on some drawings and obvious on others.
+
+**6.4.4 Reserved.** The following are not specified at 0.1 and a future version
+will settle them: the element name, namespace and content model of the
+`<metadata>` payload; the `data-planlabel-*` attribute vocabulary and which of
+the two mechanisms carries which part of the payload; whether a whole page label
+or per-element fragments are carried; and how an SVG document announces that it
+carries a payload, the declaration of 6.3 having no SVG equivalent.
+
+---
+
+### 6.5 The sidecar JSON
+
+A *sidecar* is the whole payload of one document, in one JSON file, beside it. It
+exists for two kinds of consumer: programs that cannot read PDF attachments, and
+documents that MUST NOT be modified — a signed document above all (6.2.11).
+
+**6.5.1 Shape.** A sidecar is a JSON object with these members, and no others:
+
+| Member | Status | Value |
+| --- | --- | --- |
+| `planlabel` | REQUIRED | `"0.1"`, the format version |
+| `index` | REQUIRED | one index document, valid against the index schema |
+| `pages` | REQUIRED | an array of page labels, each valid against the page-label schema |
+| `generator` | OPTIONAL | the program that wrote the sidecar, as in a label |
+| `extensions` | OPTIONAL | namespaced extras, as in a label; a reader ignores what it does not understand — 4.3 (6) |
+
+It is described by `planlabel-sidecar.schema.json`, published beside the
+page-label and index schemas, and a reader MUST validate a sidecar against it
+before using any value in it — 4.3 (1) applies to a sidecar exactly as it applies
+to a label.
+
+The members MUST agree with each other:
+
+- `planlabel` MUST equal the `planlabel` of `index` and of every member of
+  `pages`;
+- `pages` MUST contain exactly one page label for each entry of `index.pages`,
+  matched by `page.index` against `pageIndex`, and no page label that `index.pages`
+  does not list;
+- `pages` MUST be ordered by `page.index`, ascending, and MUST NOT contain two
+  labels with the same `page.index`.
+
+A validator MUST report each of these as an error. The redundancy is deliberate:
+the index and the labels are separate documents in the PDF carrier, so the
+sidecar carries both rather than deriving one from the other, and the price of
+that is a consistency rule.
+
+**6.5.2 Serialisation.** A sidecar MUST be serialised in the canonical form of
+3.8 — UTF-8 without a byte order mark, members sorted by name, two-space indent,
+every member and every array element on its own line, LF endings, one trailing
+LF, no `null` for an absent member, every number at three decimals or fewer. It
+is a public artefact like any other PlanLabel document, and the reasons in 3.8
+for making it byte-reproducible apply to it in full.
+
+**6.5.3 Naming.** For a document whose filename is `NAME.pdf`, the sidecar is
+`NAME.planlabel.json`, in the same directory. Where the document's filename has
+no extension, the sidecar is that filename with `.planlabel.json` appended.
+
+A sidecar is never itself embedded in the document it describes: it is the copy
+that travels outside.
+
+**6.5.4 Pairing.** A reader given a document looks for the sidecar at the name
+above, **in the same directory as the document and nowhere else**. It MUST NOT
+search parent directories, MUST NOT search a configured location, and MUST NOT
+dereference any path or URL found inside a sidecar in order to locate its
+document — section 9 forbids a reader from dereferencing label content, and a
+sidecar is label content.
+
+A reader MAY be given a sidecar alone, with no document. It MAY then use the
+payload, and MUST make clear that it did so without the document: with no page to
+consult, the reader cannot apply 1.2 (6), and every geometric value in the
+payload is unverified.
+
+**6.5.5 Binding a sidecar to its document.** Nothing in a filename proves that a
+sidecar was written for the document beside it. The payload's `index` may carry the
+hash of the *model* the labels came from, which says nothing about the PDF.
+
+PlanLabel 0.1 does not add a member for this. The binding is the naming rule of
+6.5.4, checked against what the payload already states about the document's pages.
+A reader pairing a sidecar with a document MUST:
+
+1. treat a page label as absent where its `page.index` is not a page of the
+   document;
+2. treat a page label as absent where its `page.widthMm` or `page.heightMm`
+   differs from that page's own unrotated dimensions (3.2) by more than the
+   geometric tolerance of 0.5 mm (3.1);
+3. treat the whole payload as absent where no page label pairs with any page.
+
+A validator MUST report each of the three as an error.
+
+**Why this and not a hash.** A byte hash is the only exact binding available, and
+it is exact about the wrong thing. A PDF's bytes change under operations that
+change nothing a label describes: every re-save renumbers its objects and rewrites
+its cross-reference table, a signature-preserving incremental update appends to it,
+an archive may recompress it. Requiring a matching hash would make a sidecar refuse
+a document that is, in every respect a label cares about, the document it was
+written for — and it would do so first in the workflow the sidecar exists to serve,
+where the document is passed between systems precisely because it cannot be
+modified.
+
+Requiring nothing is the opposite failure: a sidecar left behind from an earlier
+revision would be read as though it described the sheet in front of the reader.
+
+The checks above are cheap, robust, and directly about what the payload claims.
+They catch the stale sidecar that matters — one written for a different document,
+or for a revision whose pages changed — while a document that was merely re-saved
+still reads. And where a reader is wrong about any of it, 1.2 (6) still holds: the
+page is in front of it, and the page wins.
+
+*An explicit `document` member carrying a page count, a filename and a hash was
+considered and deferred to a future schema version, where the member could be
+declared rather than asserted. Do not carry the binding under `extensions`: an
+extension is something a reader may ignore (4.3 (6)), and a binding a reader may
+ignore is not a binding.*
+
+**6.5.6 Example.** A sidecar for a two-page document, with the payload's arrays
+and objects elided. Shown with members in canonical order; the inner objects are
+shown inline for legibility only, and a real sidecar puts every member and every
+array element on its own line, by 3.8.
+
+```json
+{
+  "generator": { "name": "planlabel", "version": "0.1.0" },
+  "index": { "pages": [ … ], "planlabel": "0.1", "provenance": "authored" },
+  "pages": [ … ],
+  "planlabel": "0.1"
+}
+```
+
+---
+
+### 6.6 Conformance of a carrier
+
+This subsection collects the obligations that attach to a carrier. It restates
+nothing: each line points at the rule that governs it. A writer, reader or
+validator is conforming with respect to a carrier when it satisfies the
+corresponding column below, and a program MUST NOT claim support for a carrier it
+does not.
+
+**6.6.1 The PDF carrier.**
+
+A conforming **writer** MUST: embed a label for every page it labels, associated
+with that page, and one index associated with the document (6.2.1); name them as
+6.2.2 requires; write every required file-specification and embedded-file member
+(6.2.3, 6.2.4); register every file in the name tree and associate every
+registered file (6.2.5); refuse a foreign name collision (6.2.6); append to `/AF`
+and never assign, deleting an array it empties (6.2.7); satisfy the appearance
+guarantee (6.2.8); do none of the things in 6.2.9; leave the header version alone
+except as 6.2.10 permits; detect a signature and refuse by default (6.2.11);
+write the declaration (6.3); and be deterministic (6.2.14).
+
+A conforming **reader** MUST: implement both the `/AF` path and the name-tree
+fallback (6.2.12); tolerate a null `/AF` entry (6.2.7) and a branching name tree
+(6.2.5); validate before trusting and treat an invalid, unknown-version,
+ambiguous or misattached label as absent (6.2.12, 4.3); and read a payload whose
+declaration is missing (6.3.8).
+
+A conforming **validator** MUST report: every missing or wrong file-specification
+or embedded-file member, including a `/Size` or `/CheckSum` that disagrees with
+the decoded bytes (6.2.3, 6.2.4); every embedded file not registered in the name
+tree and every registered file not associated (6.2.5); an `/AFRelationship` other
+than `/Data` on a PlanLabel file (6.2.3); an empty `/AF` array (6.2.7); a page
+with more than one label, and a name-tree-only label whose `page.index`
+contradicts its filename (6.2.12); a declaration without a payload and a payload
+without a declaration (6.3.8); more than one PlanLabel declaration, or one that is
+not a `rdf:Bag` of structures (6.3.1, 6.3.3); and, where it is given the input
+document as well as the labelled one, every failure of the appearance guarantee
+(6.2.8) and of the removal equivalence (6.2.13).
+
+A validator given only a labelled document MUST say so, and MUST NOT report the
+appearance guarantee as satisfied. It cannot check it, and silence about a check
+that was not run reads as a pass.
+
+**6.6.2 The SVG carrier.** Reserved (6.4). There is no conforming SVG writer or
+reader at 0.1. A validator that is given an SVG document MUST report that PlanLabel
+0.1 defines no SVG carrier rather than report the document as non-conforming.
+
+**6.6.3 The sidecar carrier.**
+
+A conforming **writer** MUST: write the shape of 6.5.1, with the three
+consistency rules satisfied; serialise it canonically (6.5.2); name it as 6.5.3
+requires; and MUST satisfy the pairing rules of 6.5.5.
+
+A conforming **reader** MUST: validate the sidecar against the sidecar schema
+before using any value in it (6.5.1); look for it only beside the document
+(6.5.4); apply the pairing rules of 6.5.5; say when it has used a sidecar without
+its document (6.5.4); and apply the carrier precedence of 6.1.3 where the
+document also carries a payload.
+
+A conforming **validator** MUST report: every violation of the three consistency
+rules of 6.5.1; a non-canonical serialisation (6.5.2); a name that does not match
+the document (6.5.3); and, where it is given the document, a page-count or
+page-dimension mismatch as an error (6.5.5).
+
+**6.6.4 Across carriers.** A validator MUST report a disagreement between two
+carriers carrying payloads for the same document, and MUST report which carrier
+6.1.3 selects. It MUST NOT report the disagreement as a failure of either
+payload: both may be internally perfect, and the defect is that they are not the
+same.
 
 ## 7. IFC mapping *(stub — Phase 4)*
 
@@ -1046,16 +1960,114 @@ with SWAPP ifc-docs.
 How `planlabel`, the schema `$id` and the `conformsTo` URI move together, and what
 counts as a breaking change.
 
-## 9. Security considerations *(stub — Phase 1)*
+## 9. Security considerations
 
-Normative summary, to be expanded:
+A PlanLabel payload is attacker-supplied input whenever the document carrying it is.
+A drawing arrives by email, from a contractor's portal or out of an archive, and the
+program that reads it is often a long-running service. This section states what a
+reader owes its caller, and — equally important — what it cannot promise.
 
-- A label is **data, never executable**. A conforming reader MUST NOT evaluate,
-  execute or dereference label content as code.
-- A conforming reader MUST validate a label against the schema before trusting any
-  value in it, and MUST treat a label that fails validation as absent.
-- Labels are attacker-supplied input whenever the PDF is. Readers MUST bound
-  resource use when parsing.
+### 9.1 A label is data
+
+A label is **data, never executable**. A conforming reader MUST NOT evaluate,
+execute, or dereference as code any value it finds in a label. In particular, a
+reader MUST NOT fetch a URI found in a label, MUST NOT resolve a filename in it
+against the filesystem, and MUST NOT pass any part of it to a template engine, a
+query language or a shell.
+
+`extensions` and an element's `properties` hold arbitrary JSON by design (6.5). A
+reader that forwards either into a system that interprets structure — a document
+database, a serialisation format with type tags, an object deserialiser — MUST treat
+them as untrusted data at that boundary too.
+
+### 9.2 Validate before trusting
+
+A conforming reader MUST validate a label against the schema before trusting any
+value in it, and MUST treat a label that fails validation as **absent** (4.3 (2)):
+no partial parse, no repair, no best effort. The page is in front of the reader and
+the page is the leading document (1.2), so falling back to it is always available and
+always correct.
+
+A reader MUST NOT treat a document-level PDF Declaration as evidence that a payload
+is valid. The declaration is a claim; the schema is the check.
+
+### 9.3 Bounded parsing
+
+A conforming reader MUST bound the resources it spends on a payload, and the bound
+MUST hold for **every** input rather than for the shapes its author anticipated. The
+document chooses the encoding, so a limit applied after a decoder has run is not a
+limit.
+
+Concretely, a reader:
+
+1. MUST bound the decoded size of an embedded payload, and MUST enforce that bound
+   *during* decoding rather than after it;
+2. MUST bound the decoded size of the XMP packet, which is the same untrusted input
+   as a payload;
+3. MUST restrict which stream filters it will decode, and MUST treat a payload under
+   any other filter chain as absent. A reader is not obliged to decode arbitrary PDF
+   filters in order to find a label;
+4. MUST validate `/DecodeParms` — the predictor, colour count, bit depth and column
+   count — against its own limits **before** allocating anything sized from them;
+5. MUST bound the depth of the JSON it parses, or convert the resulting failure into
+   an ordinary "this label is absent" outcome;
+6. MUST bound the work it does reporting a failure: the number of schema violations,
+   and the length of any fragment quoted back from the document, are both the
+   document's to choose;
+7. MUST bound any walk over document structure whose breadth or depth the document
+   controls — a form-field tree, a name tree, an array of associated files — and MUST
+   NOT perform work that is quadratic in a count the document chooses;
+8. SHOULD bound wall-clock time per operation independently of size, because a
+   payload inside every byte limit can still be expensive to decode.
+
+The reference implementation's limits are recorded here as a worked example, not as
+part of the format: a decoded payload of 16 MiB, an XMP packet of 1 MiB, 10 000 form-field
+nodes, and five reported violations each quoting at most 200 characters. An
+implementation MAY choose different numbers; it MUST choose some.
+
+### 9.4 What a reader cannot promise
+
+A PlanLabel reader sits on top of a PDF library, and some inputs are consumed by that
+library before any PlanLabel code runs. A conforming reader MUST NOT claim a guarantee
+it cannot keep. Two limits are known and are stated here rather than papered over:
+
+- **Cross-reference streams.** A cross-reference stream carries the same `/Predictor`,
+  `/Columns` and `/Colors` surface as an embedded file, and a PDF library decodes it
+  while opening the document. A reader's own decode limits do not apply to it.
+- **Recursive structure walks.** A deeply nested page tree can exhaust the C stack of
+  a library that walks it recursively, which ends the process rather than raising
+  something a reader could convert into absence.
+
+Neither is reachable by a reader's own bounds, and a reader that advertised protection
+against them would be wrong. The mitigation is architectural: **an application
+processing untrusted documents SHOULD do so in a separate process** with a memory
+limit, a CPU-time limit and a wall-clock timeout, and treat the death of that process
+as the document being unreadable. A library cannot survive its own address space being
+torn down; a supervising process can.
+
+### 9.5 Writers
+
+A conforming writer:
+
+- MUST NOT invalidate a digital signature silently. It MUST detect a signature, MUST
+  refuse by default, and MUST name a course of action that does not modify the
+  document — the sidecar carrier (6.5) exists for exactly this case. Where a writer
+  offers to proceed anyway, the option MUST be explicit and MUST say that it breaks
+  the signature (6.2).
+- MUST NOT overwrite an embedded file it did not write, MUST NOT remove a third
+  party's attachment, associated file or metadata, and MUST NOT leave a document it
+  refused to label partly written (6.2).
+- SHOULD NOT record in a label anything it was not asked to record. A drawing label
+  travels with the drawing, and a filesystem path, a user name or a machine name in a
+  `generator` or an `extensions` member travels with it too.
+
+### 9.6 Privacy
+
+A label describes a drawing, and a drawing describes a building. `sheet.author`,
+`sheet.checker` and `model.file` can carry personal names and internal paths. A writer
+SHOULD record only what the drawing itself prints, and a tool that publishes labelled
+drawings SHOULD offer to remove those members. This specification does not define a
+redaction mechanism; `planlabel strip` removes the payload entirely.
 
 ---
 
