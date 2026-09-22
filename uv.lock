@@ -1481,8 +1481,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'all'", specifier = ">=0.40" },
-    { name = "anthropic", marker = "extra == 'bench'", specifier = ">=0.40" },
+    { name = "anthropic", marker = "extra == 'all'", specifier = ">=1.0" },
+    { name = "anthropic", marker = "extra == 'bench'", specifier = ">=1.0" },
     { name = "cairosvg", marker = "extra == 'all'", specifier = ">=2.7.1" },
     { name = "cairosvg", marker = "extra == 'svg'", specifier = ">=2.7.1" },
     { name = "ifcopenshell", marker = "extra == 'all'", specifier = ">=0.8.4" },

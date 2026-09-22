@@ -174,6 +174,29 @@ def extract_page(path: Path, page_index: int) -> PageContent:
         )
 
 
+def page_text(path: Path, page_index: int) -> str:
+    """Return a page's text as a PDF reader would copy it out, in reading order.
+
+    This is the text a model gets when it is handed a PDF with no label: pdfplumber's
+    layout-free extraction, top to bottom and left to right.
+
+    Args:
+        path: The PDF.
+        page_index: The zero-based page.
+
+    Returns:
+        The page's text, lines separated by newlines.
+
+    Raises:
+        IndexError: If the document has no such page.
+    """
+    with pdfplumber.open(str(path)) as pdf:
+        if not 0 <= page_index < len(pdf.pages):
+            msg = f"{path} has {len(pdf.pages)} page(s); there is no page index {page_index}"
+            raise IndexError(msg)
+        return str(pdf.pages[page_index].extract_text())
+
+
 def page_count(path: Path) -> int:
     """Return how many pages a PDF has.
 

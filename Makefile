@@ -13,7 +13,7 @@ MCP_PKG        := planlabel_mcp
 COV_MIN_CORE   ?= 85
 COV_MIN_INFER  ?= 70
 SAMPLES_DIR    ?= samples
-BENCH_MODEL    ?= claude-sonnet-4-5
+BENCH_MODEL    ?= claude-opus-5
 BENCH_N        ?= 100
 
 # cairosvg (LGPL-3.0-or-later, used unmodified) reaches the system libcairo
@@ -30,12 +30,9 @@ ifeq ($(UNAME_S),Darwin)
   endif
 endif
 
-# $(call not_yet,<target>,<phase>,<design-brief section>)
-# One expanded line, so make 3.81 handles it without .ONESHELL.
-not_yet = @printf '\nmake %s is not implemented yet: it arrives in Phase %s.\nSee the design brief, section %s.\n\n' '$(1)' '$(2)' '$(3)' >&2; exit 2
 
 .PHONY: help install lock sync fmt fmt-check lint typecheck test fixtures check \
-        cov licenses samples samples-check bench docs inspector hooks precommit \
+        cov licenses samples samples-check bench bench-dry docs inspector hooks precommit \
         build clean distclean version
 
 help: ## Show this help
@@ -105,14 +102,19 @@ samples-check: samples ## Build the samples and validate every one of them
 	    && echo "valid" || exit 1; \
 	done
 
-bench: ## Run the labelled-vs-plain benchmark (Phase 8)
-	@if [ -f bench/runner.py ]; then \
-	  $(RUN) planlabel-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N); \
-	  $(RUN) planlabel-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N); \
-	  $(RUN) planlabel-bench report; \
-	else \
-	  printf '\nmake bench is not implemented yet: it arrives in Phase 8.\nSee the design brief, section 13.\nIt needs ANTHROPIC_API_KEY in .env; nothing in CI ever calls it.\n\n' >&2; exit 2; \
-	fi
+# The only target that calls a paid API. It needs ANTHROPIC_API_KEY in the
+# environment or in .env (git-ignored), and only for questions whose response is not
+# already in bench/cache/; a repeated run is free. CI never runs it.
+bench: samples ## Run the labelled-vs-plain benchmark and update the README table
+	$(RUN) planlabel-bench questions
+	$(RUN) planlabel-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N)
+	$(RUN) planlabel-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N)
+	$(RUN) planlabel-bench report --model $(BENCH_MODEL)
+	$(RUN) planlabel-bench readme --model $(BENCH_MODEL)
+
+bench-dry: samples ## Say how many benchmark questions would reach the API; ask none
+	$(RUN) planlabel-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
+	$(RUN) planlabel-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 
 # The schema version is read from planlabel.SCHEMA_VERSION rather than repeated
 # here, so the published URL layout cannot drift from the one constant that
@@ -125,8 +127,13 @@ docs: ## Stage spec/, schema/ and README into site/ for GitHub Pages
 	 cp -f README.md site/index.md; \
 	 printf 'docs staged in site/ (schema %s) -- publish with GitHub Pages\n' "$$V"
 
-inspector: ## Open the single-file inspector (Phase 5)
-	$(call not_yet,inspector,5,10)
+# The inspector is one static file with no build step; this only makes sure there is
+# a labelled drawing to open in it. `open` is macOS, `xdg-open` elsewhere.
+inspector: samples ## Build the samples and open the single-file inspector
+	@printf 'open %s/floorplan/sheet.labelled.pdf in the page that opens\n' '$(SAMPLES_DIR)'
+	@if command -v open >/dev/null 2>&1; then open inspector/index.html; \
+	 elif command -v xdg-open >/dev/null 2>&1; then xdg-open inspector/index.html; \
+	 else printf 'open inspector/index.html in a browser\n'; fi
 
 hooks: ## Install the git hooks
 	# default_install_hook_types in .pre-commit-config.yaml already covers

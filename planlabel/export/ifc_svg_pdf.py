@@ -21,7 +21,7 @@ import json
 import re
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, get_args
 
 from planlabel.constants import SCHEMA_VERSION
 from planlabel.errors import ExportError
@@ -32,6 +32,7 @@ from planlabel.export.svg_render import RenderedView, render_view
 from planlabel.export.to_pdf import svg_to_pdf
 from planlabel.model import (
     Annotation,
+    DrawingType,
     Element,
     Generator,
     LengthUnit,
@@ -46,7 +47,6 @@ from planlabel.model import (
     Target,
     Viewport,
     canonical_json,
-    conformance_level,
 )
 from planlabel.model import (
     Sheet as SheetInfo,
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from planlabel.export.models import BuiltModel
-    from planlabel.model import Discipline, DrawingType, LengthUnit
+    from planlabel.model import Discipline, LengthUnit
 
 #: Where the drawing sits on the sheet, as a paper bounding box on an A3 page.
 VIEWPORT_BOX = (25.0, 85.0, 325.0, 285.0)
@@ -71,6 +71,16 @@ BUBBLE_RADIUS_MM = 4.0
 
 #: Fewest points a path must have before it is worth recording as an outline.
 _MIN_OUTLINE_POINTS = 2
+
+#: One line of ``groundtruth.jsonl``: a question, its category, and its answer.
+Question = dict[str, object]
+
+#: The element classes the samples draw, in the order their counts are asked about.
+#: Walls are always asked about, so a sheet without any has a count of zero to get right.
+_PLURAL = {"IfcWall": "walls", "IfcColumn": "columns", "IfcBeam": "beams"}
+
+#: Every drawing kind the schema knows, offered as the choices for that question.
+_DRAWING_TYPES: tuple[str, ...] = get_args(DrawingType)
 
 
 @dataclass(frozen=True)
@@ -125,7 +135,7 @@ class ExportedSheet:
 
     svg: str
     label: PageLabel
-    ground_truth: tuple[dict[str, object], ...]
+    ground_truth: tuple[Question, ...]
 
 
 def export_sheet(
@@ -234,7 +244,7 @@ def export_sheet(
     return ExportedSheet(
         svg=sheet.render(),
         label=label,
-        ground_truth=tuple(_ground_truth(label, sheet_id, grids, built.length_unit)),
+        ground_truth=tuple(_ground_truth(label, sheet_id, grids)),
     )
 
 
@@ -528,38 +538,51 @@ def _draw_title_block(
     sheet.text(box[2] - 4.0, box[1] + 20.0, "Index A", size=3.0, anchor="end")
 
 
-def _ground_truth(
-    label: PageLabel, sheet_id: str, grids: tuple[GridAxis, ...], length_unit: str
-) -> list[dict[str, object]]:
+def _ground_truth(label: PageLabel, sheet_id: str, grids: tuple[GridAxis, ...]) -> list[Question]:
     """Derive questions whose answers come from the model, not from the drawing.
+
+    Every question but one kind is about what the sheet shows, so a reader of the
+    page alone can in principle answer it; the label is meant to make that easier,
+    not possible. The exception is the GlobalId of a marked element: only the label
+    carries it, and those questions say so with ``requiresLabel``.
 
     Args:
         label: The page label.
         sheet_id: The sheet number.
         grids: The grid lines.
-        length_unit: The model's length unit.
 
     Returns:
-        One question per fact worth asking about.
+        One question per fact worth asking about, in a stable order.
     """
-    questions: list[dict[str, object]] = [
+    elements = label.elements or []
+    drawn = {element.ifc_class for element in elements}
+    questions: list[Question] = [
         {
             "sheet": sheet_id,
             "category": "count",
-            "question": f"How many IfcWall elements are shown on sheet {sheet_id}?",
-            "answer": sum(1 for e in label.elements or [] if e.ifc_class == "IfcWall"),
-        },
+            "question": (
+                f"How many {_PLURAL[ifc_class]} ({ifc_class}) are drawn on sheet {sheet_id}?"
+            ),
+            "answer": sum(1 for element in elements if element.ifc_class == ifc_class),
+        }
+        for ifc_class in _PLURAL
+        if ifc_class in drawn or ifc_class == "IfcWall"
+    ]
+    questions += [
         {
             "sheet": sheet_id,
             "category": "sheet",
-            "question": f"What is the drawing scale of sheet {sheet_id}?",
+            "question": f"What is the drawing scale of sheet {sheet_id}? Answer as 1:n.",
             "answer": label.sheet.scale,
         },
         {
             "sheet": sheet_id,
-            "category": "level",
-            "question": f"What conformance level does the label of sheet {sheet_id} reach?",
-            "answer": conformance_level(label).value,
+            "category": "sheet",
+            "question": (
+                f"What kind of drawing is sheet {sheet_id}? Answer with one of: "
+                f"{', '.join(_DRAWING_TYPES)}."
+            ),
+            "answer": label.sheet.drawing_type,
         },
     ]
     for annotation in label.annotations or []:
@@ -595,14 +618,32 @@ def _ground_truth(
             "answer": sorted(grid.axis for grid in grids),
         }
     )
-    questions.append(
+    tagged = [element for element in elements if element.tag]
+    questions += [
         {
             "sheet": sheet_id,
-            "category": "model",
-            "question": f"What length unit does the model behind sheet {sheet_id} use?",
-            "answer": length_unit,
+            "category": "tag",
+            "question": (
+                f"On sheet {sheet_id}, what kind of element carries the mark "
+                f"'{element.tag}'? Answer with its IFC class, such as IfcWall."
+            ),
+            "answer": element.ifc_class,
         }
-    )
+        for element in tagged
+    ]
+    if tagged:
+        questions.append(
+            {
+                "sheet": sheet_id,
+                "category": "model",
+                "question": (
+                    f"What is the IFC GlobalId of the element marked '{tagged[0].tag}' "
+                    f"on sheet {sheet_id}?"
+                ),
+                "answer": tagged[0].ifc_guid,
+                "requiresLabel": True,
+            }
+        )
     return questions
 
 

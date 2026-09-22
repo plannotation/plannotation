@@ -65,11 +65,12 @@ svg = ["cairosvg>=2.7.1"]              # LGPL-3.0-or-later, unmodified dependenc
 # ifcopenshell publishes no sdist, only wheels, and pulls shapely, which vendors
 # GEOS (LGPL-2.1) as a prebuilt library. A 42 MB wheel unpacking to ~179 MB.
 ifc = ["ifcopenshell>=0.8.4"]          # LGPL-3.0-or-later, unmodified dependency
-bench = ["anthropic>=0.40"]            # MIT, benchmark only; tests never import it
+bench = ["anthropic>=1.0"]             # MIT, benchmark only; tests never call the API
 all = ["planlabel[svg,ifc,bench]"]
 
 [project.scripts]
 planlabel = "planlabel.cli:app"
+planlabel-bench = "planlabel.bench.cli:app"
 
 [project.urls]
 Homepage = "https://srtgn.github.io/planlabel/"
@@ -240,6 +241,7 @@ required-imports = ["from __future__ import annotations"]
 # over the five link kinds the format defines -- one return each, which reads better
 # than nesting them five deep.
 "planlabel/cli.py" = ["FBT001", "FBT002", "PLR0911"]
+"planlabel/bench/cli.py" = ["FBT001", "FBT002"]
 "planlabel_mcp/planlabel_mcp/server.py" = ["FBT001", "FBT002"]
 "tests/**" = [
   "S101",     # assert is the point

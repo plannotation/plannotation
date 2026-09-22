@@ -29,6 +29,7 @@ from __future__ import annotations
 __all__ = [
     "AppearanceChangedError",
     "AttachmentConflictError",
+    "BenchError",
     "CarrierError",
     "DeclarationError",
     "EncryptedPdfError",
@@ -163,4 +164,12 @@ class ExportError(PlanLabelError):
     Raised where continuing would write a document whose label describes something
     other than the page it is attached to -- a converted page that is not the size the
     sheet declared, or a view the serializer drew nothing into.
+    """
+
+
+class BenchError(PlanLabelError):
+    """The benchmark could not run: no credentials, no ``bench`` extra, or an API error.
+
+    Every answer obtained before the failure is already in the response cache, so the
+    same command resumes where this one stopped without paying for anything twice.
     """

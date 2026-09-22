@@ -1,20 +1,18 @@
 # PlanLabel benchmark
 
-Landing in **Phase 8**.
-
 The question it answers: *how much better does a model understand a drawing when the
-page label is available?*
+page label is available?* See [`docs/benchmark.md`](../docs/benchmark.md) for the method.
 
-- `questions.jsonl` — merged from each `samples/*/groundtruth.jsonl`, so every answer
-  is derived from the source model rather than hand-written.
-- Two conditions, one prompt template:
-  - `plain` — the page rendered at 150 dpi, plus its extracted text.
-  - `labelled` — the same, plus the PlanLabel page label supplied as a tool result.
-- Scoring is exact for categorical answers and numeric within 1% for measurements.
-  Cost and latency are logged; responses are cached on
-  `(condition, model, question)` so a re-run is free and deterministic.
-- `results/` holds the generated reports; the table in the top-level `README.md` is
-  written from them between the `BENCHMARK:START` and `BENCHMARK:END` markers.
+- `questions.jsonl` — merged from each `samples/*/groundtruth.jsonl` by
+  `planlabel-bench questions`, so every answer is derived from the source model rather
+  than hand-written.
+- `results/` — the run logs (`<model>-<condition>.jsonl`) and the reports
+  (`<date>-<model>.md`). The table in the top-level `README.md` is written from them.
+- `cache/` — cached responses, git-ignored.
 
-An API key is read from `.env`, which is git-ignored. No key ever enters the
-repository, and the test suite never calls a live API.
+```bash
+make bench-dry    # asks nothing
+make bench        # needs ANTHROPIC_API_KEY in .env (see .env.example)
+```
+
+No key ever enters the repository, and the test suite never calls a live API.
