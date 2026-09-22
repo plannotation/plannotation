@@ -16,6 +16,7 @@ sample without them would exercise nothing beyond L2.
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
 from dataclasses import dataclass
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from planlabel.export.models import BuiltModel
+    from planlabel.model import Discipline, DrawingType, LengthUnit
 
 #: Where the drawing sits on the sheet, as a paper bounding box on an A3 page.
 VIEWPORT_BOX = (25.0, 85.0, 325.0, 285.0)
@@ -87,6 +89,31 @@ class GridAxis:
 
 
 @dataclass(frozen=True)
+class SheetSpec:
+    """What is drawn on one sheet, and what the sheet says about itself.
+
+    Attributes:
+        sheet_id: The sheet number as it prints.
+        title: The sheet title as it prints.
+        scale: The drawing scale's denominator.
+        grids: The grid lines to draw and dimension between.
+        callout_to: The sheet the callout points at.
+        drawing_type: What kind of drawing this is. It is stated rather than assumed:
+            a position plan labelled as an architectural plan is a false statement
+            about the sheet, and it is exactly the one inference caught.
+        discipline: The discipline the drawing belongs to.
+    """
+
+    sheet_id: str
+    title: str
+    scale: float
+    grids: tuple[GridAxis, ...]
+    callout_to: str
+    drawing_type: DrawingType = "plan"
+    discipline: Discipline = "architecture"
+
+
+@dataclass(frozen=True)
 class ExportedSheet:
     """Everything one exported sheet produced.
 
@@ -103,12 +130,8 @@ class ExportedSheet:
 
 def export_sheet(
     built: BuiltModel,
+    spec: SheetSpec,
     *,
-    sheet_id: str,
-    title: str,
-    scale_denominator: float,
-    grids: tuple[GridAxis, ...],
-    callout_to: str,
     generator_version: str,
     page_size: str = "A3",
 ) -> ExportedSheet:
@@ -116,11 +139,7 @@ def export_sheet(
 
     Args:
         built: The model to draw.
-        sheet_id: The sheet number as it will print.
-        title: The sheet title as it will print.
-        scale_denominator: The drawing scale's denominator.
-        grids: The grid lines to draw and dimension between.
-        callout_to: The sheet id the callout points at.
+        spec: What the sheet is and what is drawn on it.
         generator_version: The version to record in ``generator``.
         page_size: A key of :data:`planlabel.export.sheet.PAPER_SIZES`.
 
@@ -130,6 +149,8 @@ def export_sheet(
     Raises:
         ExportError: If the drawing does not fit the viewport it was given.
     """
+    sheet_id, title, scale_denominator = spec.sheet_id, spec.title, spec.scale
+    grids, callout_to = spec.grids, spec.callout_to
     width_mm, height_mm = PAPER_SIZES[page_size]
     box_width = VIEWPORT_BOX[2] - VIEWPORT_BOX[0]
     box_height = VIEWPORT_BOX[3] - VIEWPORT_BOX[1]
@@ -155,7 +176,7 @@ def export_sheet(
     )
     origin, x_axis, y_axis = plane_from_ifc_plane(view.ifc_plane, _unit_scale(built.length_unit))
 
-    elements = _elements(view, height_mm, offset)
+    elements = _elements(view, height_mm, offset, _model_tags(built.path))
     if not elements:
         msg = f"sheet {sheet_id} drew no elements; the view would be empty"
         raise ExportError(msg)
@@ -174,7 +195,7 @@ def export_sheet(
     viewport = Viewport(
         id="vp-plan",
         name=title,
-        kind="plan",
+        kind="section" if spec.drawing_type == "section" else "plan",
         scale=scale_denominator,
         paperBBox=union_box(contents),
         plane=Plane(
@@ -195,8 +216,8 @@ def export_sheet(
             id=sheet_id,
             title=title,
             revision="A",
-            discipline="architecture",
-            drawingType="plan",
+            discipline=spec.discipline,
+            drawingType=spec.drawing_type,
             scale=scale_denominator,
             project=Project(name="Wohnanlage Lindenhof", number="2024-118"),
             titleBlockBBox=title_block_box(width_mm, height_mm),
@@ -248,13 +269,41 @@ def _view_group(svg: str) -> str:
     return match.group(1)
 
 
-def _elements(view: RenderedView, height_mm: float, offset: tuple[float, float]) -> list[Element]:
+def _model_tags(model_path: Path) -> dict[str, str]:
+    """Read every product's mark out of the model.
+
+    The mark printed on the drawing is the model's own ``Tag``, not a number the
+    exporter makes up. That is what makes it authored, and what lets inference match a
+    printed mark back to the element it names.
+
+    Args:
+        model_path: The IFC file.
+
+    Returns:
+        ``Tag`` by GlobalId, for every product that has one.
+    """
+    ifcopenshell = importlib.import_module("ifcopenshell")
+    model = ifcopenshell.open(str(model_path))
+    return {
+        str(entity.GlobalId): str(entity.Tag)
+        for entity in model.by_type("IfcProduct")
+        if getattr(entity, "Tag", None)
+    }
+
+
+def _elements(
+    view: RenderedView,
+    height_mm: float,
+    offset: tuple[float, float],
+    tags: dict[str, str],
+) -> list[Element]:
     """Describe every product the serializer drew.
 
     Args:
         view: The rendered view.
         height_mm: The sheet height, for the y-flip.
         offset: The wrapper translation that placed the view.
+        tags: Each product's ``Tag`` in the model, by GlobalId.
 
     Returns:
         One element per product, with its paper geometry.
@@ -273,7 +322,7 @@ def _elements(view: RenderedView, height_mm: float, offset: tuple[float, float])
                 ifcGuid=product.guid,
                 ifcClass=product.ifc_class,
                 name=product.name,
-                tag=f"Pos. {index + 1}",
+                tag=tags.get(product.guid),
                 viewport="vp-plan",
                 paperBBox=bounding_box(points),
                 paperOutlines=[

@@ -171,6 +171,23 @@ def write_model(model: Any, out: Path) -> Path:  # noqa: ANN401 - ifcopenshell i
     return out
 
 
+def assign_tags(model: Any, prefix: str = "Pos.") -> None:  # noqa: ANN401 - untyped here
+    """Give every building element a mark, stored in the model's own ``Tag``.
+
+    A position number belongs to the model: the schedule and the drawing both refer to
+    it, and it is the one thing on a drawing that names an element. Storing it in IFC's
+    ``Tag`` attribute is what lets the exporter print the model's mark rather than
+    inventing one, and what lets inference match a mark back to the element it names.
+
+    Args:
+        model: The ``ifcopenshell.file`` to tag in place.
+        prefix: The mark's prefix, "Pos." by German convention.
+    """
+    elements = sorted(model.by_type("IfcBuildingElement"), key=lambda entity: entity.id())
+    for number, element in enumerate(elements, start=1):
+        element.Tag = f"{prefix} {number}"
+
+
 @dataclass(frozen=True)
 class BuiltModel:
     """A model that has been built and written.
@@ -251,6 +268,7 @@ def build_floorplan(out: Path, *, seed: str = "floorplan") -> BuiltModel:
         )
         api_spatial.assign_container(model, products=[wall], relating_structure=storey)
 
+    assign_tags(model)
     reseed_guids(model, seed)
     write_model(model, out)
     return BuiltModel(path=out, seed=seed, storey_elevation=0.0, cut_height=1.2, length_unit="m")
@@ -394,6 +412,7 @@ def _structure(out: Path, seed: str) -> BuiltModel:
         )
         api_spatial.assign_container(model, products=[beam], relating_structure=storey)
 
+    assign_tags(model)
     reseed_guids(model, seed)
     write_model(model, out)
     # Cut low, at 400 mm. The beams here are ground beams spanning between the column
@@ -447,6 +466,7 @@ def _two_storeys(out: Path, seed: str) -> BuiltModel:
             api_spatial.assign_container(model, products=[wall], relating_structure=storey)
             del index
 
+    assign_tags(model)
     reseed_guids(model, seed)
     write_model(model, out)
     return BuiltModel(path=out, seed=seed, storey_elevation=0.0, cut_height=1.2, length_unit="m")

@@ -19,7 +19,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from planlabel.export.ifc_svg_pdf import GridAxis, export_sheet, write_sample
+from planlabel.export.ifc_svg_pdf import GridAxis, SheetSpec, export_sheet, write_sample
 from planlabel.export.models import (
     BuiltModel,
     build_floorplan,
@@ -31,6 +31,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import datetime
     from pathlib import Path
+
+    from planlabel.model import Discipline, DrawingType
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,8 @@ class SampleSpec:
         grids: The grid lines to draw and dimension between.
         callout_to: The sheet the callout points at, which makes the three samples
             reference one another rather than standing alone.
+        drawing_type: What kind of drawing it is.
+        discipline: The discipline it belongs to.
     """
 
     name: str
@@ -55,6 +59,8 @@ class SampleSpec:
     scale: float
     grids: tuple[GridAxis, ...]
     callout_to: str
+    drawing_type: DrawingType = "plan"
+    discipline: Discipline = "architecture"
 
 
 #: The three sets, arranged so that each sheet's callout names the next.
@@ -86,6 +92,8 @@ SAMPLES: tuple[SampleSpec, ...] = (
             GridAxis("2", vertical=False, position=4.8),
         ),
         callout_to="ARC-301",
+        drawing_type="positionsplan",
+        discipline="structure",
     ),
     SampleSpec(
         name="section",
@@ -100,6 +108,7 @@ SAMPLES: tuple[SampleSpec, ...] = (
             GridAxis("2", vertical=False, position=5.4),
         ),
         callout_to="ARC-101",
+        drawing_type="section",
     ),
 )
 
@@ -136,11 +145,15 @@ def build_samples(
         built = spec.build(directory / "model.ifc")
         exported = export_sheet(
             built,
-            sheet_id=spec.sheet_id,
-            title=spec.title,
-            scale_denominator=spec.scale,
-            grids=spec.grids,
-            callout_to=spec.callout_to,
+            SheetSpec(
+                sheet_id=spec.sheet_id,
+                title=spec.title,
+                scale=spec.scale,
+                grids=spec.grids,
+                callout_to=spec.callout_to,
+                drawing_type=spec.drawing_type,
+                discipline=spec.discipline,
+            ),
             generator_version=version,
         )
         written.append(write_sample(exported, built, directory, mod_date=mod_date))

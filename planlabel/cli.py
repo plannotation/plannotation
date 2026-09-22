@@ -946,3 +946,65 @@ def _link_of(annotation: Annotation) -> str:
     if annotation.ifc_guid:
         return f"guid {annotation.ifc_guid}"
     return ""
+
+
+@app.command()
+def infer(
+    source: Annotated[
+        Path, typer.Argument(help="An unlabelled PDF to reconstruct labels for.", exists=True)
+    ],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the labelled copy.")],
+    ifc: Annotated[
+        Path | None,
+        typer.Option(
+            "--ifc",
+            help="Match marks to this IFC model, recovering GlobalIds. Needs the 'ifc' extra.",
+            exists=True,
+        ),
+    ] = None,
+    llm: Annotated[
+        bool,
+        typer.Option(
+            "--llm",
+            help=(
+                "Reserved for a vision-model fallback on sheets the rules cannot classify. "
+                "Not implemented: the rules alone are used."
+            ),
+        ),
+    ] = False,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Report what was inferred as JSON.")
+    ] = False,
+) -> None:
+    """Reconstruct labels for a legacy PDF and write a labelled copy.
+
+    Reads what is printed on each page -- the title block, grid bubbles, dimensions,
+    marks and callouts -- and records what it finds as ``inferred``, each item with a
+    confidence. The input is never modified. With --ifc, every mark the model also holds
+    is matched back to its element, adding the GlobalId and the model's own class.
+
+    Raises:
+        typer.Exit: With 2 when the document cannot be read or written.
+    """
+    from planlabel.infer import infer_document  # noqa: PLC0415 - optional, and heavy
+
+    if llm:
+        errors.print(
+            "[yellow]note[/yellow] --llm is reserved and not implemented; "
+            "inferring from the rules alone"
+        )
+    try:
+        result = infer_document(source, out, ifc_model=ifc)
+    except (PlanLabelError, ValueError) as exc:
+        errors.print(f"[bold red]error[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+
+    if json_output:
+        _echo_json({"out": str(out), **result})
+        return
+    console.print(
+        f"[green]inferred[/green] {result['pages']} page(s): {result['elements']} element(s), "
+        f"{result['annotations']} annotation(s)"
+        + (f", {result['matchedToModel']} matched to the model" if ifc else "")
+    )
+    console.print(f"wrote {out}")

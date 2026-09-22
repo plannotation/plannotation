@@ -1,0 +1,300 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Inference, measured against the gate of design brief section 12.
+
+The gate is recall on the three sample drawings with their labels stripped: at least
+90% of tags, 80% of dimensions and every grid, with precision reported. It is measured
+here against the *unlabelled* PDFs, so that nothing can be read off an attached label;
+the authored ``labels.json`` beside each is only the answer key.
+
+Recall alone is easy to game -- call every word a tag and every tag is found -- so
+precision is asserted too, and the patterns are tested on their own so that a regression
+in the vocabulary shows up as itself rather than as a falling recall number.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+
+from planlabel.infer.match_ifc import normalise_mark
+from planlabel.infer.patterns import (
+    GRID_AXIS,
+    REVISION,
+    SCALE,
+    SHEET_ID,
+    parse_dimension,
+    tag_family,
+)
+
+SAMPLES = Path(__file__).parent.parent / "samples"
+NAMES = ("floorplan", "positionsplan", "section")
+
+
+def has(module: str) -> bool:
+    """Report whether an optional module is importable.
+
+    Args:
+        module: The module name.
+
+    Returns:
+        True when it is.
+    """
+    return importlib.util.find_spec(module) is not None
+
+
+needs_samples = pytest.mark.skipif(
+    not all((SAMPLES / name / "sheet.pdf").exists() for name in NAMES),
+    reason="samples are not built; run make samples",
+)
+
+
+class TestTheVocabulary:
+    """The patterns are the part of inference that a drawing office's habits break."""
+
+    @pytest.mark.parametrize("text", ["ARC-101", "TWP-201", "S-12", "TGA-104A"])
+    def test_sheet_numbers(self, text: str) -> None:
+        """Letters, a dash, digits: the shape nearly every office uses."""
+        assert SHEET_ID.match(text)
+
+    @pytest.mark.parametrize("text", ["arc-101", "ARC101", "A-1", "Pos. 3"])
+    def test_things_that_are_not_sheet_numbers(self, text: str) -> None:
+        """A tag is not a sheet number, which the title block depends on."""
+        assert not SHEET_ID.match(text)
+
+    @pytest.mark.parametrize(
+        ("text", "denominator"),
+        [("1:50", "50"), ("M 1:50", "50"), ("M1:100", "100"), ("Maßstab 1:20", "20")],
+    )
+    def test_scales(self, text: str, denominator: str) -> None:
+        """German and English spellings, with and without the M."""
+        match = SCALE.match(text)
+        assert match is not None
+        assert match.group(1) == denominator
+
+    @pytest.mark.parametrize(
+        ("text", "index"), [("Index A", "A"), ("IndexA", "A"), ("Rev. C", "C")]
+    )
+    def test_revisions(self, text: str, index: str) -> None:
+        """The PDF reader drops the space in "Index A" as often as it keeps it."""
+        match = REVISION.match(text)
+        assert match is not None
+        assert match.group(1) == index
+
+    @pytest.mark.parametrize(
+        ("text", "value"), [("8000", 8000.0), ("2,50", 2.5), ("2.50", 2.5), ("12", 12.0)]
+    )
+    def test_dimensions_read_the_decimal_comma(self, text: str, value: float) -> None:
+        """A German drawing writes two and a half as 2,50."""
+        assert parse_dimension(text) == value
+
+    @pytest.mark.parametrize("text", ["A-1", "Pos.3", "", "1:50"])
+    def test_things_that_are_not_dimensions(self, text: str) -> None:
+        """A scale is not a dimension, nor is a mark."""
+        assert parse_dimension(text) is None
+
+    @pytest.mark.parametrize(
+        ("text", "ifc_class"),
+        [
+            ("Pos.3", "IfcBuildingElement"),
+            ("Pos. 12", "IfcBuildingElement"),
+            ("St.4", "IfcColumn"),
+            ("UZ-1", "IfcBeam"),
+            ("W-2", "IfcWindow"),
+        ],
+    )
+    def test_mark_families_imply_a_class(self, text: str, ifc_class: str) -> None:
+        """A guess from the mark's prefix, carried with a confidence to match."""
+        family = tag_family(text)
+        assert family is not None
+        assert family[0] == ifc_class
+        assert 0.0 < family[1] < 1.0
+
+    def test_a_trailing_newline_is_not_part_of_a_mark(self) -> None:
+        """The dollar-anchor bug Phase 2 found, which this vocabulary is built to avoid."""
+        assert tag_family("Pos. 3\n") is not None
+        assert not GRID_AXIS.match("A\n")
+
+    def test_marks_normalise_across_whitespace(self) -> None:
+        """The drawing prints Pos.3; the model stores Pos. 3; they are one mark."""
+        assert normalise_mark("Pos.3") == normalise_mark("Pos. 3") == normalise_mark(" pos 3 ")
+
+
+@needs_samples
+class TestTheGate:
+    """Design brief section 12: recall on the stripped samples, and precision beside it."""
+
+    @staticmethod
+    def _scores() -> dict[str, list[int]]:
+        """Score inference on every sample, totalled by category.
+
+        Returns:
+            ``[expected, found, correct]`` for each category.
+        """
+        from planlabel.infer import infer_labels
+        from planlabel.infer.evaluate import score
+        from planlabel.model import load_page_label
+
+        totals: dict[str, list[int]] = {}
+        for name in NAMES:
+            authored = load_page_label((SAMPLES / name / "labels.json").read_text("utf-8"))
+            [inferred], _ = infer_labels(SAMPLES / name / "sheet.pdf")
+            for item in score(authored, inferred):
+                total = totals.setdefault(item.category, [0, 0, 0])
+                total[0] += item.expected
+                total[1] += item.found
+                total[2] += item.correct
+        return totals
+
+    @pytest.mark.parametrize(
+        ("category", "floor"), [("tag", 0.90), ("dimension", 0.80), ("grid", 1.0)]
+    )
+    def test_recall_meets_the_gate(self, category: str, floor: float) -> None:
+        """90% of tags, 80% of dimensions, every grid."""
+        expected, _, correct = self._scores()[category]
+        assert correct / expected >= floor
+
+    @pytest.mark.parametrize("category", ["tag", "dimension", "grid", "callout"])
+    def test_precision_is_high_too(self, category: str) -> None:
+        """Recall alone is gamed by reporting everything; precision is what says no."""
+        _, found, correct = self._scores()[category]
+        assert found
+        assert correct / found >= 0.9
+
+    def test_the_title_block_is_read(self) -> None:
+        """Sheet number, scale, revision and drawing type, on every sheet."""
+        expected, _, correct = self._scores()["sheet"]
+        assert correct == expected
+
+    def test_the_sheet_number_is_not_the_callout_target(self) -> None:
+        """A callout prints another sheet's number in the corner a title block sits in.
+
+        Reading it as this sheet's own number named the wrong drawing, on the floor
+        plan, and that is the defect this guards.
+        """
+        from planlabel.infer import infer_labels
+
+        [inferred], _ = infer_labels(SAMPLES / "floorplan" / "sheet.pdf")
+        assert inferred.sheet.sheet_id == "ARC-101"
+
+
+@needs_samples
+class TestWhatInferenceWrites:
+    """SPEC 4.6: everything reconstructed says so."""
+
+    @staticmethod
+    def _label(name: str = "positionsplan") -> object:
+        """Infer one sample's label.
+
+        Args:
+            name: The sample.
+
+        Returns:
+            The inferred label.
+        """
+        from planlabel.infer import infer_labels
+
+        [label], _ = infer_labels(SAMPLES / name / "sheet.pdf")
+        return label
+
+    def test_the_label_is_inferred(self) -> None:
+        """Top-level provenance, and it must not claim to be authored."""
+        from planlabel.model import Provenance
+
+        assert self._label().provenance is Provenance.INFERRED  # type: ignore[attr-defined]
+
+    def test_every_item_is_inferred_with_a_confidence(self) -> None:
+        """SPEC 4.6.5: an inferred value that will not say how sure it is withholds the point."""
+        label = self._label()
+        items = [*(label.elements or []), *(label.annotations or [])]  # type: ignore[attr-defined]
+        assert items
+        for item in items:
+            assert item.provenance.value == "inferred"
+            assert item.confidence is not None
+            assert 0.0 <= item.confidence <= 1.0
+
+    def test_dimensions_link_to_the_grids_they_span(self) -> None:
+        """So a dimension is a statement about the building, not a number beside a line."""
+        label = self._label()
+        dimensions = [a for a in label.annotations or [] if a.annotation_type == "dimension"]  # type: ignore[attr-defined]
+        assert dimensions
+        assert all(d.measures and len(d.measures) == 2 for d in dimensions)
+
+    def test_what_it_writes_validates_clean(self, tmp_path: Path) -> None:
+        """An inferred label must still satisfy every rule the validator checks."""
+        from planlabel.infer import infer_document
+        from planlabel.validate import validate
+
+        out = tmp_path / "inferred.pdf"
+        infer_document(
+            SAMPLES / "positionsplan" / "sheet.pdf", out, mod_date=datetime(2024, 1, 1, tzinfo=UTC)
+        )
+        assert list(validate(out).findings) == []
+
+    def test_it_never_modifies_its_input(self, tmp_path: Path) -> None:
+        """Design brief section 12. A tool that edits the only copy is untriable."""
+        from planlabel.infer import infer_document
+
+        source = SAMPLES / "floorplan" / "sheet.pdf"
+        before = source.read_bytes()
+        infer_document(source, tmp_path / "out.pdf", mod_date=datetime(2024, 1, 1, tzinfo=UTC))
+        assert source.read_bytes() == before
+
+    def test_it_refuses_to_write_over_its_input(self, tmp_path: Path) -> None:
+        """The same promise, enforced rather than hoped for."""
+        from planlabel.infer import infer_document
+
+        copy = tmp_path / "sheet.pdf"
+        copy.write_bytes((SAMPLES / "floorplan" / "sheet.pdf").read_bytes())
+        with pytest.raises(ValueError, match="never modifies its input"):
+            infer_document(copy, copy)
+
+
+@needs_samples
+@pytest.mark.skipif(not has("ifcopenshell"), reason="ifcopenshell is not installed")
+class TestMatchingToTheModel:
+    """--ifc turns a guessed class into the model's own, and adds the GlobalId."""
+
+    @pytest.mark.parametrize("name", NAMES)
+    def test_every_mark_recovers_its_global_id(self, name: str) -> None:
+        """Checked against the authored label, which the exporter wrote from the model."""
+        from planlabel.infer import infer_labels
+        from planlabel.model import load_page_label
+
+        authored = load_page_label((SAMPLES / name / "labels.json").read_text("utf-8"))
+        truth = {
+            normalise_mark(e.tag or ""): (e.ifc_guid, e.ifc_class) for e in authored.elements or []
+        }
+        [inferred], matched = infer_labels(
+            SAMPLES / name / "sheet.pdf", ifc_model=SAMPLES / name / "model.ifc"
+        )
+        assert matched == len(truth)
+        for element in inferred.elements or []:
+            assert truth[normalise_mark(element.tag or "")] == (element.ifc_guid, element.ifc_class)
+
+    def test_a_match_stays_inferred(self) -> None:
+        """SPEC 4.6.6: however confident, reconstructed data is never promoted to authored."""
+        from planlabel.infer import infer_labels
+
+        [inferred], _ = infer_labels(
+            SAMPLES / "floorplan" / "sheet.pdf", ifc_model=SAMPLES / "floorplan" / "model.ifc"
+        )
+        for element in inferred.elements or []:
+            assert element.provenance.value == "inferred"
+
+
+@pytest.mark.skipif(
+    not (Path(__file__).parent / "fixtures" / "realworld").is_dir(),
+    reason="no real-world PDFs in tests/fixtures/realworld (git-ignored by design)",
+)
+def test_real_world_drawings_do_not_crash_it() -> None:
+    """Design brief section 12: no crash on real drawings, which are never committed."""
+    from planlabel.infer import infer_labels
+
+    documents = sorted((Path(__file__).parent / "fixtures" / "realworld").glob("*.pdf"))
+    if not documents:
+        pytest.skip("tests/fixtures/realworld holds no PDFs")
+    for document in documents:
+        infer_labels(document)
