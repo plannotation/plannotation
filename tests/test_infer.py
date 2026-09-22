@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib.util
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -167,14 +168,15 @@ class TestTheGate:
         return totals
 
     @pytest.mark.parametrize(
-        ("category", "floor"), [("tag", 0.90), ("dimension", 0.80), ("grid", 1.0)]
+        ("category", "floor"),
+        [("tag", 0.90), ("dimension", 0.80), ("grid", 1.0), ("level", 1.0)],
     )
     def test_recall_meets_the_gate(self, category: str, floor: float) -> None:
         """90% of tags, 80% of dimensions, every grid."""
         expected, _, correct = self._scores()[category]
         assert correct / expected >= floor
 
-    @pytest.mark.parametrize("category", ["tag", "dimension", "grid", "callout"])
+    @pytest.mark.parametrize("category", ["tag", "dimension", "grid", "level", "callout"])
     def test_precision_is_high_too(self, category: str) -> None:
         """Recall alone is gamed by reporting everything; precision is what says no."""
         _, found, correct = self._scores()[category]
@@ -203,7 +205,7 @@ class TestWhatInferenceWrites:
     """SPEC 4.6: everything reconstructed says so."""
 
     @staticmethod
-    def _label(name: str = "positionsplan") -> object:
+    def _label(name: str = "positionsplan") -> Any:  # noqa: ANN401
         """Infer one sample's label.
 
         Args:
@@ -221,34 +223,71 @@ class TestWhatInferenceWrites:
         """Top-level provenance, and it must not claim to be authored."""
         from planlabel.model import Provenance
 
-        assert self._label().provenance is Provenance.INFERRED  # type: ignore[attr-defined]
+        assert self._label().provenance is Provenance.INFERRED
 
     def test_every_item_is_inferred_with_a_confidence(self) -> None:
         """SPEC 4.6.5: an inferred value that will not say how sure it is withholds the point."""
         label = self._label()
-        items = [*(label.elements or []), *(label.annotations or [])]  # type: ignore[attr-defined]
+        items = [*(label.elements or []), *(label.annotations or [])]
         assert items
         for item in items:
             assert item.provenance.value == "inferred"
             assert item.confidence is not None
             assert 0.0 <= item.confidence <= 1.0
 
-    def test_dimensions_link_to_the_grids_they_span(self) -> None:
+    @pytest.mark.parametrize("name", NAMES)
+    def test_dimensions_link_to_the_grids_they_span(self, name: str) -> None:
         """So a dimension is a statement about the building, not a number beside a line."""
-        label = self._label()
-        dimensions = [a for a in label.annotations or [] if a.annotation_type == "dimension"]  # type: ignore[attr-defined]
+        label = self._label(name)
+        dimensions = [a for a in label.annotations or [] if a.annotation_type == "dimension"]
         assert dimensions
         assert all(d.measures and len(d.measures) == 2 for d in dimensions)
 
-    def test_what_it_writes_validates_clean(self, tmp_path: Path) -> None:
+    def test_an_overall_dimension_printed_across_a_grid_line_still_links(self) -> None:
+        """11400 prints across grid B; the grid's line is not the dimension's.
+
+        Taking the nearest line to the value took grid B's, and the overall dimension
+        measured nothing. Grid and level lines are now never a dimension's own.
+        """
+        label = self._label("positionsplan")
+        by_id = {a.local_id: a for a in label.annotations or []}
+        overall = next(a for a in label.annotations or [] if a.text == "11400")
+        assert sorted(by_id[end].axis for end in overall.measures or []) == ["A", "C"]
+
+    def test_each_bay_of_a_chain_links_to_its_own_grids(self) -> None:
+        """Not the whole chain's first and last: 1-2, 2-3 and 3-4 on the floor plan."""
+        label = self._label("floorplan")
+        by_id = {a.local_id: a for a in label.annotations or []}
+        spans = sorted(
+            "".join(sorted(str(by_id[end].axis) for end in a.measures or []))
+            for a in label.annotations or []
+            if a.annotation_type == "dimension" and a.text == "2000"
+        )
+        assert spans == ["12", "23", "34"]
+
+    def test_levels_are_read_and_storey_heights_link_to_them(self) -> None:
+        """A section's storey heights run between level lines, and say so."""
+        label = self._label("section")
+        levels = {a.local_id: a for a in label.annotations or [] if a.annotation_type == "level"}
+        assert sorted(level.elevation for level in levels.values()) == [0.0, 3.0, 6.0]
+        heights = [
+            a
+            for a in label.annotations or []
+            if a.annotation_type == "dimension" and set(a.measures or []) <= set(levels)
+        ]
+        assert sorted(a.value for a in heights) == [3000.0, 3000.0, 6000.0]
+        for height in heights:
+            low, high = sorted(levels[end].elevation for end in height.measures or [])
+            assert (high - low) * 1000.0 == height.value
+
+    @pytest.mark.parametrize("name", NAMES)
+    def test_what_it_writes_validates_clean(self, name: str, tmp_path: Path) -> None:
         """An inferred label must still satisfy every rule the validator checks."""
         from planlabel.infer import infer_document
         from planlabel.validate import validate
 
         out = tmp_path / "inferred.pdf"
-        infer_document(
-            SAMPLES / "positionsplan" / "sheet.pdf", out, mod_date=datetime(2024, 1, 1, tzinfo=UTC)
-        )
+        infer_document(SAMPLES / name / "sheet.pdf", out, mod_date=datetime(2024, 1, 1, tzinfo=UTC))
         assert list(validate(out).findings) == []
 
     def test_it_never_modifies_its_input(self, tmp_path: Path) -> None:

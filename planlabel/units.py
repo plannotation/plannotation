@@ -81,7 +81,8 @@ endings and UTF-8.
 
 from __future__ import annotations
 
-from typing import Final
+import math
+from typing import Final, Literal
 
 #: Millimetres per PDF point. Exact: one point is 1/72 inch, one inch is 25.4 mm.
 MM_PER_PT: Final = 25.4 / 72.0
@@ -94,3 +95,40 @@ COORD_DECIMALS: Final = 3
 
 #: Identity affine transform in ``[a, b, c, d, e, f]`` order.
 IDENTITY_AFFINE: Final = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+
+#: The length units a label can name, by their size in metres (SPEC 3.5).
+METRES_PER_LENGTH_UNIT: Final[dict[Literal["m", "cm", "mm"], float]] = {
+    "m": 1.0,
+    "cm": 0.01,
+    "mm": 0.001,
+}
+
+
+def length_unit_for(unit_scale_to_m: float) -> Literal["m", "cm", "mm"]:
+    """Name a model's length unit, given its size in metres.
+
+    The size is what ``ifcopenshell.util.unit.calculate_unit_scale`` reports for a
+    model, so this is how a writer states ``model.lengthUnit`` from the model itself
+    rather than from an assumption about it.
+
+    Args:
+        unit_scale_to_m: The unit in metres.
+
+    Returns:
+        ``m``, ``cm`` or ``mm``.
+
+    Raises:
+        ValueError: If it is none of those; PlanLabel 0.1 names no other.
+
+    Examples:
+        >>> length_unit_for(0.001)
+        'mm'
+    """
+    for name, size in METRES_PER_LENGTH_UNIT.items():
+        if math.isclose(unit_scale_to_m, size, rel_tol=1e-9):
+            return name
+    msg = (
+        f"the model's length unit is {unit_scale_to_m} m; PlanLabel 0.1 describes models "
+        "in metres, centimetres or millimetres"
+    )
+    raise ValueError(msg)

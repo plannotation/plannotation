@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import importlib
 import logging
-import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
@@ -43,6 +42,7 @@ from planlabel.model import (
 from planlabel.model import Sheet as SheetInfo
 from planlabel.pdf import embed
 from planlabel.svg.carrier import SvgSheet, SvgView, compose, read_svg
+from planlabel.units import length_unit_for
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -70,9 +70,6 @@ NOT_ELEMENTS: Final = frozenset(
         "IfcBuildingStorey",
     }
 )
-
-#: The length units a label can name, by their size in metres.
-_LENGTH_UNITS: Final[dict[LengthUnit, float]] = {"m": 1.0, "cm": 0.01, "mm": 0.001}
 
 #: How far off horizontal a view's axes may be for it to be a plan.
 _HORIZONTAL: Final = 1e-6
@@ -157,28 +154,6 @@ def derive_label(sheet: SvgSheet, source: SheetSource, *, page_index: int = 0) -
         viewports=viewports or None,
         elements=elements or None,
     )
-
-
-def length_unit_for(unit_scale_to_m: float) -> LengthUnit:
-    """Name a model's length unit.
-
-    Args:
-        unit_scale_to_m: The unit in metres.
-
-    Returns:
-        ``m``, ``cm`` or ``mm``.
-
-    Raises:
-        ValueError: If it is none of those; PlanLabel 0.1 names no other.
-    """
-    for name, size in _LENGTH_UNITS.items():
-        if math.isclose(unit_scale_to_m, size, rel_tol=1e-9):
-            return name
-    msg = (
-        f"the model's length unit is {unit_scale_to_m} m; PlanLabel 0.1 describes models "
-        "in metres, centimetres or millimetres"
-    )
-    raise ValueError(msg)
 
 
 def source_from_model(

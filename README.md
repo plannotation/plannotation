@@ -39,7 +39,7 @@ uvx planlabel inspect samples/positionsplan/sheet.labelled.pdf
 ## Why a label helps
 
 <!-- BENCHMARK:START -->
-> **Not measured yet.** The harness is in place: 38 questions about the three sample
+> **Not measured yet.** The harness is in place: 59 questions about the three sample
 > sheets, each answered by the same model with and without the page label, and each
 > keyed to the IFC model the sheet was drawn from ([method](docs/benchmark.md)).
 > `make bench` runs it with an API key in `.env` and writes the measured table here.

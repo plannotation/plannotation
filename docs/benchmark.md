@@ -35,12 +35,14 @@ mistake with the thing it grades.
 
 | Category | Asks for | Scored |
 | --- | --- | --- |
-| `count` | How many walls, columns or beams the sheet draws | numeric |
+| `count` | How many walls, doors, windows, columns, beams or slabs the sheet draws | numeric |
 | `sheet` | The scale, and the kind of drawing | numeric, exact |
-| `dimension` | A grid spacing, in millimetres | numeric |
+| `dimension` | A grid spacing or a storey height, in millimetres | numeric |
 | `callout` | The sheet a callout points to | exact |
 | `grid` | The grid axes drawn | exact, as a set |
 | `tag` | The IFC class of the element carrying a mark | exact |
+| `section` | A member's cross-section, or a slab's thickness | exact, numeric |
+| `level` | The elevation of a level mark, in metres | numeric |
 | `model` | The IFC GlobalId of a marked element | exact; **label only** |
 
 Every category but `model` is about something the sheet prints or draws, so a careful

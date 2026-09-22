@@ -38,13 +38,15 @@ right, so that part is checked by hand against the samples:
 
 1. `make samples`
 2. Open `inspector/index.html` and choose `samples/floorplan/sheet.labelled.pdf`.
-3. The four walls should be outlined, each with a `Pos. n` tag box on it.
-4. The grid bubbles A, B, 1 and 2 should be circled, and the two dimensions drawn.
+3. The five walls, two doors and two windows should be outlined, each with its mark's
+   tag box beside it (`Pos. n`, `T1`, `W1`).
+4. The grid bubbles A–D and 1–4 should be circled, and the eight dimensions drawn.
 5. Hovering an outline should name its IFC class and GlobalId.
 6. Turning off **elements** should leave the annotations and the viewport frame.
 7. Clicking a row in the table should highlight that one and dim the rest.
 8. **Copy JSON** should put the page label on the clipboard; **Export CSV** should
    download one row per item.
-9. Repeat with `positionsplan` (six structural members) and `section`.
+9. Repeat with `positionsplan` (sixteen structural members, each with its
+   cross-section) and `section` (walls and slabs on two storeys, and three levels).
 
 Screenshots of steps 3 and 5 belong in `docs/img/`.

@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 
 from planlabel.export.ifc_svg_pdf import GridAxis, SheetSpec, export_sheet, write_sample
 from planlabel.export.models import (
+    POSITIONSPLAN_X,
+    POSITIONSPLAN_Y,
     BuiltModel,
     build_floorplan,
     build_positionsplan,
@@ -63,6 +65,23 @@ class SampleSpec:
     discipline: Discipline = "architecture"
 
 
+def _grid(axes: str, positions: tuple[float, ...], *, vertical: bool) -> tuple[GridAxis, ...]:
+    """Name a run of grid lines.
+
+    Args:
+        axes: One character per line, such as ``ABCD``.
+        positions: Their plane coordinates, in metres.
+        vertical: Whether they run up the page.
+
+    Returns:
+        The grid lines.
+    """
+    return tuple(
+        GridAxis(axis, vertical=vertical, position=position)
+        for axis, position in zip(axes, positions, strict=True)
+    )
+
+
 #: The three sets, arranged so that each sheet's callout names the next.
 SAMPLES: tuple[SampleSpec, ...] = (
     SampleSpec(
@@ -71,12 +90,8 @@ SAMPLES: tuple[SampleSpec, ...] = (
         sheet_id="ARC-101",
         title="Grundriss Erdgeschoss",
         scale=50.0,
-        grids=(
-            GridAxis("A", vertical=True, position=0.0),
-            GridAxis("B", vertical=True, position=8.0),
-            GridAxis("1", vertical=False, position=0.0),
-            GridAxis("2", vertical=False, position=6.0),
-        ),
+        grids=_grid("ABCD", (0.0, 3.0, 5.5, 8.0), vertical=True)
+        + _grid("1234", (0.0, 2.0, 4.0, 6.0), vertical=False),
         callout_to="TWP-201",
     ),
     SampleSpec(
@@ -85,12 +100,8 @@ SAMPLES: tuple[SampleSpec, ...] = (
         sheet_id="TWP-201",
         title="Positionsplan Gründung",
         scale=50.0,
-        grids=(
-            GridAxis("A", vertical=True, position=0.0),
-            GridAxis("B", vertical=True, position=5.7),
-            GridAxis("1", vertical=False, position=0.0),
-            GridAxis("2", vertical=False, position=4.8),
-        ),
+        grids=_grid("ABC", POSITIONSPLAN_X, vertical=True)
+        + _grid("123", POSITIONSPLAN_Y, vertical=False),
         callout_to="ARC-301",
         drawing_type="positionsplan",
         discipline="structure",
@@ -101,12 +112,9 @@ SAMPLES: tuple[SampleSpec, ...] = (
         sheet_id="ARC-301",
         title="Schnitt A-A",
         scale=50.0,
-        grids=(
-            GridAxis("A", vertical=True, position=0.0),
-            GridAxis("B", vertical=True, position=7.2),
-            GridAxis("1", vertical=False, position=0.0),
-            GridAxis("2", vertical=False, position=5.4),
-        ),
+        # The section looks along x, so the grids it crosses are the ones along y,
+        # and plane x is model y: grid 1 on the left, grid 4 on the right.
+        grids=_grid("1234", (0.0, 2.0, 4.0, 6.0), vertical=True),
         callout_to="ARC-101",
         drawing_type="section",
     ),
@@ -114,7 +122,12 @@ SAMPLES: tuple[SampleSpec, ...] = (
 
 
 def build_samples(
-    out_root: Path, *, mod_date: datetime, version: str, only: str | None = None
+    out_root: Path,
+    *,
+    mod_date: datetime,
+    version: str,
+    only: str | None = None,
+    inkscape_fallback: bool = False,
 ) -> list[Path]:
     """Build every sample set into a directory.
 
@@ -123,6 +136,8 @@ def build_samples(
         mod_date: The timestamp to stamp, so the output is reproducible.
         version: The version to record in each label's ``generator``.
         only: Build just this one set, by name, or None for all of them.
+        inkscape_fallback: Convert with the Inkscape command line when CairoSVG cannot
+            run, rather than failing.
 
     Returns:
         The labelled PDFs written, in order.
@@ -156,7 +171,11 @@ def build_samples(
             ),
             generator_version=version,
         )
-        written.append(write_sample(exported, built, directory, mod_date=mod_date))
+        written.append(
+            write_sample(
+                exported, built, directory, mod_date=mod_date, inkscape_fallback=inkscape_fallback
+            )
+        )
         questions.extend(dict(question) for question in exported.ground_truth)
 
     if only is None:

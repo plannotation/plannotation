@@ -536,13 +536,14 @@ def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not 
         attach_from_svg,
         source_from_ifc,
     )
+    from planlabel.units import METRES_PER_LENGTH_UNIT  # noqa: PLC0415 -- as above
 
     moment = _resolve_mod_date(mod_date)
     try:
         if ifc is not None:
             source = source_from_ifc(ifc, sheet_id=sheet_id, title=title)
         else:
-            scale = {"m": 1.0, "cm": 0.01, "mm": 0.001}[unit.value]
+            scale = METRES_PER_LENGTH_UNIT[unit.value]
             source = SheetSource(
                 sheet_id=sheet_id, unit_scale_to_m=scale, length_unit=unit.value, title=title
             )
@@ -841,6 +842,13 @@ def samples_build(
     json_output: Annotated[
         bool, typer.Option("--json", help="Report what was written as JSON.")
     ] = False,
+    inkscape: Annotated[
+        bool,
+        typer.Option(
+            "--inkscape-fallback",
+            help="Convert SVG to PDF with the inkscape command when cairosvg cannot run.",
+        ),
+    ] = False,
 ) -> None:
     """Build the sample drawings: model, sheet, PDF, labels and ground truth.
 
@@ -860,6 +868,7 @@ def samples_build(
         written = build_samples(
             out,
             mod_date=datetime.fromisoformat(mod_date),
+            inkscape_fallback=inkscape,
             version=__version__,
             only=only,
         )

@@ -11,13 +11,17 @@ tested against numbers whose answer is known independently, not against itself.
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
+import sys
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Any
 
 import pikepdf
 import pytest
 
+from planlabel.errors import ExportError
 from planlabel.export.geometry import bounding_box, path_points, union_box
 from planlabel.export.paper import (
     apply,
@@ -29,8 +33,7 @@ from planlabel.export.paper import (
 )
 from planlabel.export.sheet import PAPER_SIZES, Sheet, frame_box, title_block_box
 
-if TYPE_CHECKING:
-    from pathlib import Path
+MOD_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 
 
 def has(module: str) -> bool:
@@ -406,7 +409,7 @@ class TestTheSampleModel:
         assert seeded_guid("floorplan", 0) != seeded_guid("positionsplan", 0)
 
     def test_every_wall_reaches_the_drawing(self, tmp_path: Path) -> None:
-        """Four walls in the model, four walls on the plan."""
+        """Five walls, two doors and two windows in the model; all nine on the plan."""
         from planlabel.export.models import build_floorplan
         from planlabel.export.svg_render import render_view
 
@@ -418,7 +421,8 @@ class TestTheSampleModel:
             width_mm=300.0,
             height_mm=220.0,
         )
-        assert len(view.products) == 4
+        classes = sorted(product.ifc_class for product in view.products)
+        assert classes == ["IfcDoor"] * 2 + ["IfcWall"] * 5 + ["IfcWindow"] * 2
 
     def test_the_drawing_is_at_the_scale_it_was_asked_for(self, tmp_path: Path) -> None:
         """PL-GEO-008 compares the transform with the declared scale, so they must agree."""
@@ -439,9 +443,10 @@ class TestTheSampleModel:
     def test_a_drawn_wall_measures_what_the_model_says(self, tmp_path: Path) -> None:
         """The end-to-end claim: paper geometry, through the transform, is the building.
 
-        The walls are built 240 mm thick and 6.0 and 8.0 metres long. Measuring them off
-        the drawing has to give those numbers back, or the label describes a different
-        building from the one it was made from.
+        The external walls are built 240 mm thick and 6.0 and 8.0 metres long, the
+        internal one 115 mm thick and 5.52 metres long. Measuring them off the drawing
+        has to give those numbers back, or the label describes a different building
+        from the one it was made from.
         """
         from planlabel.export.models import build_floorplan
         from planlabel.export.svg_render import render_view
@@ -457,6 +462,8 @@ class TestTheSampleModel:
         transform = paper_to_plane(view.matrix3, view.height_mm, 1.0)
         measured = []
         for product in view.products:
+            if product.ifc_class != "IfcWall":
+                continue
             points = [
                 point
                 for path in product.paths
@@ -468,8 +475,8 @@ class TestTheSampleModel:
             measured.append((abs(high[0] - low[0]), abs(high[1] - low[1])))
         thicknesses = sorted(round(min(pair), 3) for pair in measured)
         lengths = sorted(round(max(pair), 3) for pair in measured)
-        assert thicknesses == [0.24, 0.24, 0.24, 0.24]
-        assert lengths == [6.0, 6.0, 8.0, 8.0]
+        assert thicknesses == [0.115, 0.24, 0.24, 0.24, 0.24]
+        assert lengths == [5.52, 6.0, 6.0, 8.0, 8.0]
 
 
 @needs_ifc
@@ -611,4 +618,297 @@ class TestTheSampleSets:
                 mod_date=datetime(2024, 1, 1, tzinfo=UTC),
                 version="0.0.0-test",
                 only="nonesuch",
+            )
+
+
+SAMPLES = Path(__file__).parent.parent / "samples"
+
+needs_samples = pytest.mark.skipif(
+    not (SAMPLES / "section" / "labels.json").is_file(),
+    reason="samples are not built; run make samples",
+)
+
+
+def _sample(name: str) -> dict[str, Any]:
+    """Load one built sample's label as JSON.
+
+    Args:
+        name: The sample.
+
+    Returns:
+        Its label.
+    """
+    return json.loads((SAMPLES / name / "labels.json").read_text("utf-8"))
+
+
+class TestLevelText:
+    """Levels print as a German section prints them."""
+
+    @pytest.mark.parametrize(
+        ("elevation", "text"),
+        [(0.0, "±0,00"), (0.004, "±0,00"), (3.0, "+3,00"), (-0.25, "-0,25"), (12.5, "+12,50")],
+    )
+    def test_level_text(self, elevation: float, text: str) -> None:
+        """Signed, two decimals, a decimal comma."""
+        from planlabel.export.ifc_svg_pdf import level_text
+
+        assert level_text(elevation) == text
+
+
+@needs_samples
+class TestWhatTheDesignBriefAsksOfTheSamples:
+    """Design brief section 9, sheet by sheet."""
+
+    @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
+    def test_the_label_states_the_model_s_own_unit(self, name: str) -> None:
+        """A label naming metres for a millimetre model is out by a factor of a thousand."""
+        ifcopenshell = pytest.importorskip("ifcopenshell")
+        from ifcopenshell.util.unit import calculate_unit_scale
+
+        from planlabel.units import length_unit_for
+
+        model = ifcopenshell.open(str(SAMPLES / name / "model.ifc"))
+        stated = _sample(name)["model"]["lengthUnit"]
+        assert stated == length_unit_for(calculate_unit_scale(model))
+
+    @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
+    def test_at_least_six_dimensions_per_sheet(self, name: str) -> None:
+        """Between grids, or between levels, each linked to what it measures."""
+        dimensions = [a for a in _sample(name)["annotations"] if a["type"] == "dimension"]
+        assert len(dimensions) >= 6
+        assert all(len(a["measures"]) == 2 for a in dimensions)
+
+    def test_the_floor_plan_has_doors_windows_and_a_four_by_four_grid(self) -> None:
+        """(a) walls, doors, windows, one storey, grid A-D / 1-4."""
+        label = _sample("floorplan")
+        classes = sorted(e["ifcClass"] for e in label["elements"])
+        assert classes.count("IfcDoor") == 2
+        assert classes.count("IfcWindow") == 2
+        grids = sorted(a["axis"] for a in label["annotations"] if a["type"] == "grid")
+        assert grids == ["1", "2", "3", "4", "A", "B", "C", "D"]
+
+    def test_the_position_plan_numbers_every_member_and_states_its_section(self) -> None:
+        """(b) columns, beams, a slab, every one tagged Pos. n with its cross-section."""
+        label = _sample("positionsplan")
+        elements = label["elements"]
+        assert {e["ifcClass"] for e in elements} == {"IfcColumn", "IfcBeam", "IfcSlab"}
+        assert sorted(int(e["tag"].split()[-1]) for e in elements) == list(range(1, 17))
+        shown = {
+            a["shows"]["element"]: a["text"]
+            for a in label["annotations"]
+            if a["type"] == "text" and a["shows"]["property"].endswith(".Reference")
+        }
+        assert {shown[e["id"]] for e in elements} == {"30/30", "30/75", "d = 25 cm"}
+
+    def test_the_slab_below_the_cut_is_a_projection(self) -> None:
+        """Drawn beyond the cut, and said to be; and written where an SVG reader finds it."""
+        label = _sample("positionsplan")
+        slab = next(e for e in label["elements"] if e["ifcClass"] == "IfcSlab")
+        assert slab["representation"] == "projection"
+        svg = (SAMPLES / "positionsplan" / "sheet.svg").read_text("utf-8")
+        assert f'ifc:guid="{slab["ifcGuid"]}"' in svg
+        cut = {e["representation"] for e in label["elements"] if e["ifcClass"] != "IfcSlab"}
+        assert cut == {"cut"}
+
+    def test_the_section_is_a_vertical_cut_with_levels(self) -> None:
+        """(c) two storeys and their levels, on a plane that stands up."""
+        label = _sample("section")
+        (viewport,) = label["viewports"]
+        assert viewport["kind"] == "section"
+        assert viewport["plane"]["yAxis"] == [0, 0, 1]
+        levels = [a for a in label["annotations"] if a["type"] == "level"]
+        assert sorted(a["elevation"] for a in levels) == [0, 3, 6]
+        assert all(a.get("ifcGuid") for a in levels)
+
+    def test_each_level_mark_stands_at_its_elevation(self) -> None:
+        """A level's box centre, taken through the viewport, is the height it prints."""
+        label = _sample("section")
+        (viewport,) = label["viewports"]
+        a, b, c, d, e, f = viewport["paperToPlane"]
+        plane = viewport["plane"]
+        for level in (x for x in label["annotations"] if x["type"] == "level"):
+            x0, y0, x1, y1 = level["paperBBox"]
+            x, y = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+            u, v = a * x + c * y + e, b * x + d * y + f
+            z = plane["origin"][2] + u * plane["xAxis"][2] + v * plane["yAxis"][2]
+            assert z == pytest.approx(level["elevation"], abs=0.01)
+
+    @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
+    def test_no_mark_sits_on_another_mark_or_on_an_element(self, name: str) -> None:
+        """A mark on a cut wall is black on black; two marks on each other are neither."""
+        label = _sample(name)
+        marks = [a["paperBBox"] for a in label["annotations"] if a["type"] in ("tag", "text")]
+        content = (
+            min(e["paperBBox"][0] for e in label["elements"]),
+            min(e["paperBBox"][1] for e in label["elements"]),
+            max(e["paperBBox"][2] for e in label["elements"]),
+            max(e["paperBBox"][3] for e in label["elements"]),
+        )
+        small = [
+            e["paperBBox"]
+            for e in label["elements"]
+            if not (
+                (e["paperBBox"][2] - e["paperBBox"][0]) > 0.5 * (content[2] - content[0])
+                and (e["paperBBox"][3] - e["paperBBox"][1]) > 0.5 * (content[3] - content[1])
+            )
+        ]
+
+        def overlap(p: list[float], q: list[float]) -> float:
+            width = min(p[2], q[2]) - max(p[0], q[0])
+            height = min(p[3], q[3]) - max(p[1], q[1])
+            return max(0.0, width) * max(0.0, height)
+
+        tags = [a for a in label["annotations"] if a["type"] == "tag"]
+        for tag in tags:
+            others = [m for m in marks if m is not tag["paperBBox"]]
+            reference = next(
+                (
+                    a["paperBBox"]
+                    for a in label["annotations"]
+                    if a["type"] == "text" and a["shows"]["element"] == tag["shows"]["element"]
+                ),
+                None,
+            )
+            clash = [m for m in others if m is not reference and overlap(tag["paperBBox"], m) > 0]
+            assert clash == [], tag["text"]
+            assert all(overlap(tag["paperBBox"], box) == 0 for box in small), tag["text"]
+
+    def test_the_new_question_kinds_are_asked(self) -> None:
+        """Storey elevations and cross-sections join counts, dimensions and callouts."""
+        categories = {
+            json.loads(line)["category"]
+            for line in (SAMPLES / "groundtruth.jsonl").read_text("utf-8").splitlines()
+        }
+        assert categories >= {"count", "dimension", "callout", "grid", "tag", "level", "section"}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stand-in inkscape is a shell script")
+class TestTheInkscapeFallback:
+    """Design brief section 9: fall back to the Inkscape CLI if present and the flag is set."""
+
+    SHEET = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="420mm" height="297mm" '
+        'viewBox="0 0 420 297"><rect width="10" height="10"/></svg>'
+    )
+
+    @staticmethod
+    def _no_cairo(monkeypatch: pytest.MonkeyPatch) -> None:
+        """Make CairoSVG unavailable, as on a machine without libcairo.
+
+        Args:
+            monkeypatch: pytest's monkeypatch.
+        """
+        from planlabel.errors import MissingExtraError
+        from planlabel.export import to_pdf
+
+        def missing() -> None:
+            msg = "no libcairo"
+            raise MissingExtraError(msg)
+
+        monkeypatch.setattr(to_pdf, "_cairosvg", missing)
+
+    @staticmethod
+    def _inkscape(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, exit_code: int = 0) -> None:
+        """Put a stand-in ``inkscape`` on the PATH that writes an A3 PDF.
+
+        Args:
+            tmp_path: Where to put it.
+            monkeypatch: pytest's monkeypatch.
+            exit_code: What it exits with.
+        """
+        a3 = tmp_path / "a3.pdf"
+        with pikepdf.new() as pdf:
+            pdf.add_blank_page(page_size=(420 / 25.4 * 72, 297 / 25.4 * 72))
+            pdf.save(a3)
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        script = bin_dir / "inkscape"
+        script.write_text(
+            "#!/bin/sh\n"
+            'for arg in "$@"; do case "$arg" in --export-filename=*) '
+            'out="${arg#--export-filename=}";; esac; done\n'
+            f'/bin/cp "{a3}" "$out"\n'
+            f"exit {exit_code}\n",
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        monkeypatch.setenv("PATH", str(bin_dir))
+
+    def test_without_the_flag_a_missing_cairo_is_an_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The fallback is asked for, never assumed."""
+        from planlabel.errors import MissingExtraError
+        from planlabel.export.to_pdf import svg_to_pdf
+
+        self._no_cairo(monkeypatch)
+        self._inkscape(tmp_path, monkeypatch)
+        with pytest.raises(MissingExtraError, match="libcairo"):
+            svg_to_pdf(
+                self.SHEET, tmp_path / "o.pdf", width_mm=420, height_mm=297, mod_date=MOD_DATE
+            )
+
+    def test_with_the_flag_inkscape_converts_and_the_size_is_checked(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Same checks, same stamp, whichever program drew the page."""
+        from planlabel.export.to_pdf import svg_to_pdf
+
+        self._no_cairo(monkeypatch)
+        self._inkscape(tmp_path, monkeypatch)
+        out = svg_to_pdf(
+            self.SHEET,
+            tmp_path / "o.pdf",
+            width_mm=420,
+            height_mm=297,
+            mod_date=MOD_DATE,
+            inkscape_fallback=True,
+        )
+        with pikepdf.open(out) as pdf:
+            assert str(pdf.docinfo["/ModDate"]) == "D:20240101000000Z"
+        with pytest.raises(ExportError, match=r"297\.00 x 420\.00"):
+            svg_to_pdf(
+                self.SHEET,
+                tmp_path / "p.pdf",
+                width_mm=297,
+                height_mm=420,
+                mod_date=MOD_DATE,
+                inkscape_fallback=True,
+            )
+
+    def test_with_the_flag_and_no_inkscape_the_message_names_both(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Either program would do; the message says so."""
+        from planlabel.errors import MissingExtraError
+        from planlabel.export.to_pdf import svg_to_pdf
+
+        self._no_cairo(monkeypatch)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        with pytest.raises(MissingExtraError, match="inkscape"):
+            svg_to_pdf(
+                self.SHEET,
+                tmp_path / "o.pdf",
+                width_mm=420,
+                height_mm=297,
+                mod_date=MOD_DATE,
+                inkscape_fallback=True,
+            )
+
+    def test_an_inkscape_failure_is_an_export_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With its exit code."""
+        from planlabel.export.to_pdf import svg_to_pdf
+
+        self._no_cairo(monkeypatch)
+        self._inkscape(tmp_path, monkeypatch, exit_code=3)
+        with pytest.raises(ExportError, match="exit 3"):
+            svg_to_pdf(
+                self.SHEET,
+                tmp_path / "o.pdf",
+                width_mm=420,
+                height_mm=297,
+                mod_date=MOD_DATE,
+                inkscape_fallback=True,
             )

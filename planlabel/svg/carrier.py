@@ -449,6 +449,36 @@ def guid_from_uuid(text: str) -> str:
     return "".join(reversed(characters))
 
 
+def uuid_from_guid(guid: str) -> str:
+    """Turn a 22-character IFC GlobalId back into the UUID it encodes.
+
+    The inverse of :func:`guid_from_uuid`, and what the serializer writes into a
+    product group's ``id="product-<uuid>"``.
+
+    Args:
+        guid: The GlobalId.
+
+    Returns:
+        The UUID, lower case, hyphenated.
+
+    Raises:
+        ValueError: If ``guid`` is not a GlobalId: 22 characters of IFC's alphabet
+            encoding a 128-bit number.
+
+    Examples:
+        >>> uuid_from_guid("0000000000000000000000")
+        '00000000-0000-0000-0000-000000000000'
+    """
+    if not _GUID.fullmatch(guid):
+        msg = f"not an IFC GlobalId: {guid!r}"
+        raise ValueError(msg)
+    value = 0
+    for character in guid:
+        value = value * 64 + GUID_ALPHABET.index(character)
+    digits = f"{value:032x}"
+    return f"{digits[:8]}-{digits[8:12]}-{digits[12:16]}-{digits[16:20]}-{digits[20:]}"
+
+
 def product_guid(element: ET.Element) -> str | None:
     """Return the GlobalId a group names, if it names one.
 

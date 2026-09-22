@@ -42,6 +42,8 @@ from planlabel.errors import MissingExtraError
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from planlabel.export.models import SectionCut
+
 #: Products never drawn: an opening is a void, and drawing it fills the hole it makes.
 EXCLUDED_CLASSES = ("IfcOpeningElement",)
 
@@ -118,20 +120,24 @@ def _require(name: str) -> Any:  # noqa: ANN401 - ifcopenshell is untyped here
 def render_view(
     model_path: Path,
     *,
-    section_height: float,
     scale_denominator: float,
     width_mm: float,
     height_mm: float,
+    section_height: float | None = None,
+    section: SectionCut | None = None,
+    name: str = "",
 ) -> RenderedView:
-    """Render one plan view of a model to SVG.
+    """Render one view of a model to SVG: a plan cut, or a vertical section.
 
     Args:
         model_path: The IFC file.
-        section_height: Where to cut, in the model's length unit, measured from the
-            storey the drawing belongs to.
         scale_denominator: The drawing scale's denominator, so 50 for 1:50.
         width_mm: The bounding rectangle's width in millimetres.
         height_mm: Its height in millimetres.
+        section_height: For a plan, where to cut, in metres above the storey.
+        section: For a section, the vertical cutting plane. The serializer draws it
+            through ``addDrawing`` with the storeys' own plans switched off.
+        name: The view's name, recorded as the view group's ``ifc:name``.
 
     Returns:
         The rendered view.
@@ -154,7 +160,11 @@ def render_view(
     buffer = geom.serializers.buffer()
     serializer = geom.serializers.svg(buffer, settings, geom.serializer_settings())
     serializer.setFile(model)
-    serializer.setSectionHeight(section_height)
+    if section is None:
+        serializer.setSectionHeight(1.2 if section_height is None else section_height)
+    else:
+        serializer.setWithoutStoreys(True)
+        serializer.addDrawing(section.location, section.direction, section.x_axis, name, True)  # noqa: FBT003
     serializer.setPolygonal(True)
     serializer.setUseNamespace(True)
     serializer.setAlwaysProject(True)

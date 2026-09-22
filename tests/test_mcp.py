@@ -124,7 +124,7 @@ class TestTheReadingTools:
             ServerConfig(root=root), "get_label", pdf="floorplan/sheet.labelled.pdf", page=0
         )
         assert result["label"]["sheet"]["id"] == "ARC-101"
-        assert len(result["label"]["elements"]) == 4
+        assert len(result["label"]["elements"]) == 9
 
     def test_get_label_on_an_unlabelled_page_says_so(self, root: Path) -> None:
         """And names the pages that are labelled, so the next call can be right."""
@@ -139,7 +139,7 @@ class TestTheReadingTools:
             pdf="positionsplan/sheet.labelled.pdf",
             query="ifccolumn",
         )
-        assert len(result["matches"]) == 4
+        assert len(result["matches"]) == 9
         assert {match["ifcClass"] for match in result["matches"]} == {"IfcColumn"}
 
     def test_find_elements_by_mark(self, root: Path) -> None:
@@ -153,14 +153,14 @@ class TestTheReadingTools:
         assert [match["tag"] for match in result["matches"]] == ["Pos. 3"]
 
     def test_measure_between_two_grids(self, root: Path) -> None:
-        """The grids on the floor plan are eight metres apart in the model."""
+        """The outer grids on the floor plan are eight metres apart in the model."""
         result = call(
             ServerConfig(root=root),
             "measure",
             pdf="floorplan/sheet.labelled.pdf",
             page=0,
             id_a="g-A",
-            id_b="g-B",
+            id_b="g-D",
         )
         assert result["paperMm"] > 0
         assert result["modelUnit"] == "m"
@@ -236,7 +236,7 @@ class TestWritingWhenAllowed:
         config = ServerConfig(root=root, allow_write=True)
         result = call(config, "infer", pdf="positionsplan/sheet.pdf", out="inferred.pdf")
         assert result["pages"] == 1
-        assert result["elements"] == 6
+        assert result["elements"] == 16
         assert (root / "inferred.pdf").exists()
 
 

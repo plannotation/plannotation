@@ -28,6 +28,7 @@ from planlabel.svg.carrier import (
     compose,
     guid_from_uuid,
     parse_transform,
+    uuid_from_guid,
 )
 from planlabel.svg.label import paper_to_plane
 from planlabel.validate import validate
@@ -100,6 +101,18 @@ class TestIdentity:
         assert guid_from_uuid(UUID) == GUID
         assert guid_from_uuid(UUID.replace("-", "")) == GUID
         assert guid_from_uuid("ffffffff-ffff-ffff-ffff-ffffffffffff")[0] == "3"
+
+    def test_a_global_id_decodes_to_its_uuid(self) -> None:
+        """And back again, for every character the first position can hold."""
+        assert uuid_from_guid(GUID) == UUID
+        for first in "0123":
+            guid = first + GUID[1:]
+            assert guid_from_uuid(uuid_from_guid(guid)) == guid
+
+    def test_what_is_not_a_global_id_is_refused(self) -> None:
+        """A first character past 3 would be more than 128 bits."""
+        with pytest.raises(ValueError, match="not an IFC GlobalId"):
+            uuid_from_guid("O" + GUID[1:])
 
     def test_a_non_uuid_is_refused(self) -> None:
         """Rather than encoded as whatever number it happens to spell."""
@@ -709,7 +722,8 @@ class TestFromSvgCommand:
         label = next(iter(read_pdf_labels(out).values()))
         assert label.source_model is not None
         assert label.source_model.ifc_schema == "IFC4"
-        assert {e.tag for e in label.elements or []} == {"Pos. 1", "Pos. 2", "Pos. 3", "Pos. 4"}
+        marks = {e.tag for e in label.elements or []}
+        assert marks == {f"Pos. {n}" for n in range(1, 6)} | {"T1", "T2", "W1", "W2"}
 
 
 def read_pdf_labels(path: Path) -> dict[int, PageLabel]:
@@ -732,13 +746,13 @@ class TestModelSource:
     @pytest.mark.parametrize(("scale", "name"), [(1.0, "m"), (0.01, "cm"), (0.001, "mm")])
     def test_metric_units_are_named(self, scale: float, name: str) -> None:
         """The three a label can state."""
-        from planlabel.svg.label import length_unit_for
+        from planlabel.units import length_unit_for
 
         assert length_unit_for(scale) == name
 
     def test_feet_are_refused(self) -> None:
         """PlanLabel 0.1 has no word for them."""
-        from planlabel.svg.label import length_unit_for
+        from planlabel.units import length_unit_for
 
         with pytest.raises(ValueError, match="metres, centimetres or millimetres"):
             length_unit_for(0.3048)

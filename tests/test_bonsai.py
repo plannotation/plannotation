@@ -335,5 +335,5 @@ class TestExecute:
         assert operator.pdf_path.endswith("ARC-101 - Grundriss.pdf")
         assert operator.execute(None) == {"FINISHED"}, operator.reports
         out = tmp_path / "sheets" / "ARC-101 - Grundriss.labelled.pdf"
-        assert "4 element(s)" in operator.reports[0][1]
+        assert "9 element(s)" in operator.reports[0][1]
         assert validate(out).error_count == 0
