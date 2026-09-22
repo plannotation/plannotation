@@ -49,4 +49,10 @@ right, so that part is checked by hand against the samples:
 9. Repeat with `positionsplan` (sixteen structural members, each with its
    cross-section) and `section` (walls and slabs on two storeys, and three levels).
 
-Screenshots of steps 3 and 5 belong in `docs/img/`.
+The three samples as the inspector draws them, labels over the pages:
+
+![The floor plan in the inspector](img/inspector-floorplan.png)
+
+![The position plan in the inspector: every member's mark and cross-section boxed](img/inspector-positionsplan.png)
+
+![The section in the inspector, with its level marks](img/inspector-section.png)

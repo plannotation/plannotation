@@ -48,7 +48,9 @@ The first command builds three IFC models and draws them — a floor plan, a str
 position plan and a section — as labelled A3 sheets; it needs a system `libcairo`
 (`brew install cairo`, `apt-get install libcairo2`) or Inkscape with
 `--inkscape-fallback`. The second prints what the position plan's label says. For the
-same on a page, open [`inspector/index.html`](inspector/index.html) and choose the PDF.
+same on a page, open [`inspector/index.html`](inspector/index.html) and choose the PDF:
+
+![The position plan in the inspector: each member's mark and cross-section, the grids, dimensions and viewport, drawn from the label over the page](docs/img/inspector-positionsplan.png)
 
 From a clone, before the package is on PyPI:
 
