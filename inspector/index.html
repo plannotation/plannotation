@@ -97,6 +97,7 @@
     <div class="card">
       <h2>Show</h2>
       <div class="toggles" id="toggles"></div>
+      <div class="toggles" id="types" title="Annotation types on this page"></div>
     </div>
     <div class="card">
       <h2>On this page</h2>
@@ -121,6 +122,25 @@ const KINDS = [
   ["viewport", "viewports", "--viewport"],
 ];
 const shown = new Set(KINDS.map(([k]) => k));
+// Per annotation type -- grid, dimension, level, tag, callout -- built from the page's
+// own label, since a section has levels and a plan does not.
+const hiddenTypes = new Set();
+
+function typeToggles(label) {
+  const types = [...new Set((label?.annotations || []).map((a) => a.type))].sort();
+  const box = el("types");
+  box.innerHTML = "";
+  for (const type of types) {
+    const wrap = document.createElement("label");
+    wrap.innerHTML = `<input type="checkbox" ${hiddenTypes.has(type) ? "" : "checked"}
+      data-type="${escape(type)}">${escape(type)}`;
+    wrap.querySelector("input").addEventListener("change", (e) => {
+      e.target.checked ? hiddenTypes.delete(type) : hiddenTypes.add(type);
+      draw();
+    });
+    box.append(wrap);
+  }
+}
 
 for (const [kind, label, varName] of KINDS) {
   const wrap = document.createElement("label");
@@ -204,6 +224,7 @@ function draw() {
   const paint = (items, kind, colour) => {
     if (!shown.has(kind)) return;
     for (const item of items || []) {
+      if (kind === "annotation" && hiddenTypes.has(item.type)) continue;
       const stroke = getComputedStyle(document.documentElement).getPropertyValue(colour).trim();
       const box = item.paperBBox;
       if (!box) continue;
@@ -245,6 +266,7 @@ function draw() {
 function describe() {
   const label = state.labels.get(state.page);
   const sheet = el("sheet"), rows = el("rows");
+  typeToggles(label);
   if (!label) {
     sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no PlanLabel label.</dd>`;
     rows.innerHTML = `<tr><td colspan="3" class="empty">nothing to show</td></tr>`;
