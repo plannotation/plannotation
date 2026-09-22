@@ -6,11 +6,19 @@ everything this library raises deliberately with a single ``except`` clause, and
 distinguish it from the ``OSError`` of an unreadable file or the
 ``pydantic.ValidationError`` of a malformed model.
 
-Two branches hang off it: :class:`CarrierError` for anything about getting label
-data into or out of a document, and :class:`RenderError` for anything about
-rasterising one. Each leaf names a failure a caller can actually do something
-about, and every message raised in this package is expected to say what was wrong
-and what to do instead.
+Three branches hang off it: :class:`CarrierError` for anything about getting label
+data into or out of a document, :class:`RenderError` for anything about rasterising
+one, and :class:`ValidatorError` for a validation run that could not be made at all.
+Each leaf names a failure a caller can actually do something about, and every message
+raised in this package is expected to say what was wrong and what to do instead.
+
+:class:`ValidatorError` is the branch that is *not* about the document being wrong.
+A validator has three outcomes and only two of them are about the label: it found
+nothing, it found something, or it could not look. The third is what this branch
+carries, and it is why ``planlabel validate`` has an exit code 2 distinct from its
+exit code 1 -- a pipeline must be able to tell a broken drawing from a broken
+toolchain, and a validator that reported "no errors" because it never ran a check has
+said something false.
 
 This module deliberately imports nothing. It is the one module every other module
 may depend on without creating a cycle.
@@ -24,12 +32,16 @@ __all__ = [
     "CarrierError",
     "DeclarationError",
     "EncryptedPdfError",
+    "ExternalToolError",
+    "InputNotValidatableError",
     "InvalidLabelError",
     "LabelMismatchError",
     "LabelNotFoundError",
+    "MissingExtraError",
     "PlanLabelError",
     "RenderError",
     "SignedPdfError",
+    "ValidatorError",
 ]
 
 
@@ -101,4 +113,44 @@ class AppearanceChangedError(RenderError):
 
     The governing principle of the specification is that writing a label never
     changes how a page looks. This is the error that fires when it did.
+    """
+
+
+class ValidatorError(PlanLabelError):
+    """A validation run could not be made, so its result says nothing.
+
+    Distinct from every finding a validator reports. A finding is a statement about
+    the document; this is a statement about the run. ``planlabel validate`` turns it
+    into exit code 2, which is neither the 0 of a clean document nor the 1 of a
+    defective one.
+    """
+
+
+class InputNotValidatableError(ValidatorError):
+    """The input is not something this validator can examine.
+
+    An unreadable file, a file that is not JSON and not a PDF, a PDF carrying no
+    PlanLabel data at all, or a document past one of the reader's bounds. In each case
+    there was nothing to validate, which is not the same as validating something and
+    finding it clean.
+    """
+
+
+class MissingExtraError(ValidatorError):
+    """A check was asked for whose optional dependency is not installed.
+
+    ``--ifc`` needs ifcopenshell, which lives behind the ``ifc`` extra and is
+    deliberately absent from a default install. Silently skipping the check would
+    report a clean cross-check that was never made, so the run ends instead. The
+    message names the extra to install.
+    """
+
+
+class ExternalToolError(ValidatorError):
+    """An external command a check depends on is absent or cannot run.
+
+    ``--verapdf`` shells out to veraPDF, which is a Java application behind a shell
+    wrapper and can therefore sit on ``PATH`` while being unusable. As with
+    :class:`MissingExtraError`, the run ends rather than reporting a pass it did not
+    establish.
     """

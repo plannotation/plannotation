@@ -1,73 +1,78 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Check the PlanLabel fixtures for schema, canonical-form, geometric and corpus defects.
+"""Check the PlanLabel fixture corpus: canonical bytes, manifests, and drawing sense.
 
-The fixtures under ``tests/fixtures`` are the natural test data for the Phase 3
-re-measurement check, and they are what a reader copies when learning the format. A
-fixture that is schema-legal but physically impossible -- a dimension whose printed
-value disagrees with the length it is drawn at, a level that contradicts its own
-viewport transform, an elevation mirrored by a negative determinant -- therefore costs
-twice. This script turns that whole class of defect into something CI catches.
+The fixtures under ``tests/fixtures`` are what a reader copies when learning the format
+and what every other test measures itself against, so a fixture that is schema-legal
+and physically impossible costs twice. This script turns that class of defect into
+something CI catches.
 
-What is checked
----------------
-Gate conditions of Phase 1, over ``labels/`` and over ``index/`` alike:
+It is not a second validator
+----------------------------
+Since Phase 3 it is not. Every rule about the **format** -- schema validity, identity
+and references, geometry, provenance -- belongs to :mod:`planlabel.validate`, and this
+script applies them by calling it: :func:`schema_findings` for rule 1, and
+:func:`planlabel.validate.check_page_document` and
+:func:`planlabel.validate.check_page_label` for the rest. It keeps no copy of any of
+them. That is the point: four rounds of Phase 2 were spent on defects that
+existed only because two pieces of code believed slightly different things, and the
+fixture corpus checking the format with its own arithmetic was the largest remaining
+instance of it.
 
-a. every document under ``valid/`` validates against its schema with zero errors;
-b. every document under ``invalid/`` produces exactly one error, of the keyword and at
-   the ``errorPath`` the manifest states;
+What is left here is everything that is about **this corpus** rather than about
+PlanLabel, and each item below says why it stays.
+
+The manifests and the bytes
+---------------------------
+a. every document under ``valid/`` validates against its schema with zero errors, and
+   the validator agrees;
+b. every document under ``invalid/`` produces exactly **one** schema error, of the
+   keyword, at the ``errorPath`` and with the ``validatorSchemaPath`` the manifest
+   states. This is a claim about the manifest, not about the format: a negative fixture
+   that fails for two reasons tests neither of them;
 c. every document round-trips **byte for byte** -- through the models for a valid one,
    and as canonical JSON text for an invalid one, which no model can load. The
    comparison is on bytes and never on text, because :meth:`pathlib.Path.read_text`
    translates CRLF to LF and would hide a Windows line ending completely;
-d. :func:`planlabel.model.conformance_level` returns the level the manifest, the
-   filename and every index entry naming that sheet all claim;
-e. every bbox is ordered ``x0 <= x1``, ``y0 <= y1`` and lies on the page;
-f. every element and annotation bbox lies inside the bbox of the viewport it names,
-   and drawn geometry lies inside the bbox of the item that carries it;
-g. GlobalIds are well-formed IFC identifiers and page sizes are real A-series sizes.
+d. the manifest lists exactly the files on disk, in filename order, as many of each as
+   the Phase 1 gate fixed, and every ``schemaPointer`` dereferences;
+e. :func:`planlabel.model.conformance_level` returns the level the manifest, the
+   filename and every index entry naming that sheet all claim.
 
-Geometric coherence, on top of the gate:
+The corpus is a drawing, not only a document
+--------------------------------------------
+These rules need a drawing to be plausible as well as well-formed. None is in the
+specification, none could be -- a conforming label may describe an unbuildable
+building -- and a real project's drawings would trip several of them for good reasons.
 
-* a dimension's printed value must match the length it is drawn at, taken through its
-  viewport's scale, measured along the **whole polyline path** and not merely from its
-  first point to its last -- a dog-legged dimension line is drawn to its full run;
-* a level's elevation must match what its viewport's ``paperToPlane`` yields at the
-  annotation's own paper position;
-* a ``paperToPlane`` must have a positive determinant, since a negative one mirrors the
-  view and turns a north elevation into a south one;
-* a plane's ``xAxis`` and ``yAxis`` must be unit vectors and mutually orthogonal, each
-  to within 1e-6, as SPEC 3.6 requires: scale is carried by ``paperToPlane``, and an
-  axis of any other length would state it a second time;
-* where a viewport carries both ``storey.elevation`` and ``cutHeight``, the drawing
-  plane is the cutting plane, so the plane origin's component along the view normal
-  must equal ``storey.elevation + cutHeight``;
-* a ``paperToPlane``'s linear factor must agree with the viewport's scale expressed in
-  the model's length unit.
-
-Referential integrity, which is what makes an L3 claim mean anything:
-
-* every ``annotation.measures`` entry resolves, to an element or to an annotation of
-  type ``grid`` or ``level`` (SPEC 4.5);
-* every ``annotation.shows.element`` resolves to an element on the page;
-* a ``shows.property`` of the form ``Pset_X.Y`` names a property set the element
-  actually carries, and a ``shows.property`` of ``Tag`` requires the element to have
-  one;
-* a ``target.viewportId`` that points at this very sheet resolves to a viewport on it.
-  A target naming another sheet is left alone: its ``localId`` belongs to that page.
-
-Cross-document rules, which no single fixture can fail on its own:
-
-* **model identity.** Two documents that declare the same ``model.sha256`` must agree
-  on ``lengthUnit`` and on ``schema``, and ``file`` and ``sha256`` must determine each
-  other. One file cannot be two models and one model cannot be two files;
+* **a level agrees with its own transform.** A level annotation's paper position, taken
+  through ``paperToPlane`` and the plane, must yield the elevation it prints. This is a
+  drafting convention (the tag sits at the height it names), not a format rule;
+* **a section mark lies on the plane of the section it opens.** Likewise;
+* **what a tag prints.** A tag showing ``Tag`` prints the element's tag exactly, and a
+  tag showing a numeric property prints that number. Whether the element carries the
+  property at all is the validator's PL-REF-012; what the sheet prints against it is
+  not in the format at any level, and is here;
 * **declared size versus drawn size.** Where an element's own name or its own IFC base
   quantity states a dimension, the drawing must agree to within 2 per cent;
-* **physical plausibility.** A foundation above the model datum, a storey height
-  outside 2.2 to 6 m, a slab thinner than 100 mm or thicker than 500 mm;
+* **physical plausibility.** A foundation above the model datum, a storey height outside
+  2.2 to 6 m, a slab thinner than 100 mm or thicker than 500 mm;
 * **cross-sheet consistency.** An element cut under the same name on two sheets of one
-  model must be drawn at the same size;
-* **what a tag prints.** A tag showing ``Tag`` prints the element's tag exactly, and a
-  tag showing a numeric property prints that number.
+  model must be drawn at the same size. No single fixture can fail this;
+* **model identity.** Two documents that declare the same ``model.sha256`` must agree on
+  ``lengthUnit`` and on ``schema``, and ``file`` and ``sha256`` must determine each
+  other. One file cannot be two models. Also cross-document;
+* **the index against the labels.** Matched here by printed sheet id, because the
+  corpus's indexes and labels are separate fixture files describing no one document;
+  the validator matches them by page inside a carrier, which is a different rule about
+  a different thing;
+* **GlobalIds and sheet sizes are real.** A GlobalId's first character encodes two bits,
+  so it can only be ``0`` to ``3``; the schema's pattern is deliberately looser, and a
+  page that is not an A-series size is a fixture nobody meant to write.
+
+Warnings count as failures here. On the command line a label with warnings and no
+errors is conforming and exits 0, as section 4.4 requires. In this corpus a warning is
+a defect: these are the twelve labels a reader copies, and one that trips a SHOULD
+teaches the SHOULD wrongly.
 
 Dimensions read off a name
 --------------------------
@@ -106,7 +111,6 @@ from __future__ import annotations
 
 import codecs
 import json
-import math
 import re
 import sys
 from itertools import pairwise
@@ -131,20 +135,36 @@ from planlabel.model import (
     load_page_label,
     page_schema,
 )
+from planlabel.validate import check_page_document, check_page_label
+from planlabel.validate.geometric import (
+    METRES_PER_MODEL_UNIT,
+    MM_PER_MODEL_UNIT,
+    millimetres,
+)
+from planlabel.validate.geometry import (
+    apply_affine,
+    bbox_centre,
+    bbox_corners,
+    cross,
+    dot,
+)
+from planlabel.validate.geometry import (
+    world_point as plane_to_world,
+)
+from planlabel.validate.schema import DocumentKind, check_schema
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     from pydantic import BaseModel
 
-#: Metres per value of ``model.lengthUnit``.
-METRES_PER_UNIT = {"m": 1.0, "cm": 0.01, "mm": 0.001}
+    from planlabel.validate import Finding
 
-#: Millimetres per value of ``model.lengthUnit``, for reading IFC quantities.
-MM_PER_UNIT = {"m": 1000.0, "cm": 10.0, "mm": 1.0}
+#: Metres per value of ``model.lengthUnit``. The validator's table, not a second copy.
+METRES_PER_UNIT = METRES_PER_MODEL_UNIT
 
-#: Metres per value of ``annotation.unit``, for the units that are lengths.
-METRES_PER_MEASURE = {"mm": 0.001, "cm": 0.01, "m": 1.0}
+#: Millimetres per value of ``model.lengthUnit``, for reading IFC quantities. Likewise.
+MM_PER_UNIT = MM_PER_MODEL_UNIT
 
 #: Millimetres per unit token written in an element's name.
 MM_PER_NAME_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0}
@@ -164,12 +184,6 @@ IFC_GUID_RE = re.compile(r"^[0-3][0-9A-Za-z_$]{21}$")
 
 #: How a fixture filename spells the conformance level it claims.
 LEVEL_IN_NAME_RE = re.compile(r"-(l[123])\b", re.IGNORECASE)
-
-#: Relative tolerance on a measured length, as a fraction of the expected length.
-LENGTH_RTOL = 0.01
-
-#: Absolute floor of that tolerance, in model millimetres.
-LENGTH_ATOL_MM = 0.5
 
 #: Absolute tolerance on an elevation, in metres. Coordinates carry three decimals.
 ELEVATION_ATOL_M = 1e-6
@@ -270,254 +284,10 @@ class Stated(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
-# Small geometric helpers
+# Corpus rules: is this a real drawing?
 # ---------------------------------------------------------------------------
-def cross(u: Sequence[float], v: Sequence[float]) -> tuple[float, float, float]:
-    """Return the cross product of two three-vectors.
-
-    Args:
-        u: The left operand.
-        v: The right operand.
-
-    Returns:
-        ``u x v``, which for a plane's ``xAxis`` and ``yAxis`` is the view normal.
-    """
-    return (
-        u[1] * v[2] - u[2] * v[1],
-        u[2] * v[0] - u[0] * v[2],
-        u[0] * v[1] - u[1] * v[0],
-    )
-
-
-def dot(u: Sequence[float], v: Sequence[float]) -> float:
-    """Return the dot product of two three-vectors.
-
-    Args:
-        u: The left operand.
-        v: The right operand.
-
-    Returns:
-        The scalar product.
-    """
-    return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
-
-
-def norm(u: Sequence[float]) -> float:
-    """Return the Euclidean length of a three-vector.
-
-    Args:
-        u: The vector.
-
-    Returns:
-        Its length.
-    """
-    return math.sqrt(dot(u, u))
-
-
-def apply_affine(matrix: Sequence[float], x: float, y: float) -> tuple[float, float]:
-    """Map a paper point through a ``paperToPlane`` transform.
-
-    Args:
-        matrix: The affine ``[a, b, c, d, e, f]``.
-        x: The paper x coordinate, in millimetres.
-        y: The paper y coordinate, in millimetres.
-
-    Returns:
-        The point on the viewport's model plane, in the model's length unit, as
-        ``X = a*x + c*y + e``, ``Y = b*x + d*y + f``.
-    """
-    a, b, c, d, e, f = matrix
-    return (a * x + c * y + e, b * x + d * y + f)
-
-
-def determinant(matrix: Sequence[float]) -> float:
-    """Return the determinant of a ``paperToPlane`` transform's linear part.
-
-    Args:
-        matrix: The affine ``[a, b, c, d, e, f]``.
-
-    Returns:
-        ``a*d - b*c``. A negative value mirrors the view.
-    """
-    a, b, c, d, _e, _f = matrix
-    return a * d - b * c
-
-
-def bbox_centre(box: Sequence[float]) -> tuple[float, float]:
-    """Return the centre of a bbox.
-
-    Args:
-        box: ``[x0, y0, x1, y1]`` in paper millimetres.
-
-    Returns:
-        The centre point, which is where an annotation's mark sits.
-    """
-    return ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
-
-
-def bbox_corners(box: Sequence[float]) -> list[tuple[float, float]]:
-    """Return the four corners of a bbox.
-
-    Args:
-        box: ``[x0, y0, x1, y1]`` in paper millimetres.
-
-    Returns:
-        The corners, anticlockwise from the bottom left.
-    """
-    return [(box[0], box[1]), (box[2], box[1]), (box[2], box[3]), (box[0], box[3])]
-
-
-def contains(outer: Sequence[float], inner: Sequence[float]) -> bool:
-    """Report whether one bbox lies inside another.
-
-    Args:
-        outer: The containing bbox.
-        inner: The contained bbox.
-
-    Returns:
-        True when every edge of ``inner`` is within ``outer``.
-    """
-    return (
-        inner[0] >= outer[0]
-        and inner[1] >= outer[1]
-        and inner[2] <= outer[2]
-        and inner[3] <= outer[3]
-    )
-
-
-def polyline_bbox(points: Sequence[Sequence[float]]) -> tuple[float, float, float, float]:
-    """Return the bounding box of a polyline.
-
-    Args:
-        points: Two or more points in paper millimetres.
-
-    Returns:
-        ``[x0, y0, x1, y1]`` enclosing every point.
-    """
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    return (min(xs), min(ys), max(xs), max(ys))
-
-
-def polyline_length(points: Sequence[Sequence[float]]) -> float:
-    """Return the path length of a polyline.
-
-    The path and not the chord: a dimension line with a dog-leg is drawn to its full
-    run, and measuring first point to last would let any amount of it disappear into
-    the corner.
-
-    Args:
-        points: Two or more points in paper millimetres.
-
-    Returns:
-        The sum of the segment lengths.
-    """
-    return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in pairwise(points))
-
-
-# ---------------------------------------------------------------------------
-# Gate conditions (e), (f) and (g)
-# ---------------------------------------------------------------------------
-def named_bboxes(label: PageLabel) -> Iterator[tuple[str, Sequence[float]]]:
-    """Yield every bbox in a label together with a name for it.
-
-    Args:
-        label: The page label to walk.
-
-    Yields:
-        Pairs of a human-readable name and a bbox.
-    """
-    if label.sheet.title_block_bbox is not None:
-        yield ("sheet.titleBlockBBox", label.sheet.title_block_bbox)
-    for viewport in label.viewports or []:
-        yield (f"viewport {viewport.local_id}", viewport.paper_bbox)
-    for element in label.elements or []:
-        yield (f"element {element.local_id}", element.paper_bbox)
-    for annotation in label.annotations or []:
-        yield (f"annotation {annotation.local_id}", annotation.paper_bbox)
-
-
-def check_bboxes(label: PageLabel) -> list[str]:
-    """Check gate condition (e): bboxes are ordered and lie on the page.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per offending bbox.
-    """
-    page = (label.page.width_mm, label.page.height_mm)
-    found: list[str] = []
-    for name, box in named_bboxes(label):
-        if box[0] > box[2] or box[1] > box[3]:
-            found.append(f"{name}: bbox {list(box)} is not ordered x0<=x1, y0<=y1")
-        if box[0] < 0 or box[1] < 0 or box[2] > page[0] or box[3] > page[1]:
-            found.append(f"{name}: bbox {list(box)} leaves the {page[0]}x{page[1]} mm page")
-    return found
-
-
-def check_viewport_containment(label: PageLabel) -> list[str]:
-    """Check gate condition (f): items sit inside the viewport they name.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per item that names a viewport it does not fit in, or names a
-        viewport that does not exist.
-    """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
-    found: list[str] = []
-    items: list[tuple[str, Element | Annotation]] = [
-        (f"element {item.local_id}", item) for item in label.elements or []
-    ]
-    items += [(f"annotation {item.local_id}", item) for item in label.annotations or []]
-    for name, item in items:
-        if item.viewport is None:
-            continue
-        viewport = viewports.get(item.viewport)
-        if viewport is None:
-            found.append(f"{name}: names viewport {item.viewport!r}, which is not declared")
-        elif not contains(viewport.paper_bbox, item.paper_bbox):
-            found.append(
-                f"{name}: bbox {list(item.paper_bbox)} is not inside viewport "
-                f"{item.viewport} {list(viewport.paper_bbox)}"
-            )
-    return found
-
-
-def check_drawn_geometry(label: PageLabel) -> list[str]:
-    """Check that drawn geometry stays inside the bbox of the item that carries it.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per annotation geometry or element outline that escapes its bbox.
-    """
-    found: list[str] = []
-    for annotation in label.annotations or []:
-        if annotation.geometry is None:
-            continue
-        box = polyline_bbox(annotation.geometry)
-        if not contains(annotation.paper_bbox, box):
-            found.append(
-                f"annotation {annotation.local_id}: geometry spans {list(box)}, "
-                f"outside its bbox {list(annotation.paper_bbox)}"
-            )
-    for element in label.elements or []:
-        for index, outline in enumerate(element.paper_outlines or []):
-            box = polyline_bbox(outline)
-            if not contains(element.paper_bbox, box):
-                found.append(
-                    f"element {element.local_id}: outline {index} spans {list(box)}, "
-                    f"outside its bbox {list(element.paper_bbox)}"
-                )
-    return found
-
-
 def check_identifiers_and_page_size(label: PageLabel) -> list[str]:
-    """Check gate condition (g): GlobalIds and page sizes are real.
+    """Check that GlobalIds and page sizes are real ones.
 
     Args:
         label: The page label to check.
@@ -542,61 +312,8 @@ def check_identifiers_and_page_size(label: PageLabel) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Geometric coherence
+# Corpus rules: drafting conventions the specification does not require
 # ---------------------------------------------------------------------------
-def check_dimensions(label: PageLabel) -> list[str]:
-    """Check that a dimension's value matches the length it is drawn at.
-
-    The drawn model length is the **path length** of the annotation's geometry in paper
-    millimetres, taken through the viewport's scale. Measuring the chord instead -- the
-    distance from the first point to the last -- would pass any dog-legged dimension
-    line whatever, since the two agree only for a straight run.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per dimension whose printed value disagrees with its geometry.
-    """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
-    found: list[str] = []
-    for annotation in label.annotations or []:
-        expected = measured_length_mm(annotation)
-        if expected is None:
-            continue
-        viewport = viewports.get(annotation.viewport or "")
-        if viewport is None or viewport.scale is None or annotation.geometry is None:
-            continue
-        paper_mm = polyline_length(annotation.geometry)
-        drawn_mm = paper_mm * viewport.scale
-        tolerance = max(LENGTH_ATOL_MM, LENGTH_RTOL * abs(expected))
-        if abs(drawn_mm - expected) > tolerance:
-            found.append(
-                f"annotation {annotation.local_id}: geometry runs {paper_mm:.4g} mm of paper "
-                f"at 1:{viewport.scale:g} = {drawn_mm:.4g} mm, but the value is "
-                f"{annotation.value:g} {annotation.unit} = {expected:.4g} mm"
-            )
-    return found
-
-
-def measured_length_mm(annotation: Annotation) -> float | None:
-    """Return the model length a dimension annotation declares, in millimetres.
-
-    Args:
-        annotation: The annotation to read.
-
-    Returns:
-        The value converted to millimetres, or None when the annotation is not a
-        dimension carrying a length -- an angle in degrees or a percentage gradient is
-        not a length and cannot be measured off the paper.
-    """
-    if annotation.annotation_type != "dimension" or annotation.value is None:
-        return None
-    if annotation.unit not in METRES_PER_MEASURE:
-        return None
-    return annotation.value * METRES_PER_MEASURE[annotation.unit] * 1000.0
-
-
 def check_levels(label: PageLabel) -> list[str]:
     """Check that a level's elevation matches its viewport's transform.
 
@@ -682,6 +399,11 @@ def world_point(
 ) -> tuple[float, float, float]:
     """Map a paper point into model space through a viewport's plane and transform.
 
+    Composition and nothing else: the two steps are
+    :func:`planlabel.validate.geometry.apply_affine` and
+    :func:`planlabel.validate.geometry.world_point`, both of which the validator uses
+    for the same purpose.
+
     Args:
         plane: The viewport's model-space plane.
         matrix: That viewport's ``paperToPlane``.
@@ -690,12 +412,9 @@ def world_point(
     Returns:
         The point in the model's coordinates, in the model's length unit.
     """
-    plane_x, plane_y = apply_affine(matrix, point[0], point[1])
-    coordinates = [
-        plane.origin[axis] + plane_x * plane.x_axis[axis] + plane_y * plane.y_axis[axis]
-        for axis in range(3)
-    ]
-    return (coordinates[0], coordinates[1], coordinates[2])
+    return plane_to_world(
+        plane.origin, plane.x_axis, plane.y_axis, apply_affine(matrix, point[0], point[1])
+    )
 
 
 def section_mark_placement(
@@ -730,227 +449,39 @@ def section_mark_placement(
     return (drawn_in.plane, drawn_in.paper_to_plane, opened.plane)
 
 
-def check_transforms(label: PageLabel) -> list[str]:
-    """Check that every ``paperToPlane`` preserves handedness and matches its scale.
-
-    A negative determinant mirrors the view: the plane already fixes which way the
-    observer looks, so a mirrored transform silently turns a north elevation into a
-    south one. The linear factor must also equal the viewport's scale expressed in the
-    model's length unit, since one paper millimetre at 1:50 is 50 millimetres of model.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per offending viewport.
-    """
-    unit = label.source_model.length_unit if label.source_model else None
-    found: list[str] = []
-    for viewport in label.viewports or []:
-        matrix = viewport.paper_to_plane
-        if matrix is None:
-            continue
-        det = determinant(matrix)
-        if det <= 0:
-            found.append(
-                f"viewport {viewport.local_id}: paperToPlane {list(matrix)} has "
-                f"determinant {det:g}, which mirrors the view"
-            )
-            continue
-        if viewport.scale is None or unit is None:
-            continue
-        expected = (viewport.scale / 1000.0) / METRES_PER_UNIT[unit]
-        if not math.isclose(math.sqrt(det), expected, rel_tol=1e-6):
-            found.append(
-                f"viewport {viewport.local_id}: paperToPlane scales by "
-                f"{math.sqrt(det):g} per paper mm, but 1:{viewport.scale:g} in {unit} "
-                f"is {expected:g}"
-            )
-    return found
-
-
-def check_plane_axes(label: PageLabel) -> list[str]:
-    """Check SPEC 3.6: a plane's axes are unit vectors and mutually orthogonal.
-
-    Scale is carried by ``paperToPlane``. An axis of a length other than one would
-    express it a second time, and the two statements could then disagree without either
-    being detectably wrong; an axis pair that is not orthogonal describes a sheared view
-    that the mapping ``P = origin + X*xAxis + Y*yAxis`` does not mean. Both are errors
-    a validator MUST report, to within 1e-6.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per axis that is not of unit length, plus one per pair that is not
-        orthogonal.
-    """
-    found: list[str] = []
-    for viewport in label.viewports or []:
-        plane = viewport.plane
-        if plane is None:
-            continue
-        for axis_name, axis in (("xAxis", plane.x_axis), ("yAxis", plane.y_axis)):
-            length = norm(axis)
-            if abs(length - 1.0) > AXIS_ATOL:
-                found.append(
-                    f"viewport {viewport.local_id}: plane {axis_name} {list(axis)} has "
-                    f"length {length:.6g}, but SPEC 3.6 requires a unit vector"
-                )
-        product = dot(plane.x_axis, plane.y_axis)
-        if abs(product) > AXIS_ATOL:
-            found.append(
-                f"viewport {viewport.local_id}: plane xAxis {list(plane.x_axis)} and yAxis "
-                f"{list(plane.y_axis)} have dot product {product:.6g}, but SPEC 3.6 "
-                f"requires them to be orthogonal"
-            )
-    return found
-
-
-def check_cut_heights(label: PageLabel) -> list[str]:
-    """Check the cut-height convention on every viewport that states one.
-
-    For a cut view the drawing plane is the cutting plane, and ``cutHeight`` is the
-    cut's height above ``storey.elevation`` -- German practice's "Schnitthoehe 1,20 m
-    ueber OKFF". Wherever both are present the plane origin's component along the view
-    normal must therefore be their sum.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per viewport whose plane sits at the wrong height.
-    """
-    found: list[str] = []
-    for viewport in label.viewports or []:
-        elevation = viewport.storey.elevation if viewport.storey else None
-        if viewport.cut_height is None or elevation is None or viewport.plane is None:
-            continue
-        normal = cross(viewport.plane.x_axis, viewport.plane.y_axis)
-        length = norm(normal)
-        if length == 0:
-            found.append(f"viewport {viewport.local_id}: plane axes are parallel")
-            continue
-        unit_normal = tuple(component / length for component in normal)
-        along = dot(viewport.plane.origin, unit_normal)
-        expected = elevation + viewport.cut_height
-        if not math.isclose(along, expected, rel_tol=0, abs_tol=1e-6):
-            found.append(
-                f"viewport {viewport.local_id}: plane origin lies {along:g} along the "
-                f"view normal, but storey.elevation + cutHeight is {expected:g}"
-            )
-    return found
-
-
 # ---------------------------------------------------------------------------
-# Referential integrity, and what a tag prints
+# Corpus rules: what a tag prints
 # ---------------------------------------------------------------------------
-#: Annotation types a ``measures`` entry may point at, besides an element. SPEC 4.5
-#: admits levels as well as grids, because a dimension in a section runs between them.
-MEASURABLE_ANNOTATIONS = frozenset({"grid", "level"})
-
 #: The first number in a piece of annotation text, with the unit token it carries.
 PRINTED_NUMBER_RE = re.compile(r"(?<![\d,.])(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?(?![A-Za-z0-9])")
 
 
-def check_measures(label: PageLabel) -> list[str]:
-    """Check that every ``measures`` entry resolves to something it may name.
+def check_shown_properties(label: PageLabel) -> list[str]:
+    """Check that a tag prints what it says it shows.
 
-    A dimension whose ``measures`` points at nothing is the cheapest possible way to
-    claim L3: the link is what the level is graded on, and an unresolvable link is no
-    link at all.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per entry that resolves to nothing, or to an annotation of a type
-        SPEC 4.5 does not admit.
-    """
-    elements = {element.local_id for element in label.elements or []}
-    annotations = {item.local_id: item for item in label.annotations or []}
-    found: list[str] = []
-    for annotation in label.annotations or []:
-        for referenced in annotation.measures or []:
-            if referenced in elements:
-                continue
-            target = annotations.get(referenced)
-            if target is None:
-                found.append(
-                    f"annotation {annotation.local_id}: measures {referenced!r}, which no "
-                    f"element and no annotation on the page declares"
-                )
-            elif target.annotation_type not in MEASURABLE_ANNOTATIONS:
-                found.append(
-                    f"annotation {annotation.local_id}: measures {referenced!r}, an "
-                    f"annotation of type {target.annotation_type!r}; SPEC 4.5 admits an "
-                    f"element, a grid or a level"
-                )
-    return found
-
-
-def check_targets(label: PageLabel) -> list[str]:
-    """Check that a ``target.viewportId`` aimed at this sheet resolves on it.
-
-    ``viewportId`` is a ``localId`` read in the *targeted* page, so a target naming
-    another sheet is left alone -- this label does not hold that page's identifiers. A
-    target that names this very sheet is a reference within the page like any other.
+    Whether ``shows.element`` resolves at all is PL-REF-003, which the validator owns.
+    What is left here is about the drawing rather than about the format: a property set
+    the element does not carry, and a printed number that contradicts the property the
+    tag says it displays. Nothing in the specification requires a ``shows.property`` to
+    name a property the element holds -- the schema calls it free text with two
+    examples -- so this is a statement about this corpus and not about PlanLabel.
 
     Args:
         label: The page label to check.
 
     Returns:
-        One message per target that points at a viewport this sheet does not declare.
-    """
-    viewports = {viewport.local_id for viewport in label.viewports or []}
-    sheet_id = label.sheet.sheet_id
-    found: list[str] = []
-    for annotation in label.annotations or []:
-        target = annotation.target
-        if target is None or target.viewport_id is None:
-            continue
-        if target.sheet_id not in (None, sheet_id):
-            continue
-        if target.viewport_id not in viewports:
-            found.append(
-                f"annotation {annotation.local_id}: target.viewportId "
-                f"{target.viewport_id!r} names this sheet ({sheet_id}), which declares no "
-                f"such viewport"
-            )
-    return found
-
-
-def check_shows(label: PageLabel) -> list[str]:
-    """Check that a tag shows an element it can show, and prints what it claims to.
-
-    Args:
-        label: The page label to check.
-
-    Returns:
-        One message per unresolvable ``shows.element``, per ``shows.property`` the
-        element does not carry, and per printed text that contradicts the property it
-        says it displays.
+        One message per ``shows.property`` the element does not carry, and per printed
+        text that contradicts the property it says it displays.
     """
     elements = {element.local_id: element for element in label.elements or []}
     unit = label.source_model.length_unit if label.source_model else None
     found: list[str] = []
     for annotation in label.annotations or []:
         shows = annotation.shows
-        if shows is None:
-            continue
-        if shows.element is None:
-            if shows.property_name is not None:
-                found.append(
-                    f"annotation {annotation.local_id}: shows.property "
-                    f"{shows.property_name!r} but names no element to read it from"
-                )
+        if shows is None or shows.element is None:
             continue
         element = elements.get(shows.element)
         if element is None:
-            found.append(
-                f"annotation {annotation.local_id}: shows.element {shows.element!r}, "
-                f"which is not an element on the page"
-            )
             continue
         found.extend(check_shown_property(annotation, element, unit))
     return found
@@ -965,10 +496,11 @@ def check_shown_property(
 
     Two spellings are resolvable and are checked. ``Tag`` is the element's own ``tag``,
     which the annotation must print verbatim. ``Pset_X.Y`` is a property of a property
-    set, which the element must carry; where the annotation's text contains a number
-    and the property holds one, the two must agree. Any other spelling -- a bare IFC
-    attribute name, say -- is left alone, because nothing in the label says where to
-    look it up.
+    set: where the element carries it and the annotation's text contains a number, the
+    two must agree. Whether the element carries it at all is PL-REF-012, which the
+    validator owns; this is only about what the sheet prints. Any other spelling -- a
+    bare IFC attribute name, say -- is left alone, because nothing in the label says
+    where to look it up.
 
     Args:
         annotation: The annotation doing the showing.
@@ -988,19 +520,9 @@ def check_shown_property(
         return []
     set_name, _, property_name = name.partition(".")
     quantities = element.pset(set_name)
-    if quantities is None:
-        message = (
-            f"annotation {annotation.local_id}: shows {name!r}, but element "
-            f"{element.local_id} carries no property set {set_name!r}"
-        )
-        return [message]
-    if property_name not in quantities:
-        held = ", ".join(sorted(quantities))
-        message = (
-            f"annotation {annotation.local_id}: shows {name!r}, but property set "
-            f"{set_name} of element {element.local_id} holds only {held}"
-        )
-        return [message]
+    if quantities is None or property_name not in quantities:
+        # PL-REF-012 owns this: whether the element carries what the tag says it shows.
+        return []
     return check_printed_number(annotation, quantities[property_name], unit)
 
 
@@ -1122,19 +644,6 @@ DUCT_CLASS_PREFIX = "IfcDuct"
 
 #: IFC classes whose name may carry a German width/height pair.
 SASH_CLASSES = frozenset({"IfcDoor", "IfcWindow"})
-
-
-def millimetres(value: float) -> str:
-    """Spell a model length for a message.
-
-    Args:
-        value: The length in model millimetres.
-
-    Returns:
-        The number with no exponent and no trailing zeros, so that a wall reads 26300
-        and not 2.63e+04.
-    """
-    return f"{round(value, COORD_PLACES):g}"
 
 
 def german_number(spelled: str) -> float:
@@ -1801,17 +1310,61 @@ def declared_level(filename: str) -> str | None:
 # ---------------------------------------------------------------------------
 # Per-file drivers: page labels
 # ---------------------------------------------------------------------------
+def schema_findings(document: Any, kind: DocumentKind) -> list[str]:  # noqa: ANN401
+    """Validate one fixture against its schema, through the validator.
+
+    The rule "a document must validate against its schema" has one implementation, in
+    :func:`planlabel.validate.schema.check_schema`, and this is how the corpus reaches
+    it. The negative fixtures below do keep their own ``jsonschema`` validator, and
+    that is not the same rule: they are checking the *manifest's* claim about which
+    keyword fails and where, which needs the raw ``ValidationError`` and is a statement
+    about the corpus rather than about the format.
+
+    Args:
+        document: The parsed fixture.
+        kind: Which schema to hold it to.
+
+    Returns:
+        One message per violation, each carrying the rule's code.
+    """
+    return [
+        f"[{item.code} {item.severity.value}] at {item.path or '/'}: {item.message}"
+        for item in check_schema(document, kind, source="fixture")
+    ]
+
+
+def validator_findings(findings: list[Finding]) -> list[str]:
+    """Render what the validator found, for this script's report.
+
+    Warnings count as problems here, unlike on the command line, where a label with
+    warnings and no errors is conforming and exits 0. The difference is deliberate and
+    is about what this corpus is for: these twelve labels are what a reader copies when
+    learning the format, so a fixture that trips a SHOULD teaches the SHOULD wrongly. A
+    warning fired by a real drawing is a question; a warning fired by the reference
+    corpus is a defect in the reference corpus.
+
+    Args:
+        findings: What :func:`planlabel.validate.check_page_document` or
+            :func:`planlabel.validate.check_page_label` returned.
+
+    Returns:
+        One message per finding, each carrying the rule's stable code.
+    """
+    return [
+        f"[{item.code} {item.severity.value}] {item.message}"
+        for item in sorted(findings, key=lambda item: item.sort_key)
+    ]
+
+
 def check_valid_label(
     root: Path,
     entry: dict[str, Any],
-    validator: Draft202012Validator,
 ) -> tuple[list[Problem], PageLabel | None]:
     """Run every check over one page label that is expected to be valid.
 
     Args:
         root: The ``labels`` fixture directory.
         entry: The manifest entry describing the file.
-        validator: A validator built from the page schema.
 
     Returns:
         One problem per failed expectation, and the loaded label when it loaded, for
@@ -1825,10 +1378,12 @@ def check_valid_label(
     document, parse_errors = parse_fixture(raw)
     if document is None:
         return ([Problem(where, message) for message in found + parse_errors], None)
-    errors = sorted(validator.iter_errors(document), key=error_order)
-    if errors:
-        found += [f"schema error at {error.json_path}: {error.message}" for error in errors]
-        return ([Problem(where, message) for message in found], None)
+    schema_errors = schema_findings(document, DocumentKind.PAGE)
+    if schema_errors:
+        return ([Problem(where, message) for message in found + schema_errors], None)
+    # Before the model is built: two rules the model refuses to let a label exist with,
+    # which would otherwise reach this script only as "it would not load".
+    found += validator_findings(check_page_document(document, source="fixture"))
     try:
         label = load_page_label(raw)
     except (ValidationError, ValueError) as error:
@@ -1841,6 +1396,7 @@ def check_valid_label(
         found.append(f"reaches {level}, but the manifest says {entry.get('level')}")
     if declared_level(name) not in (None, level):
         found.append(f"reaches {level}, but the filename says {declared_level(name)}")
+    found.extend(validator_findings(check_page_label(label, source="fixture")))
     for check in LABEL_CHECKS:
         found.extend(check(label))
     return ([Problem(where, message) for message in found], label)
@@ -1904,18 +1460,6 @@ def check_invalid_document(
     return [Problem(where, message) for message in found]
 
 
-def error_order(error: Any) -> str:  # noqa: ANN401
-    """Return the sort key that puts schema errors in document order.
-
-    Args:
-        error: A ``jsonschema.exceptions.ValidationError``.
-
-    Returns:
-        Its JSON path.
-    """
-    return str(error.json_path)
-
-
 def compare_error(error: Any, entry: dict[str, Any]) -> list[str]:  # noqa: ANN401
     """Compare the single schema error a fixture produced with what the manifest states.
 
@@ -1950,14 +1494,12 @@ def compare_error(error: Any, entry: dict[str, Any]) -> list[str]:  # noqa: ANN4
 def check_valid_index(
     root: Path,
     entry: dict[str, Any],
-    validator: Draft202012Validator,
 ) -> tuple[list[Problem], LabelIndex | None]:
     """Run every check over one index that is expected to be valid.
 
     Args:
         root: The ``index`` fixture directory.
         entry: The manifest entry describing the file.
-        validator: A validator built from the index schema.
 
     Returns:
         One problem per failed expectation, and the loaded index when it loaded.
@@ -1970,10 +1512,9 @@ def check_valid_index(
     document, parse_errors = parse_fixture(raw)
     if document is None:
         return ([Problem(where, message) for message in found + parse_errors], None)
-    errors = sorted(validator.iter_errors(document), key=error_order)
-    if errors:
-        found += [f"schema error at {error.json_path}: {error.message}" for error in errors]
-        return ([Problem(where, message) for message in found], None)
+    schema_errors = schema_findings(document, DocumentKind.INDEX)
+    if schema_errors:
+        return ([Problem(where, message) for message in found + schema_errors], None)
     try:
         index = load_label_index(raw)
     except (ValidationError, ValueError) as error:
@@ -2129,21 +1670,19 @@ def check_manifest_matches_disk(corpus: str, root: Path, manifest: dict[str, Any
 # ---------------------------------------------------------------------------
 # Drivers
 # ---------------------------------------------------------------------------
-#: Every check that runs over one loaded page label on its own.
+#: The corpus checks that run over one loaded page label on its own.
+#:
+#: Every rule the validator owns is applied by :func:`validator_findings` instead, and
+#: none of them appears here. What is left is what is about this corpus rather than
+#: about the format: whether its GlobalIds and sheet sizes are real, whether a level
+#: agrees with the transform of the viewport it is drawn in, whether a section mark
+#: lies on the plane of the section it opens, and whether a tag prints the property it
+#: says it shows.
 LABEL_CHECKS = (
-    check_bboxes,
-    check_viewport_containment,
-    check_drawn_geometry,
     check_identifiers_and_page_size,
-    check_dimensions,
     check_levels,
     check_section_marks,
-    check_transforms,
-    check_plane_axes,
-    check_cut_heights,
-    check_measures,
-    check_shows,
-    check_targets,
+    check_shown_properties,
 )
 
 
@@ -2163,7 +1702,7 @@ def run_labels(root: Path) -> tuple[list[Problem], list[tuple[str, PageLabel]]]:
     problems += check_schema_pointers("labels", schema, manifest["invalid"])
     loaded: list[tuple[str, PageLabel]] = []
     for entry in manifest["valid"]:
-        found, label = check_valid_label(root, entry, validator)
+        found, label = check_valid_label(root, entry)
         problems += found
         if label is not None:
             loaded.append((f"labels/{entry['file']}", label))
@@ -2193,7 +1732,7 @@ def run_index(
     by_sheet = {label.sheet.sheet_id: label for _, label in labels}
     loaded: list[tuple[str, LabelIndex]] = []
     for entry in manifest["valid"]:
-        found, index = check_valid_index(root, entry, validator)
+        found, index = check_valid_index(root, entry)
         problems += found
         if index is not None:
             where = f"index/{entry['file']}"
@@ -2307,8 +1846,9 @@ def main(argv: Sequence[str]) -> int:
         print(f"\n{len(problems)} problem(s) in {checked} fixture(s)")
         return 1
     print(
-        f"{checked} fixtures pass: schema, canonical bytes, levels, bboxes, geometry, "
-        f"references, model identity, stated sizes"
+        f"{checked} fixtures pass: manifests, canonical bytes and levels here; schema, "
+        f"references, geometry and provenance through planlabel.validate; plus drawing "
+        f"sense, model identity and stated sizes"
     )
     return 0
 

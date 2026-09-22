@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Command-line interface for PlanLabel.
 
-Four verbs arrive with the PDF carrier in Phase 2::
+Four verbs arrive with the PDF carrier in Phase 2, and the validator in Phase 3::
 
     planlabel attach in.pdf labels.json -o out.pdf
     planlabel read out.pdf [--page N] [--json]
     planlabel strip out.pdf -o clean.pdf
     planlabel sidecar out.pdf
+    planlabel validate file.pdf|labels.json [--ifc model.ifc] [--strict] [--report md|json]
 
 The rest arrive with the phases that implement them:
 
@@ -29,6 +30,15 @@ document on standard output, in PlanLabel's canonical form, with every log line 
 standard error -- so that ``planlabel read x.pdf --json | jq`` works and keeps
 working.
 
+``validate`` spells the same distinction ``--report md|json``, because that is what
+the design brief names it and because its human output is a Markdown document rather
+than a table. Both formats go to standard output as plain text, unrendered: a
+validation report is something people redirect into a file, attach to a pull request
+or pipe to ``jq``, and ANSI escapes in a file called ``report.md`` help nobody.
+
+Exit codes are part of the contract for ``validate`` and are documented in
+:mod:`planlabel.validate`: 0 clean, 1 errors found, 2 could not validate.
+
 This is the only module permitted to write to standard output directly. Everything
 else in the package reports through :mod:`logging`.
 """
@@ -39,6 +49,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path  # noqa: TC003 - typer resolves annotations at run time
 from typing import TYPE_CHECKING, Annotated, Final
 
@@ -49,7 +60,7 @@ from rich.table import Table
 
 from planlabel import __version__
 from planlabel.constants import SCHEMA_VERSION, SPEC_URI
-from planlabel.errors import PlanLabelError
+from planlabel.errors import PlanLabelError, ValidatorError
 from planlabel.model import (
     Generator,
     LabelIndex,
@@ -61,6 +72,8 @@ from planlabel.model import (
     load_sidecar,
 )
 from planlabel.pdf import embed
+from planlabel.validate import render_json_text, render_markdown
+from planlabel.validate import validate as run_validation
 
 if TYPE_CHECKING:
     from planlabel.pdf.embed import CarrierReport
@@ -69,6 +82,19 @@ console = Console()
 errors = Console(stderr=True)
 
 _LOGGER: Final = logging.getLogger("planlabel")
+
+
+class ReportFormat(StrEnum):
+    """How ``planlabel validate`` renders its report.
+
+    ``md`` is for a person and ``json`` for a machine; neither is derived from the
+    other, and the JSON shape is documented and versioned in
+    :mod:`planlabel.validate.report`.
+    """
+
+    MD = "md"
+    JSON = "json"
+
 
 app = typer.Typer(
     name="planlabel",
@@ -642,6 +668,69 @@ def sidecar(
         f"  {len(written_labels.pages)} page label(s), {written.stat().st_size} bytes; "
         "the PDF was not modified"
     )
+
+
+# ---------------------------------------------------------------------------
+# validate
+# ---------------------------------------------------------------------------
+@app.command()
+def validate(
+    source: Annotated[
+        Path,
+        typer.Argument(
+            help="A labelled PDF, a sidecar, a page label, an array of them, or an index.",
+            exists=True,
+        ),
+    ],
+    ifc: Annotated[
+        Path | None,
+        typer.Option(
+            "--ifc",
+            help=(
+                "Cross-check every ifcGuid and re-measure dimensions against this IFC "
+                "model. Needs the 'ifc' extra."
+            ),
+            exists=True,
+        ),
+    ] = None,
+    strict: Annotated[
+        bool,
+        typer.Option("--strict", help="Count warnings as errors when deciding the exit code."),
+    ] = False,
+    report: Annotated[
+        ReportFormat,
+        typer.Option("--report", help="md for a person, json for a machine."),
+    ] = ReportFormat.MD,
+    verapdf: Annotated[
+        bool,
+        typer.Option(
+            "--verapdf",
+            help="Also run veraPDF over the document. Fails the run if veraPDF cannot run.",
+        ),
+    ] = False,
+) -> None:
+    """Validate a label against the schema, the page, its own references and a model.
+
+    Exits 0 when there are no errors, 1 when there are, and 2 when the input could not
+    be validated at all -- it is not a PlanLabel document, or a check that was asked
+    for could not be made. A label with warnings and no errors is conforming and exits
+    0; pass --strict to hold it to the SHOULDs as well.
+    """
+    try:
+        result = run_validation(source, ifc_model=ifc, strict=strict, run_verapdf=verapdf)
+    except ValidatorError as exc:
+        errors.print(f"[bold red]cannot validate[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+    except PlanLabelError as exc:
+        raise _fail(str(exc)) from exc
+    except OSError as exc:
+        msg = f"{source} could not be read: {exc}"
+        raise _fail(msg) from exc
+
+    rendered = render_json_text(result) if report is ReportFormat.JSON else render_markdown(result)
+    typer.echo(rendered, nl=False)
+    if result.exit_code:
+        raise typer.Exit(result.exit_code)
 
 
 if __name__ == "__main__":  # pragma: no cover
