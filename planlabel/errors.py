@@ -32,6 +32,7 @@ __all__ = [
     "CarrierError",
     "DeclarationError",
     "EncryptedPdfError",
+    "ExportError",
     "ExternalToolError",
     "InputNotValidatableError",
     "InvalidLabelError",
@@ -153,4 +154,13 @@ class ExternalToolError(ValidatorError):
     wrapper and can therefore sit on ``PATH`` while being unusable. As with
     :class:`MissingExtraError`, the run ends rather than reporting a pass it did not
     establish.
+    """
+
+
+class ExportError(PlanLabelError):
+    """The authored exporter could not produce a drawing it would stand behind.
+
+    Raised where continuing would write a document whose label describes something
+    other than the page it is attached to -- a converted page that is not the size the
+    sheet declared, or a view the serializer drew nothing into.
     """
