@@ -1964,13 +1964,23 @@ same.
 
 PlanLabel does not model buildings. Everything it says about the building is said in
 IFC's words — class names, GlobalIds, property-set names — and this section states the
-correspondence. It aligns with the IFC documentation of buildingSMART and with the
-drawing conventions of IfcOpenShell and Bonsai, in which a sheet and a drawing are
-each an `IfcDocumentInformation`, a drawing is placed on a sheet by an
-`IfcDocumentReference`, a drawing's view is an `IfcAnnotation` of type `DRAWING`, and
-drawing annotations are `IfcAnnotation`s whose type says what they are.
+correspondence. It aligns with two descriptions of drawings in IFC:
 
-7.1 and 7.3 are normative; 7.2 is an informative correspondence, because PlanLabel
+- **SWAPP's `ifc-docs` draft** (CC0, 2024), which structures documentation as
+  *DocumentSet → Sheet → ViewPort → View → Annotation*, with annotations as
+  `IfcAnnotation` aggregated by `IfcRelAggregates` and cross-referenced to the
+  products they describe by `IfcRelAssignsToProduct`. PlanLabel reuses these names
+  where it has the same concept: its *sheet*, *viewport*, *view* and *annotation*
+  (2.1–2.6) are SWAPP's, and a labelled document's *index* (2.8) plays the part of
+  the document set.
+- **The IfcOpenShell and Bonsai conventions**, in which a sheet is an
+  `IfcDocumentInformation` with `Scope` `SHEET`, a drawing is an `IfcAnnotation`
+  with `ObjectType` `DRAWING` whose view settings, scale among them, are in
+  `EPset_Drawing`, drawings are placed on sheets by `IfcDocumentReference`, and a
+  drawing's annotations are `IfcAnnotation`s whose type says what they are.
+
+2.18 summarises which names correspond; this section adds the attributes. 7.1 and
+7.3 are normative; 7.2 is an informative correspondence, because PlanLabel
 0.1 reads and writes labels, not IFC files, and does not require a writer to have a
 model at all.
 
@@ -2001,13 +2011,16 @@ described with a `paperToPlane`, and a writer MUST NOT write one for it.
 
 | PlanLabel | IFC | Notes |
 | --- | --- | --- |
-| `sheet` | `IfcDocumentInformation` of the sheet | `Identification` → `sheet.id`, `Name` → `title`, `Revision` → `revision` |
+| `sheet` | SWAPP's Sheet; `IfcDocumentInformation` with `Scope` `SHEET` | `Identification` → `sheet.id`, `Name` → `title`, `Revision` → `revision` |
 | The PDF of a sheet | `IfcDocumentReference` with the file's `Location` | The label travels in the PDF; the model need not know it exists |
-| `viewport` | The drawing: an `IfcDocumentInformation` placed on the sheet by an `IfcDocumentReference`, whose view is an `IfcAnnotation` of type `DRAWING` | The annotation's placement is `viewport.plane`; its scale property is `viewport.scale` |
+| The index of a labelled document | SWAPP's DocumentSet | The sheets one PDF carries |
+| `viewport` | SWAPP's ViewPort, an `IfcAnnotation` aggregated with `IfcRelAggregates`; in Bonsai, a drawing placed on the sheet by an `IfcDocumentReference` | Its box on the paper is `viewport.paperBBox` |
+| `viewport.plane`, `paperToPlane`, `scale` | SWAPP's View; in Bonsai, the `IfcAnnotation` with `ObjectType` `DRAWING` and its `EPset_Drawing` | The annotation's placement is `viewport.plane`; the scale in `EPset_Drawing` is `viewport.scale` |
 | `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name`, `elevation` and `ifcGuid` are the storey's `Name`, `Elevation` and `GlobalId` |
 | `element` | An `IfcProduct`, usually an `IfcElement` | `GlobalId`, the entity class, `PredefinedType`, `Name` and `Tag` map one to one |
 | `element.properties` | The element's property sets and quantity sets | Keyed by set name (`Pset_WallCommon`), then property name |
 | `shows.property` | `Tag`, an attribute, or a dotted `Pset_Name.Property` | A mark shows `Tag`; a member's cross-section shows `Pset_ColumnCommon.Reference` |
+| `annotation` | SWAPP's Annotation: an `IfcAnnotation`, aggregated under its view by `IfcRelAggregates` | `shows.element` records its `IfcRelAssignsToProduct` |
 | `annotation.type = dimension` | `IfcAnnotation` of type `DIMENSION` | `measures` names what it runs between |
 | `level` | `IfcAnnotation` of type `SECTION_LEVEL` or `PLAN_LEVEL` | `elevation` is in metres; `ifcGuid` names the storey or the level annotation |
 | `text`, `leader` | `IfcAnnotation` of type `TEXT`, `TEXT_LEADER` | Assigned to a product by `IfcRelAssignsToProduct`, which is what `shows.element` records |
