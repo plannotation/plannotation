@@ -87,8 +87,12 @@ def seeded_guid(seed: str, index: int) -> str:
         >>> len(seeded_guid("floorplan", 0))
         22
     """
+    # Sixteen bytes, not more: a GlobalId is a 128-bit number, which is why its first
+    # character can only be 0 to 3. More bits overflow into that character and give an
+    # id that does not round-trip through a UUID -- the serializer's product-<uuid> id
+    # then names a different number from the ifc:guid beside it.
     digest = hashlib.sha256(f"{seed}:{index}".encode()).digest()
-    value = int.from_bytes(digest[:17], "big")
+    value = int.from_bytes(digest[:16], "big")
     characters = []
     for _ in range(22):
         value, remainder = divmod(value, 64)

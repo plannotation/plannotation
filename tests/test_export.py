@@ -47,6 +47,9 @@ def has(module: str) -> bool:
 
 needs_cairo = pytest.mark.skipif(not has("cairosvg"), reason="cairosvg is not installed")
 
+#: IFC's base64 alphabet, spelled out independently of the code under test.
+_IFC_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$"
+
 
 class TestThePaperTransform:
     """SPEC 3.5: paper millimetres to the model plane, in the model's own unit."""
@@ -379,6 +382,22 @@ class TestTheSampleModel:
 
         guid = seeded_guid("floorplan", 3)
         assert re.fullmatch(r"[0-9A-Za-z_$]{22}", guid)
+
+    def test_seeded_guids_are_128_bit_numbers(self) -> None:
+        """So each round-trips through a UUID, as the serializer's ids assume.
+
+        With one byte too many the first character ran past ``3``, and the serializer's
+        ``product-<uuid>`` id silently named a different number from its ``ifc:guid``.
+        """
+        from planlabel.export.models import seeded_guid
+
+        for index in range(64):
+            guid = seeded_guid("floorplan", index)
+            assert guid[0] in "0123"
+            number = 0
+            for character in guid:
+                number = number * 64 + _IFC_ALPHABET.index(character)
+            assert number < 2**128
 
     def test_seeded_guids_differ_between_models(self) -> None:
         """Two samples must not claim the same building element."""
