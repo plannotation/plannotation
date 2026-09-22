@@ -1,13 +1,16 @@
 # PlanLabel inspector
 
-A single-file, offline-capable viewer for labelled PDFs. Landing in **Phase 5**.
+`index.html` is a single-file viewer for labelled PDFs. Open it in a browser and choose
+a PDF: it renders the page with [pdf.js](https://mozilla.github.io/pdf.js/), reads the
+embedded labels through `getAttachments()`, and draws the label over the page —
+element boxes and outlines, annotation geometry, viewports — with tooltips (class,
+name, mark, GlobalId, provenance, confidence), toggles per kind and per annotation
+type, **Copy JSON** and **Export CSV**.
 
-It will render a page with [pdf.js](https://mozilla.github.io/pdf.js/), read the
-embedded labels through `getAttachments()`, and overlay element bounding boxes,
-element outlines and annotation geometry on a canvas layer — with hover tooltips
-(class, name, tag, GlobalId, provenance, confidence), per-type visibility toggles,
-"copy JSON" and "export CSV".
+It has no build step and no local dependencies. pdf.js is loaded from cdnjs on first
+use, after which the browser's cache serves it. For an air-gapped machine, point the
+two pdf.js URLs at the top of the script at a local copy; `inspector/vendor/` is
+git-ignored for that purpose, since pdf.js is far over the repository's size limit.
 
-`index.html` is deliberately a single file with no build step. pdf.js is loaded from
-a CDN on first use and then works from disk; a vendored build is an option for fully
-air-gapped use.
+`planlabel inspect file.pdf` prints the same in a terminal. The manual check against
+the samples is in [`../docs/inspector.md`](../docs/inspector.md).

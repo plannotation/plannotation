@@ -5,9 +5,8 @@ Exposes labelled drawing projects to MCP hosts such as Claude Desktop, ChatGPT a
 Copilot, over stdio or streamable HTTP.
 
 The server is **read-only by default**. Tools that write require ``--allow-write``,
-and every path is confined to a configured root directory.
-
-Implemented in Phase 6.
+and every path is confined to a configured root directory. The server itself is in
+:mod:`planlabel_mcp.server`.
 """
 
 from __future__ import annotations

@@ -1,30 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """Command-line interface for PlanLabel.
 
-Four verbs arrive with the PDF carrier in Phase 2, and the validator in Phase 3::
+::
 
     planlabel attach in.pdf labels.json -o out.pdf
     planlabel read out.pdf [--page N] [--json]
     planlabel strip out.pdf -o clean.pdf
     planlabel sidecar out.pdf
     planlabel validate file.pdf|labels.json [--ifc model.ifc] [--strict] [--report md|json]
+    planlabel samples build [--out samples] [--only NAME] [--inkscape-fallback]
+    planlabel inspect file.pdf [--page N] [--json]
+    planlabel infer old.pdf -o labelled.pdf [--ifc model.ifc]
     planlabel from-svg sheet.svg sheet.pdf -o out.pdf --sheet-id A-101 [--ifc model.ifc]
-
-The rest arrive with the phases that implement them:
-
-==================  =======
-Command             Phase
-==================  =======
-``attach``          2
-``read``            2
-``strip``           2
-``sidecar``         2
-``validate``        3
-``samples build``   4
-``inspect``         5
-``infer``           7
-``from-svg``        9
-==================  =======
 
 Two output modes, and they are kept apart on purpose. Without ``--json`` the
 output is for a person, formatted with rich. With ``--json`` it is exactly one JSON

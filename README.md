@@ -6,34 +6,57 @@
 
 **An open drawing-semantics sidecar for 2D construction drawings.**
 
-A PDF drawing is a picture as far as a machine is concerned. PlanLabel attaches a
-small JSON *label* to every drawing page that says what is actually on it: which
-sheet it is, which viewports it contains and how paper maps to model space, which
-elements appear (IFC class, GlobalId, mark, outline on the paper), and which
-annotations are present — dimensions and what they measure, tags and what they show,
-callouts and where they point, grids, levels. The page looks and prints exactly as
-it did before, byte-for-byte identical on screen and on paper. Any program can read
-the label without the software that authored the drawing.
+A PDF drawing is a picture as far as a machine is concerned. PlanLabel attaches a small
+JSON *label* to every drawing page that says what is actually on it: which sheet it
+is, which viewports it holds and how their paper maps to model coordinates, which
+elements are drawn — IFC class, GlobalId, mark, outline on the paper — and which
+annotations are present: dimensions and what they measure, marks and what they show,
+levels, grids, callouts and where they point. The page looks and prints exactly as it
+did before, pixel for pixel. Any program can read the label without the software
+that authored the drawing.
 
-> **Status: early. Phase 0 (scaffold) is complete.** The schema, the PDF carrier and
-> the tooling land in the phases that follow. Nothing here is stable yet, and the
-> `0.1` schema is a draft.
+> **Status: 0.1, draft.** The specification, schema, library, command line, MCP
+> server, inference and inspector are complete and tested. The format may still change
+> before 1.0 ([versioning](spec/SPEC.md#8-versioning-policy)).
 
-## One core, three surfaces
+## Why
 
-| Surface | Package | What it is |
+Drawings are still how buildings are issued, checked, priced and built, and they
+leave the model as PDFs that have forgotten everything the model knew. A contractor's
+software, a checking engineer's script or a language model reading the sheet has to
+reconstruct from pixels what the architect's tool knew exactly. PlanLabel keeps that
+knowledge with the page, in an open format, as an attachment the page does not
+depend on.
+
+## One core, four surfaces
+
+| Surface | Command or package | What it is |
 | --- | --- | --- |
-| **Library + CLI** | `planlabel` | Write, read, validate, inspect and export labels. |
-| **MCP server** | `planlabel-mcp` | Exposes labelled projects to Claude Desktop, ChatGPT, Copilot and other MCP hosts. |
+| **Library + CLI** | `planlabel` | Attach, read, strip, validate, inspect and export labels. |
+| **MCP server** | `planlabel-mcp` | Serves labelled drawings to Claude Desktop and other MCP hosts, read-only unless told otherwise. |
 | **Inference** | `planlabel infer` | Reconstructs labels for legacy PDFs, marked `inferred` with a confidence. |
+| **Authoring tools** | `planlabel from-svg`, the Bonsai add-on | Labels the PDF an IfcOpenShell-based tool rendered, from the SVG it drew. |
 
 ## 60-second demo
 
-> Not yet functional — the commands below land in Phases 4 and 5.
+```bash
+uvx --from 'planlabel[all]' planlabel samples build
+uvx planlabel inspect samples/positionsplan/sheet.labelled.pdf
+```
+
+The first command builds three IFC models and draws them — a floor plan, a structural
+position plan and a section — as labelled A3 sheets; it needs a system `libcairo`
+(`brew install cairo`, `apt-get install libcairo2`) or Inkscape with
+`--inkscape-fallback`. The second prints what the position plan's label says. For the
+same on a page, open [`inspector/index.html`](inspector/index.html) and choose the PDF.
+
+From a clone, before the package is on PyPI:
 
 ```bash
-uvx planlabel samples build
-uvx planlabel inspect samples/positionsplan/sheet.labelled.pdf
+uv sync --all-extras
+uv run planlabel samples build
+uv run planlabel inspect samples/positionsplan/sheet.labelled.pdf
+uv run planlabel validate samples/positionsplan/sheet.labelled.pdf
 ```
 
 ## Why a label helps
@@ -49,16 +72,19 @@ uvx planlabel inspect samples/positionsplan/sheet.labelled.pdf
 ## Who did half of this already
 
 <!-- PRIOR-ART:START -->
-> Placeholder — filled in for the v0.1.0 release. PlanLabel deliberately sits on top
-> of existing work rather than beside it; this table credits what each prior effort
-> solved and names the gap PlanLabel closes.
+PlanLabel invents as little as it can. Each piece below solved part of the problem;
+the label is the part none of them covers — what a construction drawing shows, in
+IFC's words, travelling with the issued page.
 
 | Prior work | What it already solves | What is still missing |
 | --- | --- | --- |
-| PDF 2.0 Associated Files (ISO 32000-2) | _pending_ | _pending_ |
-| PDF Declarations (PDF Association) | _pending_ | _pending_ |
-| IfcOpenShell SVG serializer | _pending_ | _pending_ |
-| SWAPP ifc-docs | _pending_ | _pending_ |
+| PDF 2.0 Associated Files (ISO 32000-2) | Machine-readable files attached to a page or a document, with their relationship to it | Any vocabulary for what a drawing shows |
+| PDF Declarations (PDF Association) | A standard way for a PDF to state which specification it conforms to | The specification to declare |
+| PDF/A-3 hybrid invoices (ZUGFeRD, Factur-X) | The pattern: a human-readable PDF with a machine-readable twin inside it | Anything for drawings; they carry invoices |
+| IFC (ISO 16739) | The building model's classes, GlobalIds and property sets, and its own entities for sheets, drawings and annotations | Survival past export: the issued PDF keeps none of it |
+| IfcOpenShell SVG serializer, Bonsai | Drawings whose SVG groups carry each product's GlobalId and class | The step to the PDF that is actually issued, signed and archived |
+| BCF (BIM Collaboration Format) | Referring to model elements by GlobalId from outside the model | Issued sheets; it describes issues, not drawings |
+| Tagged PDF, PDF/UA | A semantic structure tree for text documents | Geometry, scale and model identity; drawings are rarely tagged |
 <!-- PRIOR-ART:END -->
 
 ## Design commitments
@@ -77,8 +103,9 @@ uvx planlabel inspect samples/positionsplan/sheet.labelled.pdf
 ## Install
 
 ```bash
-uv sync --all-extras
-uv run planlabel --version
+pip install planlabel            # library and CLI
+pip install 'planlabel[all]'     # plus the exporter (ifc, svg) and the benchmark (bench)
+pip install planlabel-mcp        # the MCP server
 ```
 
 Requires Python 3.11 or newer. See [CONTRIBUTING.md](CONTRIBUTING.md) to set up a
@@ -90,10 +117,11 @@ development environment.
 | --- | --- |
 | [`spec/SPEC.md`](spec/SPEC.md) | The normative specification. |
 | [`planlabel/schema/`](planlabel/schema/) | The JSON Schema — single source of truth. |
-| [`docs/`](docs/) | Guides, and design notes for the Revit, AutoCAD and Tekla adapters. |
-| [`samples/`](samples/) | Generated sample drawings with ground truth. |
+| [`docs/`](docs/) | The inspector, MCP server, inference, benchmark and Bonsai guides, and design notes for Revit, AutoCAD and Tekla adapters. |
+| [`samples/`](samples/) | What the three generated sample sheets contain. |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed, release by release. |
 
-## Licence
+## Licence and contributing
 
 Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
