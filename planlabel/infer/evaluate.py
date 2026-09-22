@@ -69,13 +69,22 @@ def _keys(label: PageLabel, kind: str) -> Counter[str]:
         A multiset of keys, so that two tags with one mark count twice.
     """
     keys: Counter[str] = Counter()
+    by_id = {annotation.local_id: annotation for annotation in label.annotations or []}
     for annotation in label.annotations or []:
         if annotation.annotation_type != kind:
             continue
         if kind == "tag":
             keys[normalise_mark(annotation.text or "")] += 1
         elif kind == "dimension" and annotation.value is not None:
-            keys[f"{annotation.value:.0f}"] += 1
+            # A dimension is right when its value is and it measures the same things:
+            # the right number linked to the wrong grids states a false distance.
+            ends = sorted(
+                str(by_id[end].axis or by_id[end].text) if end in by_id else "?"
+                for end in annotation.measures or []
+            )
+            keys[f"{annotation.value:.0f}:{'-'.join(ends)}"] += 1
+        elif kind == "level":
+            keys[str(annotation.text)] += 1
         elif kind == "grid":
             keys[str(annotation.axis)] += 1
         elif kind == "callout" and annotation.target is not None:
@@ -94,7 +103,7 @@ def score(authored: PageLabel, inferred: PageLabel) -> list[Score]:
         One score per category.
     """
     scores: list[Score] = []
-    for kind in ("tag", "dimension", "grid", "callout"):
+    for kind in ("tag", "dimension", "grid", "level", "callout"):
         truth, guess = _keys(authored, kind), _keys(inferred, kind)
         scores.append(
             Score(

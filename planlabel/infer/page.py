@@ -25,6 +25,7 @@ from planlabel.infer.patterns import (
     SHEET_ID,
     STRUCTURAL_TYPES,
     parse_dimension,
+    parse_level,
     tag_family,
 )
 from planlabel.model import (
@@ -53,6 +54,10 @@ GRID_LINE_REACH_MM = 20.0
 
 #: How far a dimension's number may sit from the line it labels, in millimetres.
 DIMENSION_REACH_MM = 6.0
+
+#: How far below a level's text its line may run, in paper millimetres: the text sits
+#: on the line it names.
+LEVEL_REACH_MM = 3.0
 
 #: The fraction of the page, measured from the bottom-right corner, searched for the
 #: title block. Drawing offices put it there by convention, and nearly all of them.
@@ -156,7 +161,10 @@ def infer_page(content: PageContent, *, page_index: int, generator_version: str)
 
     grids = _grids(content, used)
     annotations += grids
-    annotations += _link_dimensions(_dimensions(content, used), grids)
+    levels = _levels(content, used)
+    annotations += levels
+    marked = [*grids, *levels]
+    annotations += _link_dimensions(_dimensions(content, used, marked), grids, levels)
     elements, tags = _tags(content, used)
     annotations += tags
     annotations += _callouts(content, used)
@@ -257,7 +265,56 @@ def _segment_box(segment: Segment) -> tuple[float, float, float, float]:
     )
 
 
-def _dimensions(content: PageContent, used: set[int]) -> list[Annotation]:
+def _levels(content: PageContent, used: set[int]) -> list[Annotation]:
+    """Find level marks: a signed elevation printed on a horizontal line.
+
+    A section marks each storey with its elevation, ``±0,00`` or ``+3,00``, written on
+    the level line. The sign is what tells a level from a dimension. Finding levels
+    before dimensions matters for the dimensions too: a storey height runs between two
+    level lines, and can only be linked to them once they are known.
+
+    Args:
+        content: The page.
+        used: Indexes of words already claimed, updated in place.
+
+    Returns:
+        One ``level`` annotation per mark with a line under it.
+    """
+    found: list[Annotation] = []
+    for index, word in enumerate(content.words):
+        if index in used:
+            continue
+        elevation = parse_level(word.text)
+        if elevation is None:
+            continue
+        under = [
+            segment
+            for segment in content.segments
+            if abs(segment.start[1] - segment.end[1]) < GRID_ALIGNMENT_MM
+            and 0.0 <= word.bbox[1] - segment.start[1] <= LEVEL_REACH_MM
+            and min(segment.start[0], segment.end[0]) <= word.bbox[2]
+            and max(segment.start[0], segment.end[0]) >= word.bbox[0]
+        ]
+        if not under:
+            continue
+        line = max(under, key=lambda segment: segment.length)
+        found.append(
+            Annotation(
+                id=f"lvl-{len(found) + 1:02d}",
+                type="level",
+                paperBBox=_union(word.bbox, _segment_box(line)),
+                text=word.text,
+                elevation=elevation,
+                geometry=[line.start, line.end],
+                provenance=Provenance.INFERRED,
+                confidence=0.85,
+            )
+        )
+        used.add(index)
+    return found
+
+
+def _dimensions(content: PageContent, used: set[int], marked: list[Annotation]) -> list[Annotation]:
     """Find dimensions: a number printed beside a line.
 
     The unit is taken as millimetres, which is what a building drawing dimensions in by
@@ -265,13 +322,28 @@ def _dimensions(content: PageContent, used: set[int]) -> list[Annotation]:
     line near it is not reported: that is the likelier reading of a stray figure in a
     note than of a dimension whose line was lost.
 
+    The line is the nearest one that is not already a grid's or a level's. An overall
+    dimension's value often prints across a grid line, and taking that line for the
+    dimension's would make it measure nothing.
+
     Args:
         content: The page.
         used: Indexes of words already claimed, updated in place.
+        marked: The grids and levels already found, whose lines are theirs.
 
     Returns:
         One ``dimension`` annotation per number with a line beside it.
     """
+    taken = {
+        (round(point[0], 2), round(point[1], 2))
+        for annotation in marked
+        for point in (annotation.geometry or [])
+    }
+
+    def owned(segment: Segment) -> bool:
+        ends = {(round(p[0], 2), round(p[1], 2)) for p in (segment.start, segment.end)}
+        return ends <= taken
+
     found: list[Annotation] = []
     for index, word in enumerate(content.words):
         if index in used:
@@ -284,6 +356,7 @@ def _dimensions(content: PageContent, used: set[int]) -> list[Annotation]:
             for segment in content.segments
             if _distance_to_segment(word.centre, segment) <= DIMENSION_REACH_MM
             and segment.length > (word.bbox[2] - word.bbox[0])
+            and not owned(segment)
         ]
         if not near:
             continue
@@ -305,8 +378,10 @@ def _dimensions(content: PageContent, used: set[int]) -> list[Annotation]:
     return found
 
 
-def _link_dimensions(dimensions: list[Annotation], grids: list[Annotation]) -> list[Annotation]:
-    """Say which grids each dimension measures between, where the geometry shows it.
+def _link_dimensions(
+    dimensions: list[Annotation], grids: list[Annotation], levels: list[Annotation]
+) -> list[Annotation]:
+    """Say which grids or levels each dimension measures between, where it shows.
 
     A running dimension between two grid lines ends on them: a horizontal dimension
     line starts and stops at the x of two vertical grids. Where both ends of a
@@ -318,9 +393,13 @@ def _link_dimensions(dimensions: list[Annotation], grids: list[Annotation]) -> l
     linked to the nearest grids, because a dimension to a wall face measured as though
     it ran grid to grid would state the wrong distance between the wrong things.
 
+    A dimension running up the page ends on two horizontal lines, which are grid
+    lines on a plan and level lines on a section; both are looked for.
+
     Args:
         dimensions: The dimensions found.
         grids: The grids found, with their lines as ``geometry``.
+        levels: The levels found, with their lines as ``geometry``.
 
     Returns:
         The dimensions, with ``measures`` filled in where both ends align.
@@ -335,6 +414,10 @@ def _link_dimensions(dimensions: list[Annotation], grids: list[Annotation]) -> l
             vertical.append(((x0 + x1) / 2.0, grid.local_id))
         else:
             horizontal.append(((y0 + y1) / 2.0, grid.local_id))
+    for level in levels:
+        if level.geometry and len(level.geometry) >= _MIN_LINE_POINTS:
+            (_, y0), (_, y1) = level.geometry[0], level.geometry[-1]
+            horizontal.append(((y0 + y1) / 2.0, level.local_id))
 
     linked: list[Annotation] = []
     for dimension in dimensions:

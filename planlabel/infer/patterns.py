@@ -33,6 +33,10 @@ GRID_AXIS: Final = re.compile(r"\A(?:[A-Z]|\d{1,2})\Z")
 #: A dimension value: "8000", "2,50", "2.50", "2 500".
 DIMENSION: Final = re.compile(r"\A\d{1,6}(?:[.,]\d{1,3})?\Z")
 
+#: A level: an elevation in metres with its sign, as a section prints it: "±0,00",
+#: "+3,00", "-0,25". The sign is what tells it from a dimension.
+LEVEL: Final = re.compile(r"\A([±+\-])(\d{1,3}[.,]\d{2,3})\Z")
+
 #: Structural and architectural marks, with the IFC class each family implies. The
 #: class is a guess from the mark's family and is recorded with a confidence to match.
 TAG_FAMILIES: Final[tuple[tuple[re.Pattern[str], str, float], ...]] = (
@@ -86,6 +90,26 @@ def tag_family(text: str) -> tuple[str, float] | None:
         if pattern.match(text.strip()):
             return ifc_class, confidence
     return None
+
+
+def parse_level(text: str) -> float | None:
+    """Read a printed level as an elevation in metres.
+
+    Args:
+        text: The printed level, such as ``+3,00``.
+
+    Returns:
+        The elevation, or None when the text is not a level.
+
+    Examples:
+        >>> parse_level("-0,25")
+        -0.25
+    """
+    match = LEVEL.match(text.strip())
+    if match is None:
+        return None
+    value = float(match.group(2).replace(",", "."))
+    return -value if match.group(1) == "-" else value
 
 
 def parse_dimension(text: str) -> float | None:

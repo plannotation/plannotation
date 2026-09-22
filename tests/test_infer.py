@@ -26,6 +26,7 @@ from planlabel.infer.patterns import (
     SCALE,
     SHEET_ID,
     parse_dimension,
+    parse_level,
     tag_family,
 )
 
@@ -82,6 +83,23 @@ class TestTheVocabulary:
         match = REVISION.match(text)
         assert match is not None
         assert match.group(1) == index
+
+    @pytest.mark.parametrize(
+        ("text", "value"),
+        [("±0,00", 0.0), ("+3,00", 3.0), ("-0,25", -0.25), ("+12.500", 12.5)],
+    )
+    def test_levels_carry_their_sign(self, text: str, value: float) -> None:
+        """The sign is what tells a level from a dimension."""
+        assert parse_level(text) == value
+
+    @pytest.mark.parametrize("text", ["3,00", "3000", "+3", "Pos. 3"])
+    def test_things_that_are_not_levels(self, text: str) -> None:
+        """An unsigned number is a dimension, and a level has two decimals."""
+        assert parse_level(text) is None
+
+    def test_a_level_is_not_a_dimension(self) -> None:
+        """Otherwise every level mark would be counted twice."""
+        assert parse_dimension("+3,00") is None
 
     @pytest.mark.parametrize(
         ("text", "value"), [("8000", 8000.0), ("2,50", 2.5), ("2.50", 2.5), ("12", 12.0)]
