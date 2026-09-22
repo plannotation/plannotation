@@ -7,10 +7,10 @@ canonical: https://srtgn.github.io/planlabel/spec/0.1
 
 # PlanLabel 0.1 — Specification
 
-**Status: draft.** This document is the normative specification for PlanLabel. It
-is written and ratified phase by phase. Sections 1 to 4 are normative as of
-Phase 1, and sections 6 and 9 as of Phase 2. Sections still marked *(stub)* are not
-yet normative and must not be relied upon.
+**Status: draft.** This document is the normative specification for PlanLabel 0.1.
+Every section is complete. Sections marked *informative* explain or illustrate and
+impose no requirement; everything else is normative. While the version is `0.x` the
+format may still change between minor versions (8.2).
 
 The canonical location of this document is
 <https://srtgn.github.io/planlabel/spec/0.1>. The `conformsTo` value written into
@@ -1759,6 +1759,16 @@ the two mechanisms carries which part of the payload; whether a whole page label
 or per-element fragments are carried; and how an SVG document announces that it
 carries a payload, the declaration of 6.3 having no SVG equivalent.
 
+**6.4.5 Reading IFC identity from an SVG *(informative)*.** An SVG written by
+IfcOpenShell's serializer already says which product each group draws and how each
+view maps to the model, so a writer can derive a label for the PDF rendered from that
+SVG without an SVG payload: the GlobalId from `ifc:guid`, or from the serializer's
+`id="product-<uuid>"` by 7.1.2; the class from the group's `class`; and the paper
+transform of 3.5 from the view group's `ifc:matrix3` and `ifc:plane` composed with
+every transform and viewport above it, followed by the flip of 3.3. The reference
+implementation's `planlabel from-svg` and its Bonsai operator do exactly this, and
+write nothing into the SVG.
+
 ---
 
 ### 6.5 The sidecar JSON
@@ -1950,15 +1960,122 @@ carriers carrying payloads for the same document, and MUST report which carrier
 payload: both may be internally perfect, and the defect is that they are not the
 same.
 
-## 7. IFC mapping *(stub — Phase 4)*
+## 7. IFC mapping
 
-Outline of the correspondence between PlanLabel objects and IFC entities, aligned
-with SWAPP ifc-docs.
+PlanLabel does not model buildings. Everything it says about the building is said in
+IFC's words — class names, GlobalIds, property-set names — and this section states the
+correspondence. It aligns with the IFC documentation of buildingSMART and with the
+drawing conventions of IfcOpenShell and Bonsai, in which a sheet and a drawing are
+each an `IfcDocumentInformation`, a drawing is placed on a sheet by an
+`IfcDocumentReference`, a drawing's view is an `IfcAnnotation` of type `DRAWING`, and
+drawing annotations are `IfcAnnotation`s whose type says what they are.
 
-## 8. Versioning policy *(stub — Phase 1)*
+7.1 and 7.3 are normative; 7.2 is an informative correspondence, because PlanLabel
+0.1 reads and writes labels, not IFC files, and does not require a writer to have a
+model at all.
 
-How `planlabel`, the schema `$id` and the `conformsTo` URI move together, and what
-counts as a breaking change.
+### 7.1 Identity
+
+**7.1.1 Classes.** `element.ifcClass` MUST be the name of the IFC class the element
+is an instance of, or of one of its supertypes — `IfcWall` for an
+`IfcWallStandardCase` — as the schema spells it, and SHOULD be the exact class. It is
+never a type object's name, an authoring tool's category or a layer name. `element.predefinedType`, where present, MUST be the instance's
+`PredefinedType`, or its `ObjectType` when that is `USERDEFINED`.
+
+**7.1.2 GlobalIds.** `element.ifcGuid` and `annotation.ifcGuid` MUST be the IFC
+`GlobalId` of the entity they name, exactly as the model stores it: 22 characters of
+IFC's base-64 alphabet encoding a 128-bit number, so that its first character is `0`
+to `3`. A writer MUST NOT invent a GlobalId for something the model does not contain;
+such an element has no `ifcGuid`. A reader MUST compare GlobalIds as case-sensitive
+strings. Where a tool records the 128-bit number as a UUID, as IfcOpenShell's SVG
+serializer does in `id="product-<uuid>"`, the GlobalId is its base-64 encoding and a
+writer MAY decode it (6.4.5).
+
+**7.1.3 Units.** `model.lengthUnit` MUST name the length unit of the model's
+`IfcUnitAssignment` — `m` for the SI metre without prefix, `cm` for `CENTI`, `mm` for
+`MILLI` — and a writer MUST read it from the model rather than assume it. PlanLabel
+0.1 names no other unit; a model in a conversion-based unit (feet, inches) cannot be
+described with a `paperToPlane`, and a writer MUST NOT write one for it.
+
+### 7.2 Correspondence *(informative)*
+
+| PlanLabel | IFC | Notes |
+| --- | --- | --- |
+| `sheet` | `IfcDocumentInformation` of the sheet | `Identification` → `sheet.id`, `Name` → `title`, `Revision` → `revision` |
+| The PDF of a sheet | `IfcDocumentReference` with the file's `Location` | The label travels in the PDF; the model need not know it exists |
+| `viewport` | The drawing: an `IfcDocumentInformation` placed on the sheet by an `IfcDocumentReference`, whose view is an `IfcAnnotation` of type `DRAWING` | The annotation's placement is `viewport.plane`; its scale property is `viewport.scale` |
+| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name`, `elevation` and `ifcGuid` are the storey's `Name`, `Elevation` and `GlobalId` |
+| `element` | An `IfcProduct`, usually an `IfcElement` | `GlobalId`, the entity class, `PredefinedType`, `Name` and `Tag` map one to one |
+| `element.properties` | The element's property sets and quantity sets | Keyed by set name (`Pset_WallCommon`), then property name |
+| `shows.property` | `Tag`, an attribute, or a dotted `Pset_Name.Property` | A mark shows `Tag`; a member's cross-section shows `Pset_ColumnCommon.Reference` |
+| `annotation.type = dimension` | `IfcAnnotation` of type `DIMENSION` | `measures` names what it runs between |
+| `level` | `IfcAnnotation` of type `SECTION_LEVEL` or `PLAN_LEVEL` | `elevation` is in metres; `ifcGuid` names the storey or the level annotation |
+| `text`, `leader` | `IfcAnnotation` of type `TEXT`, `TEXT_LEADER` | Assigned to a product by `IfcRelAssignsToProduct`, which is what `shows.element` records |
+| `sectionMark` | `IfcAnnotation` of type `SECTION` | `target` names the sheet and viewport of the section it opens |
+| `grid` | `IfcGridAxis` of an `IfcGrid` | `AxisTag` → `axis` |
+| `callout` | A reference to another sheet's `IfcDocumentInformation` | `target.sheetId` is that sheet's `Identification` |
+| `tag` | `IfcAnnotation` of type `TEXT`, templated from the product it is assigned to | Its text is the product's `Tag` |
+
+### 7.3 Round trip
+
+Given the model a label was written from, a reader SHOULD resolve every `ifcGuid` in
+it, and a validator given the model (4.4) MUST report an `ifcGuid` the model does not
+contain, and an `ifcClass` that is neither the class of the entity with that
+GlobalId nor a supertype of it (PL-IFC-001, PL-IFC-002). A
+label MAY name entities the reader's copy of the model lacks — the model may have
+moved on since the drawing was issued — and a reader MUST then treat the drawing, not
+the model, as the record of what was issued (1.2).
+
+## 8. Versioning policy
+
+### 8.1 One number, three places
+
+A version of PlanLabel is one `MAJOR.MINOR` number, and it appears in exactly three
+places, which always move together:
+
+1. the `planlabel` member of every label, index and sidecar (`"0.1"`);
+2. the `$id` of each schema, `https://srtgn.github.io/planlabel/schema/0.1/…`;
+3. the `conformsTo` URI of the PDF declaration, `https://srtgn.github.io/planlabel/spec/0.1`.
+
+A writer MUST write the same version in all three. A reader selects the schema by the
+`planlabel` member and, where the version is one it does not implement, treats the
+label as absent (4.3 (3)); a validator reports such a label as unvalidatable rather
+than invalid (4.4).
+
+### 8.2 What a version may change
+
+While the major number is `0`, the format is a draft and any new minor version MAY
+change anything. From `1.0`:
+
+- a **major** version is required for any **breaking change**: removing or renaming a
+  member; changing a member's meaning, unit or coordinate convention; making an
+  optional member required; tightening a constraint so that a previously valid label
+  becomes invalid; removing a value from an enumeration; or changing the carrier —
+  the attachment names, their relationship, their placement or the declaration;
+- a **minor** version MAY add optional members, add values to an enumeration, add
+  annotation types, and relax constraints. A reader of `1.n` MUST therefore treat an
+  enumeration value it does not know as though it were `other`, where the enumeration
+  has one, and otherwise ignore the object that carries it;
+- **errata** change neither number. An erratum may correct an example, a typo or an
+  ambiguity, and MUST NOT make a valid label invalid or an invalid one valid.
+
+A member deprecated in `1.n` remains valid until the next major version, and a writer
+SHOULD stop writing it.
+
+### 8.3 Permanence
+
+A version's specification and schemas, once published under the canonical URLs above,
+are never withdrawn and never changed except by errata, which are listed in the
+document they amend. A label written today must mean the same thing when it is read
+from an archive in thirty years.
+
+### 8.4 Software and extensions
+
+The version of a program that reads or writes labels — including this project's
+`planlabel` package, which follows semantic versioning of its own — is independent of
+the format's, and is recorded in `generator.version`. Members under `extensions` whose
+keys begin `x-` are outside the version entirely: they may appear, change and disappear
+in any version, and a reader never requires them (4.3 (6)).
 
 ## 9. Security considerations
 
