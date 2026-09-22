@@ -251,7 +251,11 @@ required-imports = ["from __future__ import annotations"]
 ]
 "tools/**" = ["INP001", "T201"]  # standalone maintenance scripts, not a package
 "bench/**" = ["T201"]
-"bonsai_ext/**" = ["ANN", "D", "INP001"]  # Blender operators, checked by hand
+# A Blender add-on, checked by hand in Blender (docs/bonsai.md). Blender reads operator
+# properties from evaluated class annotations, so postponed evaluation -- I002's
+# required import -- would break it, and bl_options is the plain mutable set
+# Blender's API documents (RUF012).
+"bonsai_ext/**" = ["ANN", "D", "INP001", "I002", "RUF012"]
 
 [tool.ruff.format]
 docstring-code-format = true
