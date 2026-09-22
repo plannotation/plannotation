@@ -256,7 +256,13 @@ line-ending = "lf"
 # mypy
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.11"
+# 3.12 rather than the 3.11 floor, and not by preference. numpy's bundled stubs use
+# PEP 695 `type` statements, which mypy refuses to parse at all when asked to check
+# for 3.11 -- a fatal syntax error in a third-party stub that no per-module override
+# can suppress. pikepdf's own stubs import numpy, so every module that touches a PDF
+# drags it in. ruff still targets py311, and CI still runs the tests on 3.11, so the
+# interpreter floor itself is unaffected.
+python_version = "3.12"
 strict = true
 files = ["planlabel", "planlabel_mcp/planlabel_mcp", "tests"]
 mypy_path = "planlabel_mcp"

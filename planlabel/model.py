@@ -11,13 +11,17 @@ What lives here
 * One model per object in ``planlabel-0.1.json`` (the page label) and in
   ``planlabel-index-0.1.json`` (the document-level index), plus the enumerations and
   constrained scalars the schemas define under ``$defs``.
+* :class:`Sidecar`, the root of ``planlabel-sidecar-0.1.json``: an index and every
+  page label of one document in one file, which is what the sidecar carrier writes
+  beside a document that cannot or must not carry them itself.
 * The Phase 1 rules from the design brief as pure functions with thin model
   properties over them: :func:`aggregate_provenance`, :func:`conformance_level`,
   :func:`annotation_has_link`, :func:`local_ids`.
 * Canonical serialisation, :func:`canonical_json`, and its inverses
-  :func:`load_page_label` and :func:`load_label_index`.
+  :func:`load_page_label`, :func:`load_label_index` and :func:`load_sidecar`.
 * Access to the packaged schemas through :mod:`importlib.resources`, so that
-  :func:`page_schema` and :func:`index_schema` work from an installed wheel.
+  :func:`page_schema`, :func:`index_schema` and :func:`sidecar_schema` work from an
+  installed wheel.
 
 Canonical JSON
 --------------
@@ -77,7 +81,7 @@ from enum import StrEnum
 from functools import cache
 from importlib import resources
 from math import isfinite
-from typing import TYPE_CHECKING, Annotated, Literal, NoReturn, Self, cast
+from typing import TYPE_CHECKING, Annotated, Final, Literal, NoReturn, Self, cast
 
 from pydantic import (
     BaseModel,
@@ -89,13 +93,14 @@ from pydantic import (
     model_validator,
 )
 
-from planlabel.constants import SCHEMA_VERSION
+from planlabel.constants import BASE_URL, SCHEMA_VERSION
 from planlabel.units import COORD_DECIMALS
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
 __all__ = [
+    "SIDECAR_SCHEMA_ID",
     "Affine6",
     "Annotation",
     "AnnotationType",
@@ -132,6 +137,7 @@ __all__ = [
     "Sha256",
     "Sheet",
     "Shows",
+    "Sidecar",
     "Storey",
     "Target",
     "Vec3",
@@ -145,8 +151,10 @@ __all__ = [
     "index_schema",
     "load_label_index",
     "load_page_label",
+    "load_sidecar",
     "local_ids",
     "page_schema",
+    "sidecar_schema",
 ]
 
 #: Import path of the package that carries the schema files as package data.
@@ -157,6 +165,18 @@ _PAGE_SCHEMA_FILE = f"planlabel-{SCHEMA_VERSION}.json"
 
 #: Filename of the document-level index schema inside that package.
 _INDEX_SCHEMA_FILE = f"planlabel-index-{SCHEMA_VERSION}.json"
+
+#: Filename of the sidecar schema inside that package.
+_SIDECAR_SCHEMA_FILE = f"planlabel-sidecar-{SCHEMA_VERSION}.json"
+
+#: ``$id`` of the sidecar JSON Schema.
+#:
+#: It lives here rather than beside its two siblings in :mod:`planlabel.constants`
+#: because the sidecar is a carrier detail introduced with the carriers themselves,
+#: and because nothing outside this module needs it to build a URL. Like every other
+#: public PlanLabel URL it is derived from :data:`planlabel.constants.BASE_URL`, so
+#: the rule that no module may hard-code the host still holds.
+SIDECAR_SCHEMA_ID: Final = f"{BASE_URL}/schema/{SCHEMA_VERSION}/planlabel-sidecar.schema.json"
 
 
 # ---------------------------------------------------------------------------
@@ -728,6 +748,67 @@ class LabelIndex(_LabelModel):
     extensions: Extensions | None = None
 
 
+class Sidecar(_LabelModel):
+    """A whole document's labels in one file: the root of ``planlabel-sidecar-0.1.json``.
+
+    The sidecar is the third carrier. It holds exactly what a labelled PDF holds --
+    the document-level index and one page label per labelled page -- as a single JSON
+    file written beside the document as ``X.planlabel.json``. It exists for two
+    consumers: one that cannot read PDF attachments, and one that must not rewrite the
+    document at all, a signed PDF above all.
+
+    Carrying the index as well as the pages is what makes the sidecar a twin rather
+    than a bag of labels: a reader can see which pages are labelled and at what level
+    without parsing every page, exactly as it could from the embedded index.
+
+    ``index`` is required because a sidecar is written by a program that has all the
+    labels in front of it, and can therefore always derive an index from them. A
+    sidecar whose index is missing would be a weaker document than the PDF it stands
+    in for.
+    """
+
+    planlabel: Literal["0.1"]
+    generator: Generator | None = None
+    index: LabelIndex
+    pages: list[PageLabel]
+    extensions: Extensions | None = None
+
+    @model_validator(mode="after")
+    def _one_label_per_page(self) -> Self:
+        """Enforce that no two page labels claim the same page.
+
+        Returns:
+            The validated sidecar.
+
+        Raises:
+            ValueError: If two labels carry the same ``page.index``. The schema cannot
+                express this, and a reader keying labels by page -- which is the only
+                useful way to read them -- would silently lose one of the two.
+        """
+        seen: set[int] = set()
+        duplicates: set[int] = set()
+        for label in self.pages:
+            if label.page.index in seen:
+                duplicates.add(label.page.index)
+            seen.add(label.page.index)
+        if duplicates:
+            listed = ", ".join(str(index) for index in sorted(duplicates))
+            msg = f"two page labels claim the same page; repeated page.index: {listed}"
+            raise ValueError(msg)
+        return self
+
+    @property
+    def levels(self) -> dict[int, ConformanceLevel]:
+        """Return the conformance level of each page label, keyed by page index.
+
+        Returns:
+            One entry per label in :attr:`pages`, as :func:`conformance_level` grades
+            it. The index's own ``level`` values are a claim inside a document; these
+            are computed from the labels themselves.
+        """
+        return {label.page.index: conformance_level(label) for label in self.pages}
+
+
 # ---------------------------------------------------------------------------
 # Rules from the design brief, as pure functions
 # ---------------------------------------------------------------------------
@@ -1057,6 +1138,25 @@ def load_label_index(text: str | bytes) -> LabelIndex:
     return LabelIndex.model_validate(_loads(text))
 
 
+def load_sidecar(text: str | bytes) -> Sidecar:
+    """Parse and validate a sidecar document.
+
+    The inverse of :func:`canonical_json` for a sidecar, on the same terms as
+    :func:`load_page_label`.
+
+    Args:
+        text: The sidecar document, as text or as UTF-8 bytes.
+
+    Returns:
+        The validated sidecar.
+
+    Raises:
+        ValueError: If the text is not valid JSON.
+        pydantic.ValidationError: If the document does not match the schema.
+    """
+    return Sidecar.model_validate(_loads(text))
+
+
 # ---------------------------------------------------------------------------
 # The packaged schemas
 # ---------------------------------------------------------------------------
@@ -1096,3 +1196,18 @@ def index_schema() -> dict[str, JsonValue]:
         mutate.
     """
     return cast("dict[str, JsonValue]", json.loads(_schema_text(_INDEX_SCHEMA_FILE)))
+
+
+def sidecar_schema() -> dict[str, JsonValue]:
+    """Load the sidecar JSON Schema.
+
+    The sidecar schema inlines the page-label and index schemas rather than
+    referencing them, so that a reader can validate a sidecar with this one document
+    and no network access. The three are generated from one source and cannot drift
+    apart unnoticed: the inlined copies are the other two files verbatim.
+
+    Returns:
+        ``planlabel-sidecar-0.1.json`` parsed, as a fresh object the caller may keep
+        or mutate.
+    """
+    return cast("dict[str, JsonValue]", json.loads(_schema_text(_SIDECAR_SCHEMA_FILE)))
