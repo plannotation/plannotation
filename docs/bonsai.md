@@ -40,8 +40,10 @@ plannotation from-svg sheet.svg sheet.pdf -o sheet.plannotated.pdf --sheet-id A-
 
    ```bash
    <blender-python> -m ensurepip
-   <blender-python> -m pip install plannotation
+   <blender-python> -m pip install /path/to/plannotation   # a clone of this repository
    ```
+
+   Once Plannotation is released on PyPI, `pip install plannotation` does the same.
 
 2. In Blender, **Edit > Preferences > Add-ons > Install from Disk**, choose
    `bonsai_ext/plannotation_bonsai.py`, and enable **Plannotation for Bonsai**.

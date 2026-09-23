@@ -43,27 +43,31 @@ depend on.
 
 ## 60-second demo
 
-```bash
-uvx --from 'plannotation[all]' plannotation samples build
-uvx plannotation inspect samples/positionsplan/sheet.plannotated.pdf
-```
-
-The first command builds three IFC models and draws them — a floor plan, a structural
-position plan and a section — as plannotated A3 sheets; it needs a system `libcairo`
-(`brew install cairo`, `apt-get install libcairo2`) or Inkscape with
-`--inkscape-fallback`. The second prints what the position plan's plannotation says.
-For the same on a page, open [`inspector/index.html`](inspector/index.html) and choose
-the PDF:
-
-![The position plan in the inspector: each member's mark and cross-section, the grids, dimensions and viewport, drawn from the plannotation over the page](docs/img/inspector-positionsplan.png)
-
-From a clone, before the package is on PyPI:
+Plannotation is not on PyPI yet, so run it from a clone:
 
 ```bash
+git clone https://github.com/plannotation/plannotation && cd plannotation
 uv sync --all-extras
 uv run plannotation samples build
 uv run plannotation inspect samples/positionsplan/sheet.plannotated.pdf
 uv run plannotation validate samples/positionsplan/sheet.plannotated.pdf
+```
+
+`samples build` makes three IFC models and draws them — a floor plan, a structural
+position plan and a section — as plannotated A3 sheets; it needs a system `libcairo`
+(`brew install cairo`, `apt-get install libcairo2`) or Inkscape with
+`--inkscape-fallback`. `inspect` prints what the position plan's plannotation says,
+and `validate` checks it. To see the same on the page, open the
+[inspector](https://plannotation.github.io/inspector/) (or `inspector/index.html` in
+the clone) and choose the PDF:
+
+![The position plan in the inspector: each member's mark and cross-section, the grids, dimensions and viewport, drawn from the plannotation over the page](docs/img/inspector-positionsplan.png)
+
+Once the package is released on PyPI, the same without a clone:
+
+```bash
+uvx --from 'plannotation[all]' plannotation samples build
+uvx plannotation inspect samples/positionsplan/sheet.plannotated.pdf
 ```
 
 ## Why a plannotation helps
@@ -108,6 +112,8 @@ in IFC's words, travelling with the issued page.
 - **Plannotations are data, never executable.** Readers must validate before trusting.
 
 ## Install
+
+Once released on PyPI:
 
 ```bash
 pip install plannotation            # library and CLI

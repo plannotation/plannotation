@@ -62,36 +62,24 @@ lives in [`spec/SPEC.md`](spec/SPEC.md).
 - **Specification.** `spec/SPEC.md` is complete: scope, terms, coordinate
   conventions, conformance, provenance, the PDF, SVG and sidecar carriers, the IFC
   mapping, the versioning policy and security considerations.
-
 - **Schema 0.1.** The `plannotation-0.1` JSON Schema, which is the single
   source of truth for the format, plus the document-level `plannotation-index-0.1`
   schema. Both ship inside the wheel as package data, so a validator works from an
   installed package with no network and no checkout. Pydantic v2 models mirror them
   exactly, with a canonical serialiser — sorted keys, two-space indent, LF, at most
   three decimals — that round-trips byte for byte. The rules of SPEC 4.1 and 4.6 are
-  encoded as pure functions the Phase 3 validator can call rather than reimplement:
+  encoded as pure functions the validator can call rather than reimplement:
   conformance level, provenance aggregation, and link detection. 24 plannotation
   fixtures (12 valid, 12 invalid) and 6 index fixtures, each negative failing for
-  exactly one reason recorded in a manifest. Specification sections 1 to 4 are now
-  normative.
-
+  exactly one reason recorded in a manifest.
 - **Scaffold.** Repository layout, packaging for the two distributions
   (`plannotation`, `plannotation-mcp`), `plannotation --version` CLI entry point, lint and
   type-check configuration, test harness, pre-commit hooks, and CI.
 
 ### Changed
 
-- Renamed from PlanLabel to Plannotation before the first release: package, CLI, schema
-  key, embedded file names and URLs changed; no compatibility shim.
-
-### Fixed
-
-- The sample models were in millimetres while their plannotations said metres, putting
-  `paperToPlane`, `plane` and `cutHeight` a factor of a thousand out against the files
-  they described. The exporter now reads the unit from the model.
-- Seeded GlobalIds took 136 bits for a 128-bit number, so their first character ran
-  past `3` and the serializer's `product-<uuid>` ids named different numbers.
-- Marks were printed at their elements' centres, black on black inside cut walls.
+- The project was called PlanLabel until it was renamed Plannotation, before the
+  first release; nothing was ever published under the old name.
 
 ### Decided
 

@@ -6,11 +6,14 @@ answers read from the drawing's plannotation rather than guessed from its pixels
 
 ## Run it
 
+From a clone (the package is not on PyPI yet):
+
 ```bash
-uvx plannotation-mcp --root ~/Drawings
+uv run plannotation-mcp --root ~/Drawings
 ```
 
-Over stdio by default. Add `--http` for streamable HTTP.
+Once it is released, `uvx plannotation-mcp --root ~/Drawings` does the same without a
+clone. Over stdio by default. Add `--http` for streamable HTTP.
 
 ## Claude Desktop
 
@@ -23,6 +26,23 @@ Add this to `claude_desktop_config.json` (on macOS,
     "plannotation": {
       "command": "uvx",
       "args": ["plannotation-mcp", "--root", "/absolute/path/to/Drawings"]
+    }
+  }
+}
+```
+
+That form needs the released package. From a clone, run it with `uv` instead; both
+paths must be absolute, because `--directory` changes the working directory:
+
+```json
+{
+  "mcpServers": {
+    "plannotation": {
+      "command": "uv",
+      "args": [
+        "run", "--directory", "/absolute/path/to/plannotation",
+        "plannotation-mcp", "--root", "/absolute/path/to/Drawings"
+      ]
     }
   }
 }
@@ -57,7 +77,7 @@ with `--allow-write`. A host can be talked into writing a file by a prompt hidde
 drawing it is reading; the safe default is that it cannot.
 
 ```bash
-uvx plannotation-mcp --root ~/Drawings --allow-write
+uv run plannotation-mcp --root ~/Drawings --allow-write
 ```
 
 **Confined to a root.** Every path a tool receives is resolved -- symlinks included --

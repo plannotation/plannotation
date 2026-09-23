@@ -9,12 +9,18 @@ By contributing you agree that your contribution is licensed under the
 ## Getting set up
 
 ```bash
-uv sync --all-extras          # create the environment from uv.lock
-uv run plannotation --version    # smoke test
-make check                    # format, lint, type-check, test, fixtures
+uv sync --all-extras           # create the environment from uv.lock
+uv run plannotation --version  # smoke test
+make samples                   # the sample sheets some tests read
+make check                     # format, lint, type-check, test, fixtures
 ```
 
-`make check` is the single gate. It runs exactly what CI runs:
+`make samples` needs a system `libcairo` (`brew install cairo`, `apt-get install
+libcairo2`); without the samples, the tests that read them skip.
+
+`make check` is the local gate. CI runs it, then two more steps: the
+`plannotation --version` smoke test and `python tools/audit_licenses.py` (see
+`.github/workflows/check.yml`). `make check` runs:
 
 | Step | Command |
 | --- | --- |
@@ -90,7 +96,7 @@ never touch the network and never depend on wall-clock time.
 - No committed binaries over 200 kB.
 - English only in code, documentation and commit messages. German terms are allowed
   inside enum values, with English descriptions.
-- No personal data, employer material or application material anywhere in the repo.
+- No personal data and no real project drawings anywhere in the repo.
   `tests/fixtures/realworld/` is git-ignored by design — real drawings never get
   committed.
 
@@ -119,9 +125,6 @@ feat(pdf): embed page-level /AF with /AFRelationship /Data
 fix(units): flip SVG y-axis before computing paper bbox
 docs(spec): define conformance levels L1-L3
 ```
-
-Development proceeds in numbered phases. One phase is one or more commits, and
-history is never squashed across a phase boundary.
 
 Before opening a pull request: `make check` is green, new behaviour has tests, and
 anything normative is reflected in `spec/SPEC.md`.
