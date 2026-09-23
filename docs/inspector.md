@@ -2,8 +2,9 @@
 
 `inspector/index.html` is a single file. Open it in a browser, choose a plannotated PDF,
 and it draws the plannotation over the page: element outlines and bounding boxes,
-annotation geometry, viewport extents, with a hover tooltip and a table of everything on
-the sheet.
+annotation geometry, viewport extents, with a tooltip on hover or tap and a table of
+everything on the sheet. The page is fitted to the width and drawn at the screen's
+density.
 
 There is no build step and nothing to install. pdf.js is fetched from a CDN the first
 time and cached after that; everything else is in the file.
@@ -20,6 +21,19 @@ plannotation inspect samples/floorplan/sheet.plannotated.pdf
 plannotation inspect samples/floorplan/sheet.plannotated.pdf --json | jq .pages
 ```
 
+## Opening a drawing from a link
+
+Served from a site, the inspector opens the PDF its address names:
+`inspector/?pdf=<URL>&page=<n>`. The URL is resolved against the inspector's own and must
+be on the same site; anything else is refused with a note. Choosing a sheet or turning a
+page updates the address, so it can be shared.
+
+Where `../examples/index.json` exists, as it does on
+[plannotation.github.io](https://plannotation.github.io/inspector/), a picker lists the
+example sheets and the first opens by default. A copy kept next to the drawings has
+neither and opens files from its button, which reads them in the browser and uploads
+nothing.
+
 ## What it reads
 
 A plannotation travels as an attachment named `plannotation-pNNNN.json`. The inspector
@@ -29,7 +43,7 @@ as well as on the page's own `/AF` (SPEC 6.2). A plannotation that will not pars
 treated as absent, as SPEC 4.3 (2) requires of any reader.
 
 Paper coordinates are millimetres with the origin at the bottom-left and y up; a canvas
-is pixels with y down. One function does that flip, so nothing else has to remember it.
+is CSS pixels with y down. One function does that flip, so nothing else has to remember it.
 
 ## Manual check
 
@@ -49,6 +63,15 @@ right, so that part is checked by hand against the samples:
    should download one row per item.
 9. Repeat with `positionsplan` (sixteen structural members, each with its
    cross-section) and `section` (walls and slabs on two storeys, and three levels).
+
+And on the site, with the examples staged (`make examples docs`, then
+`python -m http.server -d site`):
+
+10. `/inspector/` opens the first example, fitted to the width and sharp.
+11. Choosing the other example from the picker opens it and puts its `?pdf=` in the
+    address; `?pdf=https://example.com/x.pdf` is refused with a note.
+12. On a phone, the page does not scroll sideways, and tapping an outline shows its
+    tooltip until the next tap.
 
 The three samples as the inspector draws them, plannotations over the pages:
 

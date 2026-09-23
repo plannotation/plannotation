@@ -10,15 +10,20 @@ hard-codes still match the format. A manual check against the samples is recorde
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
 from plannotation.cli import app
 from plannotation.constants import plannotation_filename
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 INSPECTOR = Path(__file__).parent.parent / "inspector" / "index.html"
 SAMPLES = Path(__file__).parent.parent / "samples"
@@ -45,8 +50,12 @@ class TestTheInspectorIsOneFile:
         assert "SPDX-License-Identifier: Apache-2.0" in html()
 
     def test_it_has_no_local_dependencies(self) -> None:
-        """No relative script or stylesheet: nothing to be missing when it is copied."""
-        assert not re.findall(r'<(?:script|link)[^>]*(?:src|href)="(?!https://)[^"]+"', html())
+        """No relative script or stylesheet: nothing to be missing when it is copied.
+
+        A data: URI, such as the icon, is inline and cannot go missing.
+        """
+        pattern = r'<(?:script|link)[^>]*(?:src|href)="(?!https://|data:)[^"]+"'
+        assert not re.findall(pattern, html())
 
     def test_its_only_remote_dependency_is_pdfjs(self) -> None:
         """Documented in the README, and the only thing a first load needs."""
@@ -109,6 +118,99 @@ class TestItReadsWhatThisProjectWrites:
     def test_a_plannotation_that_will_not_parse_is_treated_as_absent(self) -> None:
         """SPEC 4.3 (2), which binds a reader whatever language it is written in."""
         assert "catch" in html()
+
+
+class TestItOpensADrawingFromALink:
+    """The site links straight to a drawing; a copy beside the drawings works as before."""
+
+    def test_it_reads_the_pdf_and_page_from_the_address(self) -> None:
+        """``?pdf=<url>&page=<n>``, the page a whole number from 1."""
+        source = html()
+        assert "new URLSearchParams(location.search)" in source
+        assert 'linked.get("pdf")' in source
+        assert 'Number.parseInt(linked.get("page")' in source
+
+    def test_it_opens_only_pdfs_on_its_own_site(self) -> None:
+        """Nobody can show a stranger's PDF under this site's name."""
+        source = html()
+        assert "url?.origin !== location.origin" in source
+        assert "is not on this site" in source
+
+    def test_pdfjs_never_evaluates_code_from_the_pdf(self) -> None:
+        """A PDF from a link is opened with pdf.js's eval path switched off."""
+        assert "isEvalSupported: false" in html()
+
+    def test_its_examples_are_where_the_site_stages_them(self) -> None:
+        """The picker reads the index stage_site.py writes, beside the inspector's folder."""
+        stage_site = _stage_site()
+        assert f'const EXAMPLES = "../{stage_site.EXAMPLES.as_posix()}/";' in html()
+        assert "${EXAMPLES}index.json" in html()
+
+    def test_its_picker_reads_fields_the_index_has(self) -> None:
+        """The option names the sheet by its number and title, and opens its PDF."""
+        source = html()
+        for field in ("pdf", "sheet", "title"):
+            assert f"entry.{field}" in source
+            assert field in _stage_site().EXAMPLE_FIELDS
+
+    def test_it_opens_the_first_example_when_the_address_names_none(self) -> None:
+        """So the hosted inspector never opens empty."""
+        assert "EXAMPLES + list[0].pdf" in html()
+
+    def test_its_address_stays_a_link_to_what_is_shown(self) -> None:
+        """Choosing an example or turning a page rewrites the address."""
+        assert "history.replaceState" in html()
+
+
+class TestItFitsTheScreen:
+    """A phone gets the whole sheet, sharp, and a tap does what a hover does."""
+
+    def test_it_fits_the_width_by_default(self) -> None:
+        """The zoom starts at fit, and fit is re-measured when the stage changes size."""
+        source = html()
+        assert '<option value="fit" selected>' in source
+        assert 'scale: "fit"' in source
+        assert "new ResizeObserver" in source
+
+    def test_it_renders_at_the_screen_density_within_a_canvas_limit(self) -> None:
+        """Sharp on a high-density screen, but under the 16.7 M-pixel iOS canvas limit."""
+        source = html()
+        assert "devicePixelRatio" in source
+        assert "16e6" in source
+
+    def test_a_tap_shows_the_tooltip(self) -> None:
+        """Pointer events, and a touch's tip is not hidden by its own pointerleave."""
+        source = html()
+        assert 'addEventListener("pointerdown", tipAt)' in source
+        assert 'event.pointerType === "mouse"' in source
+
+    def test_the_overlay_keeps_paper_colours_in_the_dark_theme(self) -> None:
+        """The page is white paper in either theme, so the dark theme leaves them alone."""
+        dark = re.findall(r'(?:prefers-color-scheme: dark\)|data-theme="dark"\]) \{[^}]*\}', html())
+        assert len(dark) == 2
+        for block in dark:
+            for colour in ("--element", "--annotation", "--viewport"):
+                assert colour not in block
+
+    def test_a_failure_says_why(self) -> None:
+        """An address that cannot be opened gets a note, not a blank stage."""
+        assert "Could not open ${name}: ${error.message}" in html()
+
+
+def _stage_site() -> ModuleType:
+    """Load tools/stage_site.py, which is a script rather than a module.
+
+    Returns:
+        The module.
+    """
+    loader = importlib.util.spec_from_file_location(
+        "stage_site", Path(__file__).parent.parent / "tools" / "stage_site.py"
+    )
+    assert loader is not None
+    assert loader.loader is not None
+    module = importlib.util.module_from_spec(loader)
+    loader.loader.exec_module(module)
+    return module
 
 
 class TestTheInspectCommand:

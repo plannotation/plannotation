@@ -5,23 +5,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plannotation inspector</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20x='3'%20y='6'%20width='26'%20height='20'%20rx='2'%20fill='%23fff'%20stroke='%231b1b19'%20stroke-width='2'/%3E%3Crect%20x='8'%20y='11'%20width='10'%20height='10'%20fill='none'%20stroke='%231d6fa5'%20stroke-width='2.5'/%3E%3Cpath%20d='M21%2021h4'%20stroke='%239a5b00'%20stroke-width='2.5'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #f6f6f4; --panel: #fff; --ink: #1a1a18; --muted: #6b6b66;
     --line: #d8d8d2; --accent: #1d6fa5; --warn: #9a5b00;
+    /* The overlay's colours. The page is white paper in either theme, so they stay. */
     --element: #1d6fa5; --annotation: #9a5b00; --viewport: #3f7d3f;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #17171a; --panel: #1f1f23; --ink: #e8e8e4; --muted: #9a9a94;
       --line: #34343a; --accent: #6ab7e8; --warn: #e0a24a;
-      --element: #6ab7e8; --annotation: #e0a24a; --viewport: #7fc77f;
     }
   }
   :root[data-theme="dark"] {
     --bg: #17171a; --panel: #1f1f23; --ink: #e8e8e4; --muted: #9a9a94;
     --line: #34343a; --accent: #6ab7e8; --warn: #e0a24a;
-    --element: #6ab7e8; --annotation: #e0a24a; --viewport: #7fc77f;
   }
   * { box-sizing: border-box; }
   body {
@@ -34,6 +34,11 @@
     position: sticky; top: 0; z-index: 2;
   }
   h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 600; letter-spacing: -0.01em; }
+  h1 a { color: inherit; text-decoration: none; }
+  h1 a[href] { color: var(--accent); }
+  h1 a[href]:hover { text-decoration: underline; }
+  .pages { display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+  @media (max-width: 640px) { header { position: static; gap: 8px; padding: 10px 16px; } }
   .muted { color: var(--muted); }
   button, select, label.file {
     font: inherit; padding: 5px 10px; border: 1px solid var(--line);
@@ -41,12 +46,16 @@
   }
   button:hover, label.file:hover { border-color: var(--accent); }
   input[type=file] { display: none; }
+  select#example { max-width: 100%; }
   main { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; align-items: flex-start; }
+  /* The stage takes the free width, so "fit" can measure it; the canvas never sets it. */
   #stage { position: relative; background: var(--panel); border: 1px solid var(--line);
-           border-radius: 8px; line-height: 0; overflow: auto; max-width: 100%; }
+           border-radius: 8px; line-height: 0; overflow: auto; flex: 1 1 640px; min-width: 0; }
   #paper, #overlay { display: block; }
-  #overlay { position: absolute; inset: 0; }
-  aside { flex: 1 1 320px; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
+  #overlay { position: absolute; top: 0; left: 0; touch-action: pan-x pan-y pinch-zoom; }
+  #note { line-height: 1.5; margin: 0; padding: 48px 20px; text-align: center; color: var(--muted); }
+  #note:empty { display: none; }
+  aside { flex: 0 1 360px; min-width: min(300px, 100%); display: flex; flex-direction: column; gap: 12px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
   .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
              color: var(--muted); margin: 0 0 8px; font-weight: 600; }
@@ -71,14 +80,15 @@
 </head>
 <body>
 <header>
-  <h1>Plannotation inspector</h1>
-  <label class="file">Open a plannotated PDF<input type="file" id="file" accept="application/pdf"></label>
-  <button id="prev">&larr;</button>
+  <h1><a id="home">Plannotation</a> inspector</h1>
+  <select id="example" aria-label="Example drawing" hidden></select>
+  <label class="file">Open PDF<input type="file" id="file" accept="application/pdf"></label>
+  <span class="pages"><button id="prev" aria-label="Previous page">&larr;</button>
   <span id="pager" class="muted">no document</span>
-  <button id="next">&rarr;</button>
-  <select id="zoom">
-    <option value="1">100%</option><option value="1.5" selected>150%</option>
-    <option value="2">200%</option><option value="3">300%</option>
+  <button id="next" aria-label="Next page">&rarr;</button></span>
+  <select id="zoom" aria-label="Zoom">
+    <option value="fit" selected>fit</option><option value="1">100%</option>
+    <option value="2">200%</option><option value="4">400%</option>
   </select>
   <button id="copy">Copy JSON</button>
   <button id="csv">Export CSV</button>
@@ -86,13 +96,14 @@
 
 <main>
   <div id="stage">
-    <canvas id="paper"></canvas>
-    <canvas id="overlay"></canvas>
+    <p id="note">Open a plannotated PDF. Nothing is uploaded.</p>
+    <canvas id="paper" width="0" height="0"></canvas>
+    <canvas id="overlay" width="0" height="0"></canvas>
   </div>
   <aside>
     <div class="card">
       <h2>Sheet</h2>
-      <dl id="sheet"><dd class="muted" style="grid-column:1/-1">Open a plannotated PDF to begin.</dd></dl>
+      <dl id="sheet"><dd class="muted" style="grid-column:1/-1">nothing yet</dd></dl>
     </div>
     <div class="card">
       <h2>Show</h2>
@@ -115,7 +126,8 @@ const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs"
 const WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
 
 const el = (id) => document.getElementById(id);
-const state = { doc: null, page: 1, plannotations: new Map(), scale: 1.5, hit: [], selected: null };
+const state = { doc: null, page: 1, plannotations: new Map(), scale: "fit", hit: [], selected: null,
+                pdf: null, size: null, task: null, ticket: 0, opening: 0, fitWidth: 0 };
 const KINDS = [
   ["element", "elements", "--element"],
   ["annotation", "annotations", "--annotation"],
@@ -162,16 +174,79 @@ async function library() {
   return pdfjs;
 }
 
+// Opens a document from bytes ({ data }) or from this site ({ url }). A failure clears
+// the stage and says why, instead of leaving the last drawing up under a new name.
+async function open(source, name, page = 1) {
+  const opening = ++state.opening;
+  el("note").textContent = "";
+  el("pager").textContent = `opening ${name}`;
+  try {
+    const lib = await library();
+    const doc = await lib.getDocument({ ...source, isEvalSupported: false }).promise;
+    const plannotations = await readPlannotations(doc);
+    if (opening !== state.opening) { doc.destroy(); return; } // a later choice has taken over
+    state.doc?.destroy();
+    state.doc = doc;
+    state.plannotations = plannotations;
+    state.page = Math.min(Math.max(1, page), doc.numPages);
+    state.selected = null;
+    await render();
+  } catch (error) {
+    if (opening !== state.opening) return;
+    state.doc?.destroy();
+    state.doc = null;
+    state.plannotations = new Map();
+    for (const canvas of [el("paper"), el("overlay")]) canvas.width = canvas.height = 0;
+    el("pager").textContent = "no document";
+    el("note").textContent = `Could not open ${name}: ${error.message}`;
+    describe();
+  }
+}
+
 el("file").addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
-  const lib = await library();
-  const data = new Uint8Array(await file.arrayBuffer());
-  state.doc = await lib.getDocument({ data }).promise;
-  state.plannotations = await readPlannotations(state.doc);
-  state.page = 1;
-  await render();
+  state.pdf = null;
+  remember();
+  el("example").value = "";
+  await open({ data: new Uint8Array(await file.arrayBuffer()) }, file.name);
 });
+
+// A link can name a drawing on this site: ?pdf=<url relative to this page>&page=<n>.
+// Only same-site URLs open this way, so nobody can show a stranger's PDF under this
+// site's name. A site that also serves ../examples/index.json gets a picker of them;
+// a copy kept next to the drawings has neither and works as before.
+const EXAMPLES = "../examples/";
+
+async function examples() {
+  try {
+    const response = await fetch(`${EXAMPLES}index.json`);
+    return response.ok ? (await response.json()).examples || [] : [];
+  } catch {
+    return [];
+  }
+}
+
+async function openLink(value, page = 1) {
+  state.pdf = value;
+  let url = null;
+  try { url = new URL(value, location.href); } catch { /* not a URL at all */ }
+  if (url?.origin !== location.origin) {
+    el("note").textContent = `Not opened: ${value} is not on this site.`;
+    return;
+  }
+  await open({ url: url.href }, value.split("/").pop(), page);
+  remember();
+}
+
+function remember() {
+  const query = state.pdf == null ? "" :
+    `?pdf=${encodeURIComponent(state.pdf).replace(/%2F/g, "/")}` +
+    (state.page > 1 ? `&page=${state.page}` : "");
+  history.replaceState(null, "", location.pathname + query);
+}
+
+el("example").onchange = (event) => openLink(event.target.value);
 
 // A plannotation travels as an attachment named plannotation-pNNNN.json. pdf.js exposes
 // the EmbeddedFiles name tree through getAttachments(), which is why Plannotation
@@ -189,49 +264,81 @@ async function readPlannotations(doc) {
   return found;
 }
 
-el("prev").onclick = () => { if (state.page > 1) { state.page--; render(); } };
-el("next").onclick = () => { if (state.doc && state.page < state.doc.numPages) { state.page++; render(); } };
-el("zoom").onchange = (e) => { state.scale = Number(e.target.value); render(); };
+el("prev").onclick = () => { if (state.page > 1) { state.page--; render(); remember(); } };
+el("next").onclick = () => {
+  if (state.doc && state.page < state.doc.numPages) { state.page++; render(); remember(); }
+};
+el("zoom").onchange = (e) => {
+  state.scale = e.target.value === "fit" ? "fit" : Number(e.target.value);
+  render();
+};
+// The stage's width changes with the window, and when a scrollbar comes or goes.
+let resizing = null;
+new ResizeObserver(() => {
+  if (state.scale !== "fit" || el("stage").clientWidth === state.fitWidth) return;
+  clearTimeout(resizing);
+  resizing = setTimeout(render, 100);
+}).observe(el("stage"));
 
 async function render() {
   if (!state.doc) return;
+  const ticket = ++state.ticket;
   const page = await state.doc.getPage(state.page);
-  const viewport = page.getViewport({ scale: state.scale });
+  if (ticket !== state.ticket) return; // a later page or zoom has taken over
+  state.fitWidth = el("stage").clientWidth;
+  const scale = state.scale === "fit"
+    ? Math.max(0.1, (state.fitWidth - 2) / page.getViewport({ scale: 1 }).width)
+    : state.scale;
+  const viewport = page.getViewport({ scale });
+  // Sharp on high-density screens, but never more canvas than a phone will allocate.
+  const ratio = Math.min(devicePixelRatio || 1,
+    Math.sqrt(16e6 / (viewport.width * viewport.height)));
+  state.task?.cancel();
+  state.size = { width: viewport.width, height: viewport.height, ratio };
   for (const canvas of [el("paper"), el("overlay")]) {
-    canvas.width = viewport.width; canvas.height = viewport.height;
+    canvas.width = Math.floor(viewport.width * ratio);
+    canvas.height = Math.floor(viewport.height * ratio);
     canvas.style.width = `${viewport.width}px`; canvas.style.height = `${viewport.height}px`;
   }
-  await page.render({ canvasContext: el("paper").getContext("2d"), viewport }).promise;
+  state.task = page.render({ canvasContext: el("paper").getContext("2d"),
+                             viewport: page.getViewport({ scale: scale * ratio }) });
+  try {
+    await state.task.promise;
+  } catch (error) {
+    if (error?.name === "RenderingCancelledException") return;
+    throw error;
+  }
   el("pager").textContent = `page ${state.page} of ${state.doc.numPages}` +
     (state.plannotations.has(state.page) ? "" : " — no plannotation");
   describe();
   draw();
 }
 
-// Paper is millimetres, y up from the bottom left; a canvas is pixels, y down from the
-// top. One function does the flip, so nothing else has to remember it.
-function toCanvas(x, y, plannotation, canvas) {
+// Paper is millimetres, y up from the bottom left; a canvas is CSS pixels, y down from
+// the top. One function does the flip, so nothing else has to remember it.
+function toCanvas(x, y, plannotation, size) {
   const w = plannotation.page.widthMm, h = plannotation.page.heightMm;
-  return [x / w * canvas.width, (h - y) / h * canvas.height];
+  return [x / w * size.width, (h - y) / h * size.height];
 }
 
 function draw() {
   const canvas = el("overlay"), ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   state.hit = [];
   const plannotation = state.plannotations.get(state.page);
-  if (!plannotation) return;
+  if (!plannotation || !state.size) return;
+  ctx.setTransform(state.size.ratio, 0, 0, state.size.ratio, 0, 0);
   const paint = (items, kind, colour) => {
     if (!shown.has(kind)) return;
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue(colour).trim();
     for (const item of items || []) {
       if (kind === "annotation" && hiddenTypes.has(item.type)) continue;
-      const stroke = getComputedStyle(document.documentElement).getPropertyValue(colour).trim();
       const box = item.paperBBox;
       if (!box) continue;
-      const [x0, y0] = toCanvas(box[0], box[1], plannotation, canvas);
-      const [x1, y1] = toCanvas(box[2], box[3], plannotation, canvas);
+      const [x0, y0] = toCanvas(box[0], box[1], plannotation, state.size);
+      const [x1, y1] = toCanvas(box[2], box[3], plannotation, state.size);
       const rect = [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
-      ctx.strokeStyle = stroke;
       ctx.lineWidth = state.selected === item.id ? 2.5 : 1;
       ctx.setLineDash(kind === "viewport" ? [6, 4] : []);
       ctx.globalAlpha = state.selected && state.selected !== item.id ? 0.35 : 1;
@@ -240,7 +347,7 @@ function draw() {
         for (const outline of item.paperOutlines) {
           ctx.beginPath();
           outline.forEach(([px, py], index) => {
-            const [cx, cy] = toCanvas(px, py, plannotation, canvas);
+            const [cx, cy] = toCanvas(px, py, plannotation, state.size);
             index ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
           });
           ctx.stroke();
@@ -249,7 +356,7 @@ function draw() {
       if (kind === "annotation" && item.geometry) {
         ctx.beginPath();
         item.geometry.forEach(([px, py], index) => {
-          const [cx, cy] = toCanvas(px, py, plannotation, canvas);
+          const [cx, cy] = toCanvas(px, py, plannotation, state.size);
           index ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
         });
         ctx.stroke();
@@ -267,6 +374,11 @@ function describe() {
   const plannotation = state.plannotations.get(state.page);
   const sheet = el("sheet"), rows = el("rows");
   typeToggles(plannotation);
+  if (!state.doc) {
+    sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">nothing yet</dd>`;
+    rows.innerHTML = `<tr><td colspan="3" class="empty">nothing yet</td></tr>`;
+    return;
+  }
   if (!plannotation) {
     sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no plannotation.</dd>`;
     rows.innerHTML = `<tr><td colspan="3" class="empty">nothing to show</td></tr>`;
@@ -318,14 +430,19 @@ function conformance(plannotation) {
 const escape = (value) => String(value).replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-el("overlay").addEventListener("mousemove", (event) => {
+// Pointer events, so that a tap on a phone shows what a hover shows on a desktop. A
+// touch has no hover to end, so its tip stays until the next tap or scroll.
+function tipAt(event) {
   const box = el("overlay").getBoundingClientRect();
   const x = event.clientX - box.left, y = event.clientY - box.top;
   const under = state.hit.filter(({ rect: [rx, ry, rw, rh] }) =>
     x >= rx && x <= rx + rw && y >= ry && y <= ry + rh);
   const tip = el("tip");
   if (!under.length) { tip.style.display = "none"; return; }
-  const { item, kind } = under[under.length - 1];
+  // The smallest box is the most specific thing there: the wall, not the grid line
+  // whose box runs the height of the sheet through it.
+  const area = ({ rect }) => rect[2] * rect[3];
+  const { item, kind } = under.reduce((best, hit) => (area(hit) < area(best) ? hit : best));
   const lines = [`<strong>${escape(item.id)}</strong> <span class="muted">${kind}</span>`];
   for (const key of ["ifcClass", "type", "kind", "name", "tag", "text", "axis", "value", "unit",
                      "ifcGuid", "provenance", "confidence", "elevation"]) {
@@ -333,10 +450,21 @@ el("overlay").addEventListener("mousemove", (event) => {
   }
   tip.innerHTML = lines.join("<br>");
   tip.style.display = "block";
-  tip.style.left = `${Math.min(event.clientX + 14, innerWidth - 340)}px`;
-  tip.style.top = `${event.clientY + 14}px`;
+  tip.style.left = `${Math.max(8, Math.min(event.clientX + 14, innerWidth - 340))}px`;
+  const below = event.clientY + 14;
+  tip.style.top = `${below + tip.offsetHeight > innerHeight
+    ? Math.max(8, event.clientY - 14 - tip.offsetHeight) : below}px`;
+}
+const hideTip = () => { el("tip").style.display = "none"; };
+el("overlay").addEventListener("pointermove", tipAt);
+el("overlay").addEventListener("pointerdown", tipAt);
+el("overlay").addEventListener("pointerleave", (event) => {
+  if (event.pointerType === "mouse") hideTip();
 });
-el("overlay").addEventListener("mouseleave", () => { el("tip").style.display = "none"; });
+document.addEventListener("pointerdown", (event) => {
+  if (event.target !== el("overlay")) hideTip();
+});
+addEventListener("scroll", hideTip, { capture: true, passive: true });
 
 el("copy").onclick = async () => {
   const plannotation = state.plannotations.get(state.page);
@@ -368,6 +496,23 @@ el("csv").onclick = () => {
   link.click();
   URL.revokeObjectURL(url);
 };
+
+// Last, so that everything above is defined before the first drawing opens.
+const list = await examples();
+if (list.length) {
+  el("home").href = "../";
+  el("example").innerHTML = list.map((entry) =>
+    `<option value="${escape(EXAMPLES + entry.pdf)}">` +
+    `${escape(`${entry.sheet ?? ""} ${entry.title ?? ""}`.trim())}</option>`).join("");
+  el("example").hidden = false;
+}
+const linked = new URLSearchParams(location.search);
+const first = linked.get("pdf") ?? (list.length ? EXAMPLES + list[0].pdf : null);
+if (first != null) {
+  const page = Number.parseInt(linked.get("page") ?? "", 10);
+  el("example").value = first;
+  openLink(first, page > 0 ? page : 1);
+}
 </script>
 </body>
 </html>
