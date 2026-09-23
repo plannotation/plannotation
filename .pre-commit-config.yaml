@@ -42,9 +42,8 @@ repos:
 
   # ------------------------------------------------- JSON schema self-checks
   # check-metaschema validates that each file under plannotation/schema/ is itself
-  # a well-formed JSON Schema for the draft its own $schema declares. Phase 1
-  # adds those files; until then nothing matches the pattern and the hook is
-  # skipped. That is why `files:` is used and `always_run` deliberately is not.
+  # a well-formed JSON Schema for the draft its own $schema declares. `files:`
+  # scopes it to those files; `always_run` deliberately is not set.
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.38.0
     hooks:
@@ -54,7 +53,7 @@ repos:
       - id: check-github-workflows
         args: [--verbose]
 
-      # Phase 1 onwards: the positive fixtures are checked against the schema they
+      # The positive fixtures are checked against the schema they
       # are fixtures for, so a schema edit that invalidates them fails at commit
       # time rather than in CI. The invalid/ fixtures are deliberately NOT listed:
       # failing is their whole job, and tests/test_fixtures.py asserts that they

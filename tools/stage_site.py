@@ -8,7 +8,8 @@ and from :data:`plannotation.constants.SPEC_URI`, never spelled out a second tim
 
 * ``plannotation/schema/*.json`` -> the path of its ``$id`` under the base URL;
 * ``spec/SPEC.md`` -> ``<SPEC_URI path>/index.md``, which the site renders to HTML;
-* ``README.md`` -> ``index.md``.
+* ``README.md`` -> ``index.md``;
+* ``inspector/index.html`` -> ``inspector/index.html``, served as it is.
 
 Usage:
     python tools/stage_site.py [OUT]     # default OUT: site/
@@ -63,6 +64,7 @@ def stage(out: Path) -> list[tuple[Path, Path]]:
     plan += [
         (REPO_ROOT / "spec" / "SPEC.md", site_path(SPEC_URI) / "index.md"),
         (REPO_ROOT / "README.md", Path("index.md")),
+        (REPO_ROOT / "inspector" / "index.html", Path("inspector") / "index.html"),
     ]
     for source, target in plan:
         (out / target).parent.mkdir(parents=True, exist_ok=True)

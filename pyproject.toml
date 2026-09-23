@@ -74,7 +74,7 @@ plannotation-bench = "plannotation.bench.cli:app"
 
 [project.urls]
 Homepage = "https://plannotation.github.io/"
-Documentation = "https://plannotation.github.io/"
+Documentation = "https://github.com/plannotation/plannotation/tree/main/docs"
 Specification = "https://plannotation.github.io/spec/0.1"
 Schema = "https://plannotation.github.io/schema/0.1/plannotation.schema.json"
 Source = "https://github.com/plannotation/plannotation"
@@ -89,7 +89,7 @@ path = "plannotation/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 # Ships every non-Python file under plannotation/ too, which is how
-# plannotation/schema/*.json reaches users as package data from Phase 1.
+# plannotation/schema/*.json reaches users as package data.
 packages = ["plannotation"]
 
 [tool.hatch.build.targets.sdist]
@@ -123,10 +123,9 @@ default-groups = ["dev"]
 [dependency-groups]
 # PEP 735 group: development tooling never ships to users.
 #
-# Deliberately lean -- it does NOT pull the svg/ifc extras. Phase 0 needs neither,
-# and keeping them out means CI installs no 42 MB ifcopenshell wheel and needs no
-# apt/brew libcairo step. Local development gets them via `make install`, which
-# syncs --all-extras; Phase 4 is when CI starts needing them too.
+# Deliberately lean -- it does NOT pull the svg/ifc extras. Local development gets
+# them via `make install`, which syncs --all-extras. CI installs them separately
+# (see .github/workflows/check.yml); without them the tests that need them skip.
 dev = [
   "plannotation-mcp",
   "ruff>=0.8",

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 0 gate tests: the scaffold is importable, versioned and self-consistent."""
+"""Scaffold tests: the package is importable, versioned and self-consistent."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def test_version_is_pep440() -> None:
 
 
 def test_cli_version_flag() -> None:
-    """``plannotation --version`` exits zero and reports the version. Phase 0 gate."""
+    """``plannotation --version`` exits zero and reports the version."""
     result = CliRunner().invoke(app, ["--version"])
     assert result.exit_code == 0, result.output
     assert plannotation.__version__ in result.output
@@ -227,3 +227,11 @@ def test_the_site_serves_every_schema_at_its_id_and_the_spec_at_its_uri(
     assert staged(SCHEMA_ID).is_file()
     assert staged(INDEX_SCHEMA_ID).is_file()
     assert (staged(SPEC_URI) / "index.md").is_file()
+    assert (tmp_path / "inspector" / "index.html").is_file()
+
+
+@pytest.mark.parametrize("name", ["LICENSE", "NOTICE"])
+def test_the_mcp_distribution_ships_the_same_legal_files(name: str) -> None:
+    """``plannotation-mcp`` carries real copies, so they must not drift from the root."""
+    copy = REPO_ROOT / "plannotation_mcp" / name
+    assert copy.read_bytes() == (REPO_ROOT / name).read_bytes()

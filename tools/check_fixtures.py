@@ -8,12 +8,12 @@ something CI catches.
 
 It is not a second validator
 ----------------------------
-Since Phase 3 it is not. Every rule about the **format** -- schema validity, identity
+Not any more. Every rule about the **format** -- schema validity, identity
 and references, geometry, provenance -- belongs to :mod:`plannotation.validate`, and this
 script applies them by calling it: :func:`schema_findings` for rule 1, and
 :func:`plannotation.validate.check_page_document` and
 :func:`plannotation.validate.check_plannotation` for the rest. It keeps no copy of any of
-them. That is the point: four rounds of Phase 2 were spent on defects that
+them. That is the point: four rounds of review were spent on defects that
 existed only because two pieces of code believed slightly different things, and the
 fixture corpus checking the format with its own arithmetic was the largest remaining
 instance of it.
@@ -34,7 +34,7 @@ c. every document round-trips **byte for byte** -- through the models for a vali
    comparison is on bytes and never on text, because :meth:`pathlib.Path.read_text`
    translates CRLF to LF and would hide a Windows line ending completely;
 d. the manifest lists exactly the files on disk, in filename order, as many of each as
-   the Phase 1 gate fixed, and every ``schemaPointer`` dereferences;
+   the corpus fixes, and every ``schemaPointer`` dereferences;
 e. :func:`plannotation.model.conformance_level` returns the level the manifest, the
    filename and every index entry naming that sheet all claim.
 
@@ -211,8 +211,8 @@ MAX_STOREY_HEIGHT_M = 6.0
 MIN_SLAB_THICKNESS_MM = 100.0
 MAX_SLAB_THICKNESS_MM = 500.0
 
-#: How many fixtures each of ``valid/`` and ``invalid/`` holds, per corpus. The Phase 1
-#: gate fixes the count, so a fixture added without one being retired is itself a
+#: How many fixtures each of ``valid/`` and ``invalid/`` holds, per corpus. The count
+#: is fixed, so a fixture added without one being retired is itself a
 #: defect.
 FIXTURES_PER_DIRECTORY = {"plannotations": 12, "index": 3}
 
@@ -1651,7 +1651,7 @@ def check_manifest_matches_disk(corpus: str, root: Path, manifest: dict[str, Any
 
     Returns:
         One problem per file that is listed but missing, present but unlisted, or per
-        directory whose count is not the one the Phase 1 gate fixed.
+        directory whose count is not the one fixed here.
     """
     expected = FIXTURES_PER_DIRECTORY[corpus]
     where = f"{corpus}/manifest.json"

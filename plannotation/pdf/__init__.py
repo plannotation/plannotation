@@ -14,7 +14,6 @@ Three modules, with one job each:
 
 :mod:`plannotation.pdf.extract`
     Vectors, characters and words with coordinates, for the inference pipeline.
-    Arrives in a later phase.
 
 The names below are re-exported so that ``from plannotation.pdf import attach, read``
 works; the modules themselves remain the documented home of each function.

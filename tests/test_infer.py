@@ -134,7 +134,7 @@ class TestTheVocabulary:
         assert 0.0 < family[1] < 1.0
 
     def test_a_trailing_newline_is_not_part_of_a_mark(self) -> None:
-        """The dollar-anchor bug Phase 2 found, which this vocabulary is built to avoid."""
+        """The dollar-anchor bug, which this vocabulary is built to avoid."""
         assert tag_family("Pos. 3\n") is not None
         assert not GRID_AXIS.match("A\n")
 

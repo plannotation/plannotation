@@ -2,7 +2,7 @@
 """The three reference sample sets, and how to build them.
 
 There are three: an architectural floor plan, a structural position plan and a section
-through two storeys. They exist so that every later phase has something real to point
+through two storeys. They exist so that every later stage has something real to point
 at -- the inspector renders them, the MCP server serves them, the inference pass is
 measured against them with their plannotations stripped, and the benchmark asks
 questions whose answers came from the models rather than from anyone reading the

@@ -1,0 +1,57 @@
+Plannotation
+Copyright 2026 The Plannotation Authors
+
+This product includes software developed by The Plannotation Authors
+(https://github.com/plannotation/plannotation).
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+
+Plannotation depends on, but does not include or modify, the following third-party
+packages. Each remains under its own licence; see THIRD_PARTY_LICENSES.md for the
+current audited list.
+
+Weak-copyleft dependencies are used as unmodified, dynamically imported libraries
+only, consistent with the project's licence policy:
+
+  * ifcopenshell  -- LGPL-3.0-or-later (unmodified dependency)
+  * CairoSVG      -- LGPL-3.0-or-later (unmodified dependency)
+
+Strong-copyleft tools are invoked, when present, only as external command-line
+programs over a process boundary. They are never linked or imported, and they are
+always optional -- Plannotation degrades gracefully when they are absent:
+
+  * veraPDF   -- GPL-3.0 / MPL-2.0 dual-licensed (optional external CLI)
+  * Inkscape  -- GPL-3.0 (optional external CLI)
+  * ocrmypdf / tesseract -- GPL-3.0 / Apache-2.0 (optional external CLI)
+
+Plannotation deliberately does NOT depend on PyMuPDF (AGPL-3.0) or any other
+AGPL-licensed component.
+
+--------------------------------------------------------------------------------
+Normative references
+--------------------------------------------------------------------------------
+
+The Plannotation specification builds on, and credits, the following prior work. No
+text from these sources is reproduced in this repository.
+
+  * ISO 32000-2 (PDF 2.0) -- Associated Files and the /AF mechanism.
+  * ISO 19005-4:2020 (PDF/A-4f) -- embedded files of arbitrary type.
+  * PDF Declarations (PDF Association, 2019) -- the XMP conformance declaration.
+  * IfcOpenShell SVG serializer conventions (v0.8) -- product ids, classes and
+    view-transform attributes, reused unchanged.
+  * SWAPP ifc-docs (CC0, 2024) -- DocumentSet / Sheet / ViewPort / View /
+    Annotation vocabulary, reused where it already names a concept.
+  * buildingSMART IFC -- all class names, GlobalIds and property-set names.

@@ -54,16 +54,20 @@ junit*.xml
 report.xml
 
 # ----------------------------------------------------- secrets / local env --
-# The benchmark harness reads ANTHROPIC_API_KEY from .env. No key ever belongs
-# in the repository.
+# The benchmark harness reads ANTHROPIC_API_KEY from the environment (a direnv
+# .envrc, say) or from .env. No key ever belongs in the repository.
 .env
 .env.*
 !.env.example
+.envrc
+.envrc.*
+.pypirc
+.netrc
 *.pem
 *.key
 
 # ------------------------------------------------------------ real-world ----
-# Phase 7 is exercised against real construction PDFs -- third-party material
+# Inference is exercised against real construction PDFs -- third-party material
 # that must NEVER be committed. The tests skip when the directory is absent,
 # which is the state of every clean clone.
 tests/fixtures/realworld/

@@ -201,7 +201,7 @@ class ConformanceLevel(StrEnum):
 
     ``L1`` is page and sheet (plus viewports, when there are any); ``L2`` adds
     elements; ``L3`` adds annotations that link to something. The index schema stores
-    this value per page, and the Phase 3 validator reports it.
+    this value per page, and the validator reports it.
     """
 
     L1 = "L1"
@@ -331,7 +331,7 @@ Vec3 = tuple[Number, Number, Number]
 BBox = tuple[Number, Number, Number, Number]
 """Mirrors ``#/$defs/bbox``: ``[x0, y0, x1, y1]`` in paper millimetres, origin
 bottom-left, y up. The schema does not require ``x0 <= x1``, and neither does this
-model; the Phase 3 geometric validator is where that is checked."""
+model; the geometric validator is where that is checked."""
 
 Affine6 = tuple[Number, Number, Number, Number, Number, Number]
 """``viewport.paperToPlane``: the affine ``[a, b, c, d, e, f]`` described in
@@ -695,7 +695,7 @@ class Plannotation(_PlannotationModel):
     def provenance_is_consistent(self) -> bool:
         """Report whether the declared provenance matches the page's own items.
 
-        This is the provenance rule as the Phase 3 validator will apply it. It is a
+        This is the provenance rule as the validator applies it. It is a
         report rather than a validation error, because a plannotation that misreports
         itself is still a well-formed plannotation: the schema does not constrain the
         aggregate, and refusing to load such a document would leave no way to inspect it.

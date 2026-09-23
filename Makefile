@@ -19,7 +19,7 @@ BENCH_N        ?= 100
 # cairosvg (LGPL-3.0-or-later, used unmodified) reaches the system libcairo
 # through cffi, and ctypes.util.find_library does not search Homebrew's prefix on
 # macOS -- `import cairosvg` then dies with `no library called "cairo-2" was
-# found` even with cairo installed. Point the dynamic loader at it so Phase 4
+# found` even with cairo installed. Point the dynamic loader at it so `make samples`
 # works out of the box rather than looking like a packaging bug.
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -39,7 +39,7 @@ help: ## Show this help
 	@printf 'Plannotation targets:\n\n'
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | sort \
-	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 	@printf '\n'
 
 install: ## Create the venv and install everything (dev group included)
@@ -142,7 +142,7 @@ precommit: ## Run every pre-commit hook over the whole tree
 build: ## Build wheels and sdists for both distributions
 	$(UV) build --all-packages --out-dir dist
 
-version: ## Print the version the CLI reports (the Phase 0 gate)
+version: ## Print the version the CLI reports
 	$(RUN) plannotation --version
 
 clean: ## Remove build and test artefacts

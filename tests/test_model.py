@@ -77,7 +77,7 @@ def load(doc: dict[str, Any]) -> Plannotation:
 
 
 class TestCanonicalSerialisation:
-    """Canonical form is what the byte-for-byte gate and Phase 2 checksums rest on."""
+    """Canonical form is what the byte-for-byte gate and the PDF checksums rest on."""
 
     def test_round_trip_is_byte_for_byte(self) -> None:
         """Loading a canonical document and re-emitting it reproduces the bytes."""
@@ -104,7 +104,7 @@ class TestCanonicalSerialisation:
         assert '\n  "page"' in text
 
     def test_canonical_bytes_is_the_utf8_of_canonical_json(self) -> None:
-        """Phase 2 embeds these exact bytes, so the two must not drift."""
+        """The PDF carrier embeds these exact bytes, so the two must not drift."""
         parsed = load(plannotation())
         assert canonical_bytes(parsed) == canonical_json(parsed).encode("utf-8")
 

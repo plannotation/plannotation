@@ -4,7 +4,7 @@
 Two corpora share one manifest shape and are therefore tested by one module:
 
 ``tests/fixtures/plannotations/``
-    12 valid and 12 invalid plannotations -- the Phase 1 gate.
+    12 valid and 12 invalid plannotations -- a fixed count.
 
 ``tests/fixtures/index/``
     3 valid and 3 invalid document indexes.
@@ -109,7 +109,7 @@ class TestManifestsMatchDisk:
 
     @pytest.mark.parametrize("corpus", ["plannotations", "index"])
     def test_counts(self, corpus: str) -> None:
-        """The Phase 1 gate fixes the plannotation counts at 12 and 12."""
+        """The plannotation corpus holds exactly 12 valid and 12 invalid documents."""
         expected_valid, expected_invalid = EXPECTED_COUNTS[corpus]
         man = manifest(corpus)
         assert len(man["valid"]) == expected_valid
@@ -141,7 +141,7 @@ class TestValidFixtures:
 
     @pytest.mark.parametrize(("corpus", "entry"), VALID_PARAMS)
     def test_round_trips_byte_for_byte(self, corpus: Corpus, entry: dict[str, Any]) -> None:
-        """The Phase 1 gate: canonical in, canonical out, identical bytes."""
+        """Canonical in, canonical out, identical bytes."""
         text = text_of(corpus.name, entry)
         assert canonical_json(corpus.loader(text)) == text  # type: ignore[arg-type]
 
