@@ -4,7 +4,7 @@
 Design brief section 9 asks for three: an architectural floor plan, a structural position
 plan and a section through two storeys. They exist so that every later phase has
 something real to point at -- the inspector renders them, the MCP server serves them,
-the inference pass is measured against them with their labels stripped, and the
+the inference pass is measured against them with their plannotations stripped, and the
 benchmark asks questions whose answers came from the models rather than from anyone
 reading the drawings.
 
@@ -134,13 +134,13 @@ def build_samples(
     Args:
         out_root: The directory to write the sets into.
         mod_date: The timestamp to stamp, so the output is reproducible.
-        version: The version to record in each label's ``generator``.
+        version: The version to record in each plannotation's ``generator``.
         only: Build just this one set, by name, or None for all of them.
         inkscape_fallback: Convert with the Inkscape command line when CairoSVG cannot
             run, rather than failing.
 
     Returns:
-        The labelled PDFs written, in order.
+        The plannotated PDFs written, in order.
 
     Raises:
         KeyError: If ``only`` names no sample.

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Deterministic PDF and label fixtures, built with pikepdf alone.
+"""Deterministic PDF and plannotation fixtures, built with pikepdf alone.
 
 Nothing here is committed as a binary and nothing here reads the clock, the locale or
 the network. Every builder returns bytes, and building the same fixture twice -- in
@@ -139,8 +139,8 @@ FOREIGN_SPEC_URI: Final = "https://example.invalid/some-other-spec/2.0"
 #: The two attachments the fixture already carries before Plannotation sees it.
 FOREIGN_DOC_FILENAME: Final = "site-notes.txt"
 FOREIGN_PAGE_FILENAME: Final = "page0-source.txt"
-_FOREIGN_DOC_BYTES: Final = b"Third-party site notes. Must survive labelling.\n"
-_FOREIGN_PAGE_BYTES: Final = b"Third-party page source for page 0. Must survive labelling.\n"
+_FOREIGN_DOC_BYTES: Final = b"Third-party site notes. Must survive plannotating.\n"
+_FOREIGN_PAGE_BYTES: Final = b"Third-party page source for page 0. Must survive plannotating.\n"
 
 #: Number of digits a content-stream number is written with.
 _DECIMALS: Final = 4
@@ -823,14 +823,14 @@ def build_drawing_set(
         pdf,
         _FOREIGN_DOC_BYTES,
         filename=FOREIGN_DOC_FILENAME,
-        description="Third-party site notes: must survive labelling",
+        description="Third-party site notes: must survive plannotating",
         relationship=Name.Supplement,
     )
     page_spec = _attach_foreign(
         pdf,
         _FOREIGN_PAGE_BYTES,
         filename=FOREIGN_PAGE_FILENAME,
-        description="Third-party page source: must survive labelling",
+        description="Third-party page source: must survive plannotating",
         relationship=Name.Source,
     )
     page0.obj[Name.AF] = Array([page_spec])
@@ -883,7 +883,7 @@ def build_geometry_set() -> bytes:
     Returns:
         The document's bytes. Page 0 has a crop box strictly inside its media box and
         a ``/UserUnit`` of 2; page 1 has a crop box larger than its media box, which a
-        viewer clips and so must a label.
+        viewer clips and so must a plannotation.
     """
     pdf = Pdf.new()
     ops = Ops()
@@ -1024,7 +1024,8 @@ def build_pdfa(part: int, *, with_extension_schema: bool = False) -> bytes:
 BOMB_MEGABYTES: Final = 64
 
 #: One mebibyte of the byte a bomb is made of. Zeros: they compress to nothing and are
-#: not valid JSON, so a reader that survives the decompression still refuses the label.
+#: not valid JSON, so a reader that survives the decompression still refuses the
+#: plannotation.
 _BOMB_CHUNK: Final = bytes(1024 * 1024)
 
 #: The name the bomb is filed under, which is what makes a reader open it at all.
@@ -1032,7 +1033,7 @@ _BOMB_FILENAME: Final = plannotation_filename(0)
 
 
 def build_plannotation_bomb(*, megabytes: int = BOMB_MEGABYTES, honest_size: bool = True) -> bytes:
-    """Build a small document carrying a Flate decompression bomb as a page label.
+    """Build a small document carrying a Flate decompression bomb as a plannotation.
 
     The bomb is registered both in the ``EmbeddedFiles`` name tree and on page 0's
     ``/AF``, because a reader consults both and each path must be bounded.
@@ -1054,7 +1055,7 @@ def build_plannotation_bomb(*, megabytes: int = BOMB_MEGABYTES, honest_size: boo
         spec = pikepdf.AttachedFileSpec(
             pdf,
             b"{}",
-            description="A page label that is not what it says it is",
+            description="A plannotation that is not what it says it is",
             filename=_BOMB_FILENAME,
             mime_type="application/json",
             creation_date=FIXED_PDF_DATE,
@@ -1196,7 +1197,7 @@ def build_filtered_plannotation(
     decode_parms: Object | None = None,
     stated_size: int | None = None,
 ) -> bytes:
-    """Build a document whose page-0 label is stored under a filter chain of choice.
+    """Build a document whose page-0 plannotation is stored under a filter chain of choice.
 
     The bound a reader places on what it will decompress has to hold for every chain,
     not for the one its author had in mind, because the chain is the attacker's to
@@ -1220,7 +1221,7 @@ def build_filtered_plannotation(
         spec = pikepdf.AttachedFileSpec(
             pdf,
             b"{}",
-            description="A page label stored under a filter chain of the writer's choosing",
+            description="A plannotation stored under a filter chain of the writer's choosing",
             filename=_BOMB_FILENAME,
             mime_type="application/json",
             creation_date=FIXED_PDF_DATE,
@@ -1333,10 +1334,10 @@ def raw_pdf(bodies: Sequence[bytes]) -> bytes:
 def build_metadata_bomb(*, megabytes: int = BOMB_MEGABYTES) -> bytes:
     """Build a small document whose catalog XMP packet inflates to something enormous.
 
-    The packet is the same attacker-controlled input as a label, and it is read on
-    every operation: to decide whether a declaration is already there, whether one
+    The packet is the same attacker-controlled input as a plannotation, and it is read
+    on every operation: to decide whether a declaration is already there, whether one
     could be spliced in, and what part of PDF/A the document claims. A reader that
-    bounds the label and not the packet has bounded nothing.
+    bounds the plannotation and not the packet has bounded nothing.
 
     Args:
         megabytes: How many mebibytes the packet inflates to.
@@ -1462,12 +1463,12 @@ def signature_digest(data: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Labels
+# Plannotations
 # ---------------------------------------------------------------------------
 #: A valid IFC GlobalId, reused wherever one is needed.
 _GUID: Final = "14t7YOs$QNL7Hfom5OO5uF"
 
-#: The tool the fixture labels record as their writer.
+#: The tool the fixture plannotations record as their writer.
 _GENERATOR: Final = Generator(
     name="plannotation-tests", version="0.1", created="2024-01-01T00:00:00Z"
 )
@@ -1482,10 +1483,10 @@ def plannotation(
     sheet_id: str = "A-101",
     level: str = "L1",
 ) -> Plannotation:
-    """Build a valid page label at a chosen conformance level.
+    """Build a valid plannotation at a chosen conformance level.
 
     Args:
-        page_index: The zero-based page the label describes.
+        page_index: The zero-based page the plannotation describes.
         width_mm: The page's unrotated width in millimetres.
         height_mm: The page's unrotated height in millimetres.
         rotation: The page's ``/Rotate``.
@@ -1494,7 +1495,7 @@ def plannotation(
             element, ``"L3"`` to add an annotation that links to it.
 
     Returns:
-        The label.
+        The plannotation.
 
     Raises:
         ValueError: If ``level`` is not one of the three.
@@ -1556,9 +1557,9 @@ def plannotation(
         plannotation="0.1",
         generator=_GENERATOR,
         provenance=Provenance.AUTHORED,
-        # The viewport carries a paperToPlane, and SPEC 3.5 requires a label that does
-        # so to declare the unit its output is in: without it a derived number is not
-        # a length. The validator reports the omission as PL-GEO-013, which is how
+        # The viewport carries a paperToPlane, and SPEC 3.5 requires a plannotation that
+        # does so to declare the unit its output is in: without it a derived number is
+        # not a length. The validator reports the omission as PL-GEO-013, which is how
         # this was noticed.
         model=Model(lengthUnit="mm"),
         page=Page(index=page_index, widthMm=width_mm, heightMm=height_mm, rotation=rotation),
@@ -1578,10 +1579,10 @@ def plannotation(
 
 
 def drawing_set_plannotations() -> list[Plannotation]:
-    """Build one label per page of :func:`build_drawing_set`.
+    """Build one plannotation per page of :func:`build_drawing_set`.
 
     Returns:
-        A label for page 0 at L3 and a label for page 1 at L2, each stating the
+        A plannotation for page 0 at L3 and one for page 1 at L2, each stating the
         unrotated size and the rotation of the page it belongs to.
     """
     return [

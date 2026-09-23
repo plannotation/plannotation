@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Measure how much of an authored label inference recovers.
+"""Measure how much of an authored plannotation inference recovers.
 
 Design brief section 12's gate is stated as recall -- at least 90% of tags, 80% of
 dimensions and every grid -- against the authored ``plannotations.json``, with precision
@@ -32,7 +32,7 @@ class Score:
 
     Attributes:
         category: ``tag``, ``dimension``, ``grid``, ``callout`` or ``sheet``.
-        expected: How many the authored label holds.
+        expected: How many the authored plannotation holds.
         found: How many inference reported.
         correct: How many of those match an authored item.
     """
@@ -58,19 +58,19 @@ class Score:
         return self.recall >= GATE.get(self.category, 0.0)
 
 
-def _keys(label: Plannotation, kind: str) -> Counter[str]:
+def _keys(plannotation: Plannotation, kind: str) -> Counter[str]:
     """Return the recognisable keys of one kind of annotation.
 
     Args:
-        label: The label.
+        plannotation: The plannotation.
         kind: The annotation type.
 
     Returns:
         A multiset of keys, so that two tags with one mark count twice.
     """
     keys: Counter[str] = Counter()
-    by_id = {annotation.local_id: annotation for annotation in label.annotations or []}
-    for annotation in label.annotations or []:
+    by_id = {annotation.local_id: annotation for annotation in plannotation.annotations or []}
+    for annotation in plannotation.annotations or []:
         if annotation.annotation_type != kind:
             continue
         if kind == "tag":
@@ -93,11 +93,11 @@ def _keys(label: Plannotation, kind: str) -> Counter[str]:
 
 
 def score(authored: Plannotation, inferred: Plannotation) -> list[Score]:
-    """Score one inferred label against the authored one for the same page.
+    """Score one inferred plannotation against the authored one for the same page.
 
     Args:
-        authored: The label the exporter wrote from the model.
-        inferred: The label inference reconstructed from the drawing.
+        authored: The plannotation the exporter wrote from the model.
+        inferred: The plannotation inference reconstructed from the drawing.
 
     Returns:
         One score per category.

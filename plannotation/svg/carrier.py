@@ -3,15 +3,16 @@
 
 Plannotation 0.1 reserves the SVG *payload* (SPEC 6.4.4): no Plannotation data is written
 into an SVG, and nothing here writes one. What an SVG does carry already is enough to
-build a label from. IfcOpenShell's serializer -- and Bonsai, which draws with it --
-marks every product group with its GlobalId (``ifc:guid``, or ``id="product-<uuid>"``)
-and its IFC class (``class``), and every view group with ``ifc:matrix3`` and
-``ifc:plane``, which together say how the view's paper maps to the model.
+build a plannotation from. IfcOpenShell's serializer -- and Bonsai, which draws with
+it -- marks every product group with its GlobalId (``ifc:guid``, or
+``id="product-<uuid>"``) and its IFC class (``class``), and every view group with
+``ifc:matrix3`` and ``ifc:plane``, which together say how the view's paper maps to the
+model.
 
 This module reads those markers, never renames or rewrites them (SPEC 6.4.1), and
-returns the geometry in the coordinates a label uses: millimetres, origin bottom-left,
-y up (SPEC 3.1). Units, ``viewBox``, nested ``<svg>`` viewports and every transform are
-resolved on the way, so the flip of SPEC 3.3 happens in exactly one place.
+returns the geometry in the coordinates a plannotation uses: millimetres, origin
+bottom-left, y up (SPEC 3.1). Units, ``viewBox``, nested ``<svg>`` viewports and every
+transform are resolved on the way, so the flip of SPEC 3.3 happens in exactly one place.
 
 The document is untrusted input (SPEC 9.3). A document type declaration is refused
 outright -- entity expansion is how XML parsers are attacked, and no drawing needs one

@@ -12,7 +12,7 @@ build-backend = "hatchling.build"
 [project]
 name = "plannotation"
 dynamic = ["version"]                      # single-sourced from plannotation/__init__.py
-description = "An open drawing-semantics sidecar for 2D construction drawings: write, read, validate and inspect machine-readable labels on PDF pages."
+description = "Construction drawings that machines can read: an open, IFC-aligned data layer inside PDF drawings."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]

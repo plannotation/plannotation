@@ -1,20 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
 """Rule 2: identity and references, as section 4.5 of the specification defines them.
 
-Every reference in a page label points inside that page, with one exception. Viewports,
-elements and annotations share a single ``localId`` namespace -- they must, because
-``measures`` may name an element or a grid annotation and the reference does not say
-which -- and ``target`` is the only member through which a label may name another page.
+Every reference in a plannotation points inside its own page, with one exception.
+Viewports, elements and annotations share a single ``localId`` namespace -- they must,
+because ``measures`` may name an element or a grid annotation and the reference does not
+say which -- and ``target`` is the only member through which a plannotation may name
+another page.
 
 Two of these rules run on the parsed JSON rather than on the loaded model, and the
 reason is worth stating because it looks like an inconsistency. :class:`Plannotation`
-already refuses to load a label with a repeated ``localId``; so does the schema refuse
-several other things. A rule whose violation stops the model loading cannot be checked
-after the model has loaded, and reporting it as "the model would not load" would tell a
-person nothing they could act on. So the two rules the model enforces beyond the schema
--- a repeated ``localId`` here, and an inferred item with no confidence in
-:mod:`plannotation.validate.provenance` -- are checked on the parsed document, where they
-are still visible, and every other rule is checked on the model.
+already refuses to load a plannotation with a repeated ``localId``; so does the schema
+refuse several other things. A rule whose violation stops the model loading cannot be
+checked after the model has loaded, and reporting it as "the model would not load" would
+tell a person nothing they could act on. So the two rules the model enforces beyond the
+schema -- a repeated ``localId`` here, and an inferred item with no confidence in
+:mod:`plannotation.validate.provenance` -- are checked on the parsed document, where
+they are still visible, and every other rule is checked on the model.
 """
 
 from __future__ import annotations
@@ -59,10 +60,10 @@ def check_duplicate_ids(document: Mapping[str, object], *, source: str) -> list[
     """Check that no ``localId`` is used twice on one page.
 
     Run on the parsed document rather than on the model, because the model refuses to
-    load a label that breaks this rule and the rule would then be unreportable.
+    load a plannotation that breaks this rule and the rule would then be unreportable.
 
     Args:
-        document: The parsed page label, already schema-valid.
+        document: The parsed plannotation, already schema-valid.
         source: Which document it is, for the findings.
 
     Returns:
@@ -105,15 +106,15 @@ def check_duplicate_ids(document: Mapping[str, object], *, source: str) -> list[
 
 
 def check_references(
-    label: Plannotation,
+    plannotation: Plannotation,
     *,
     source: str,
     page_count: int | None = None,
 ) -> list[Finding]:
-    """Check every reference a page label carries.
+    """Check every reference a plannotation carries.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         source: Which document it is, for the findings.
         page_count: How many pages the document has, when one is in front of the
             validator. None when there is not, in which case ``target.pdfPage`` cannot
@@ -122,18 +123,18 @@ def check_references(
     Returns:
         Every violation, in document order.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
-    elements = {element.local_id: element for element in label.elements or []}
-    annotations = {item.local_id: item for item in label.annotations or []}
-    found = _check_viewport_refs(label, viewports, source=source)
-    for position, annotation in enumerate(label.annotations or []):
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
+    elements = {element.local_id: element for element in plannotation.elements or []}
+    annotations = {item.local_id: item for item in plannotation.annotations or []}
+    found = _check_viewport_refs(plannotation, viewports, source=source)
+    for position, annotation in enumerate(plannotation.annotations or []):
         base = json_pointer(["annotations", position])
         found += _check_shows(annotation, elements, base=base, source=source)
         found += _check_measures(annotation, elements, annotations, base=base, source=source)
         found += _check_target(
             annotation,
             viewports,
-            sheet_id=label.sheet.sheet_id,
+            sheet_id=plannotation.sheet.sheet_id,
             page_count=page_count,
             base=base,
             source=source,
@@ -157,7 +158,7 @@ def check_references(
 
 
 def _check_viewport_refs(
-    label: Plannotation,
+    plannotation: Plannotation,
     viewports: Mapping[str, Viewport],
     *,
     source: str,
@@ -165,7 +166,7 @@ def _check_viewport_refs(
     """Check that every ``viewport`` member names a viewport on the page.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         viewports: Its viewports, by local id.
         source: Which document it is, for the findings.
 
@@ -174,10 +175,11 @@ def _check_viewport_refs(
     """
     found: list[Finding] = []
     items: list[tuple[str, int, Element | Annotation]] = [
-        ("elements", position, item) for position, item in enumerate(label.elements or [])
+        ("elements", position, item) for position, item in enumerate(plannotation.elements or [])
     ]
     items += [
-        ("annotations", position, item) for position, item in enumerate(label.annotations or [])
+        ("annotations", position, item)
+        for position, item in enumerate(plannotation.annotations or [])
     ]
     for collection, position, item in items:
         if item.viewport is None or item.viewport in viewports:
@@ -188,8 +190,8 @@ def _check_viewport_refs(
                 "PL-REF-002",
                 message=(
                     f"{collection[:-1]} {item.local_id!r} names viewport "
-                    f"{item.viewport!r}, which this label does not declare; it declares "
-                    f"{declared}"
+                    f"{item.viewport!r}, which this plannotation does not declare; it "
+                    f"declares {declared}"
                 ),
                 path=json_pointer([collection, position, "viewport"]),
                 source=source,
@@ -260,8 +262,8 @@ def _check_shown_property(
     """Check that a dotted ``shows.property`` names something the element carries.
 
     Only the ``PsetName.PropertyName`` spelling is checked, because it is the only one
-    the label says where to look up: an undotted name is an IFC attribute, or a
-    convention between two programs, and nothing in the document resolves it. That
+    the plannotation says where to look up: an undotted name is an IFC attribute, or
+    a convention between two programs, and nothing in the document resolves it. That
     restriction is a heuristic, which with the absence of any MUST is why the finding
     is a warning.
 
@@ -376,13 +378,14 @@ def _check_target(
     """Check one annotation's ``target`` member.
 
     ``viewportId`` is a ``localId`` read in the *targeted* page, so a target naming
-    another sheet is left alone: this label does not hold that page's identifiers. A
-    target that names this very sheet is a reference within the page like any other.
+    another sheet is left alone: this plannotation does not hold that page's
+    identifiers. A target that names this very sheet is a reference within the page
+    like any other.
 
     Args:
         annotation: The annotation.
         viewports: Every viewport on the page, by local id.
-        sheet_id: The sheet number this label prints.
+        sheet_id: The sheet number this plannotation prints.
         page_count: The document's page count, or None when there is no document.
         base: The JSON Pointer of the annotation itself.
         source: Which document it is, for the findings.
@@ -424,12 +427,12 @@ def _check_target(
     return found
 
 
-def check_sheet_ids(labels: Sequence[tuple[int, Plannotation]]) -> list[Finding]:
-    """Check that no two labelled pages of one document print the same sheet number.
+def check_sheet_ids(plannotations: Sequence[tuple[int, Plannotation]]) -> list[Finding]:
+    """Check that no two plannotated pages of one document print the same sheet number.
 
     Args:
-        labels: Every page label in the carrier, paired with the page it was found on,
-            ascending.
+        plannotations: Every plannotation in the carrier, paired with the page it was
+            found on, ascending.
 
     Returns:
         One finding per sheet number used more than once, reported against the second
@@ -437,8 +440,8 @@ def check_sheet_ids(labels: Sequence[tuple[int, Plannotation]]) -> list[Finding]
     """
     first: dict[str, int] = {}
     found: list[Finding] = []
-    for page_index, label in labels:
-        sheet_id = label.sheet.sheet_id
+    for page_index, plannotation in plannotations:
+        sheet_id = plannotation.sheet.sheet_id
         if sheet_id not in first:
             first[sheet_id] = page_index
             continue

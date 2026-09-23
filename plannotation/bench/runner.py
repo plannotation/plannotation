@@ -111,7 +111,7 @@ class RunConfig:
     """What to run.
 
     Attributes:
-        condition: ``plain`` or ``labelled``.
+        condition: ``plain`` or ``plannotated``.
         model: The model id.
         n: Ask at most this many questions, in file order; None asks them all.
         effort: An ``output_config.effort`` level, or None for the model's default.
@@ -140,7 +140,7 @@ class Record:
         expected: The key.
         given: The model's answer, or None when it gave none.
         correct: Whether the answer matched the key.
-        requires_plannotation: Whether only the label carries the answer.
+        requires_plannotation: Whether only the plannotation carries the answer.
         stop_reason: Why generation stopped.
         usage: The request's token counts.
         cost_usd: Its estimated cost, or None when the model's price is unknown.

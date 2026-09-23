@@ -11,11 +11,11 @@ Two things matter for a drawing and neither is CairoSVG's default:
 **The page must be the size it says.** The sheet's SVG declares ``width="420mm"``, and
 CairoSVG honours that only when told the output resolution that makes a millimetre a
 millimetre. An A3 sheet that comes out 396 mm wide is not an A3 sheet, and every paper
-coordinate in the label would then describe a page that does not exist. The size is
-asserted after conversion rather than assumed.
+coordinate in the plannotation would then describe a page that does not exist. The size
+is asserted after conversion rather than assumed.
 
 **The output must be reproducible.** The design brief requires it, and it is what makes a
-labelled drawing diffable. CairoSVG stamps a creation date into the PDF; the date is
+plannotated drawing diffable. CairoSVG stamps a creation date into the PDF; the date is
 replaced with a supplied one, so two runs over the same inputs produce the same bytes.
 
 Where CairoSVG cannot run and the caller asks for it, the Inkscape command line does the
@@ -137,7 +137,7 @@ def svg_to_pdf(
             msg = (
                 f"the converted page is {actual[0]:.2f} x {actual[1]:.2f} mm, but the "
                 f"sheet declares {width_mm:.2f} x {height_mm:.2f} mm; every paper "
-                f"coordinate in the label would describe a page that does not exist"
+                f"coordinate in the plannotation would describe a page that does not exist"
             )
             raise ExportError(msg)
         stamp = pikepdf.String(mod_date.strftime("D:%Y%m%d%H%M%SZ"))

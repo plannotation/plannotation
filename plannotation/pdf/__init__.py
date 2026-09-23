@@ -4,9 +4,9 @@
 Three modules, with one job each:
 
 :mod:`plannotation.pdf.embed`
-    Writes labels into a PDF as associated files, reads them back out, takes them
-    off again, and writes the sidecar twin. This is where the promise that a label
-    never changes the page is kept.
+    Writes plannotations into a PDF as associated files, reads them back out, takes
+    them off again, and writes the sidecar twin. This is where the promise that a
+    plannotation never changes the page is kept.
 
 :mod:`plannotation.pdf.render`
     Rasterises pages with pdfium and compares two documents pixel for pixel. This is

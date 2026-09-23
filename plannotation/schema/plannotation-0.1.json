@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://plannotation.github.io/schema/0.1/plannotation.schema.json",
   "title": "Plannotation 0.1",
-  "description": "Machine-readable semantics for one 2D construction-drawing page. The page is the leading document; the label is auxiliary.",
+  "description": "Machine-readable semantics for one 2D construction-drawing page. The page is the leading document; the plannotation is auxiliary.",
   "type": "object",
   "additionalProperties": false,
   "required": [

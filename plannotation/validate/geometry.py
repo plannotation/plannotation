@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """The small geometric vocabulary every rule in this package is written in.
 
-Nothing here knows what a label is. These are the six operations the specification's
-section 3 keeps reaching for -- a cross product, a dot product, an affine applied to a
-paper point, a determinant, a box that contains a box, the length of a path -- factored
-out so that exactly one piece of code performs each of them.
+Nothing here knows what a plannotation is. These are the six operations the
+specification's section 3 keeps reaching for -- a cross product, a dot product, an
+affine applied to a paper point, a determinant, a box that contains a box, the length of
+a path -- factored out so that exactly one piece of code performs each of them.
 
 That matters more than it looks. The rules these support are the ones whose
 disagreements are invisible: two implementations of "is this box inside that box" that

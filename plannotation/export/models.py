@@ -7,10 +7,10 @@ model rather than from someone reading a drawing.
 
 **GlobalIds are assigned, not generated.** ``ifcopenshell.api`` mints a fresh
 GlobalId for every entity it creates, so an unseeded model differs on every run and
-nothing downstream -- the SVG, the labels, the ground truth -- can be byte-reproducible.
-Each builder therefore walks its finished model and rewrites every GlobalId from a
-seeded sequence, which is the only point in the chain where that can be done once and
-for all.
+nothing downstream -- the SVG, the plannotations, the ground truth -- can be
+byte-reproducible. Each builder therefore walks its finished model and rewrites every
+GlobalId from a seeded sequence, which is the only point in the chain where that can be
+done once and for all.
 
 ifcopenshell lives behind the ``ifc`` extra and is not installed in CI, so it is
 imported inside the functions that need it.
@@ -72,8 +72,8 @@ def seeded_guid(seed: str, index: int) -> str:
 
     A GlobalId is 22 characters of IFC's own base64 alphabet. The value here is derived
     from a seed and an index rather than from randomness or a clock, so that a model
-    rebuilt tomorrow carries the same identities as the one built today and the labels
-    that name them stay true.
+    rebuilt tomorrow carries the same identities as the one built today and the
+    plannotations that name them stay true.
 
     Args:
         seed: The model's name, which makes ids unique between models.
@@ -125,8 +125,8 @@ def normalise(model: Any) -> None:  # noqa: ANN401 - ifcopenshell is untyped her
     sets, so their order varies between runs and two otherwise identical models differ
     by a handful of bytes. The order carries no meaning -- a set of units is a set, and
     so is the list of products a storey contains -- so sorting them changes nothing
-    about the model, and it is what lets every label, drawing and answer derived from
-    the model be reproducible too.
+    about the model, and it is what lets every plannotation, drawing and answer derived
+    from the model be reproducible too.
 
     Args:
         model: The ``ifcopenshell.file`` to normalise in place.
@@ -264,7 +264,7 @@ def _metric_units(model: Any) -> None:  # noqa: ANN401 - ifcopenshell is untyped
 
     ``assign_unit`` with no arguments gives millimetres, which is a fine choice for a
     model but not the one these samples' numbers are written in. Stating the unit is
-    what keeps the label's ``model.lengthUnit`` true.
+    what keeps the plannotation's ``model.lengthUnit`` true.
 
     Args:
         model: The ``ifcopenshell.file`` whose project needs units.

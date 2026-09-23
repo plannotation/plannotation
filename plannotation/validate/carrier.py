@@ -5,26 +5,26 @@ Sections 1 to 4 define the payload and section 6 defines the ways it travels. Mo
 section 6 binds writers and readers, but three passages bind a validator in terms, and
 this module is those three:
 
-* **6.5.1** -- a sidecar's ``plannotation`` must match its index's and every page label's,
-  its ``pages`` must correspond one to one with ``index.pages``, and those pages must be
-  ordered by ``page.index`` without repeats. "A validator MUST report each of these as
-  an error."
-* **6.5.5** -- a page label whose ``page.index`` is not a page of the document, or whose
-  page dimensions differ from that page's by more than the geometric tolerance, is
-  absent; a payload where no label pairs with any page is absent entirely. "A validator
-  MUST report each of the three as an error." The first two are PL-REF-008 and
-  PL-GEO-001, which are checked per page in the modules that own them; the third is
-  here, because only the whole carrier can fail it.
-* **2.8** -- where the index and a page label disagree, the page label is correct. That
-  rule tells a reader how to survive the disagreement; it does not make the index's
-  claim true, and an index whose whole purpose is to save a reader from opening every
-  attachment is worth nothing if it may misreport the two things it carries that the
-  attachment also carries.
+* **6.5.1** -- a sidecar's ``plannotation`` must match its index's and every
+  plannotation's, its ``pages`` must correspond one to one with ``index.pages``, and
+  those pages must be ordered by ``page.index`` without repeats. "A validator MUST
+  report each of these as an error."
+* **6.5.5** -- a plannotation whose ``page.index`` is not a page of the document, or
+  whose page dimensions differ from that page's by more than the geometric tolerance,
+  is absent; a payload where no plannotation pairs with any page is absent entirely.
+  "A validator MUST report each of the three as an error." The first two are
+  PL-REF-008 and PL-GEO-001, which are checked per page in the modules that own them;
+  the third is here, because only the whole carrier can fail it.
+* **2.8** -- where the index and a plannotation disagree, the plannotation is correct.
+  That rule tells a reader how to survive the disagreement; it does not make the
+  index's claim true, and an index whose whole purpose is to save a reader from opening
+  every attachment is worth nothing if it may misreport the two things it carries that
+  the attachment also carries.
 
 The declaration is deliberately only a warning. 9.2 forbids a reader from treating a
 PDF Declaration as evidence that a payload is valid -- the declaration is a claim and
 the schema is the check -- so its absence costs discoverability and not meaning, and
-every label in the document reads perfectly without it.
+every plannotation in the document reads perfectly without it.
 """
 
 from __future__ import annotations
@@ -57,10 +57,10 @@ def check_sidecar_versions(document: Mapping[str, object], *, source: str) -> li
 
     On the parsed document and not on the model, because the model cannot break it:
     ``plannotation`` is a ``Literal["0.1"]`` on the sidecar, on the index and on every
-    page label, so a loaded sidecar's three members are the same string by
+    plannotation, so a loaded sidecar's three members are the same string by
     construction. The rule is real all the same -- it is a MUST, and 6.5.1 names the
     validator as the place it is reported -- and a sidecar that pairs a 0.1 index with
-    a 0.2 page label is exactly the file it exists for. Reported here, before the
+    a 0.2 plannotation is exactly the file it exists for. Reported here, before the
     schema pass returns, so that such a file is described as a version disagreement
     rather than only as three ``const`` failures with no relation between them.
 
@@ -94,14 +94,14 @@ def check_sidecar_versions(document: Mapping[str, object], *, source: str) -> li
             finding(
                 "PL-CAR-004",
                 message=(
-                    f"the sidecar declares plannotation {declared!r} and page label "
-                    f"{position} declares {label.get('plannotation')!r}"
+                    f"the sidecar declares plannotation {declared!r} and the plannotation at "
+                    f"pages[{position}] declares {member.get('plannotation')!r}"
                 ),
                 path=json_pointer(["pages", position, "plannotation"]),
                 source=source,
             )
-            for position, label in enumerate(pages)
-            if isinstance(label, dict) and label.get("plannotation") != declared
+            for position, member in enumerate(pages)
+            if isinstance(member, dict) and member.get("plannotation") != declared
         ]
     return found
 
@@ -109,8 +109,8 @@ def check_sidecar_versions(document: Mapping[str, object], *, source: str) -> li
 def check_sidecar_consistency(sidecar: Sidecar, *, source: str) -> list[Finding]:
     """Check the two agreement rules of 6.5.1 that need the loaded sidecar.
 
-    The redundancy those rules police is deliberate: the index and the labels are
-    separate documents in the PDF carrier, so a sidecar carries both rather than
+    The redundancy those rules police is deliberate: the index and the plannotations
+    are separate documents in the PDF carrier, so a sidecar carries both rather than
     deriving one from the other, and the price of that is a consistency rule. The
     third rule, on the declared version, is :func:`check_sidecar_versions`.
 
@@ -135,11 +135,11 @@ def _check_sidecar_correspondence(sidecar: Sidecar, *, source: str) -> list[Find
         source: Which document it is, for the findings.
 
     Returns:
-        One finding naming the pages listed without a label, and one naming the labels
-        the index does not list.
+        One finding naming the pages listed without a plannotation, and one naming the
+        plannotations the index does not list.
     """
     indexed = {entry.page_index for entry in sidecar.index.pages}
-    carried = {label.page.index for label in sidecar.pages}
+    carried = {plannotation.page.index for plannotation in sidecar.pages}
     found: list[Finding] = []
     missing = sorted(indexed - carried)
     if missing:
@@ -149,7 +149,8 @@ def _check_sidecar_correspondence(sidecar: Sidecar, *, source: str) -> list[Find
                 "PL-CAR-005",
                 message=(
                     f"the index lists page(s) {listed}, for which the sidecar carries no "
-                    f"page label; a sidecar contains exactly one label per index entry"
+                    f"plannotation; a sidecar contains exactly one plannotation per index "
+                    f"entry"
                 ),
                 path="/index/pages",
                 source=source,
@@ -162,7 +163,7 @@ def _check_sidecar_correspondence(sidecar: Sidecar, *, source: str) -> list[Find
             finding(
                 "PL-CAR-005",
                 message=(
-                    f"the sidecar carries a page label for page(s) {listed}, which its "
+                    f"the sidecar carries a plannotation for page(s) {listed}, which its "
                     f"index does not list"
                 ),
                 path="/pages",
@@ -183,14 +184,14 @@ def _check_sidecar_order(sidecar: Sidecar, *, source: str) -> list[Finding]:
         A single finding when they do not. Repeats are refused by the model before a
         sidecar loads at all, so what is left to report here is the ordering.
     """
-    indices = [label.page.index for label in sidecar.pages]
+    indices = [plannotation.page.index for plannotation in sidecar.pages]
     if indices == sorted(indices):
         return []
     return [
         finding(
             "PL-CAR-006",
             message=(
-                f"the sidecar's page labels are ordered {indices}, not ascending by "
+                f"the sidecar's plannotations are ordered {indices}, not ascending by "
                 f"page.index; 6.5.1 fixes the order so that two sidecars for one "
                 f"document are the same bytes"
             ),
@@ -202,60 +203,63 @@ def _check_sidecar_order(sidecar: Sidecar, *, source: str) -> list[Finding]:
 
 def check_index_against_plannotations(
     index: PlannotationIndex,
-    labels: Sequence[tuple[int, Plannotation]],
+    plannotations: Sequence[tuple[int, Plannotation]],
     *,
     source: str,
 ) -> list[Finding]:
-    """Check an index entry against the page label it describes.
+    """Check an index entry against the plannotation it describes.
 
-    Entries are matched to labels by page, which is the identity both carry and the one
-    4.5 makes a fact about the document. An entry naming a page that carries no label
-    is not reported: 4.3 forbids a reader from assuming that an index lists every
-    labelled page, and the same restraint applies the other way.
+    Entries are matched to plannotations by page, which is the identity both carry and
+    the one 4.5 makes a fact about the document. An entry naming a page that carries no
+    plannotation is not reported: 4.3 forbids a reader from assuming that an index lists
+    every plannotated page, and the same restraint applies the other way.
 
     Args:
         index: The loaded index.
-        labels: Every page label in the carrier, paired with the page it was found on.
+        plannotations: Every plannotation in the carrier, paired with the page it was
+            found on.
         source: Which document it is, for the findings.
 
     Returns:
         Every disagreement, entry by entry.
     """
-    by_page = dict(labels)
+    by_page = dict(plannotations)
     found: list[Finding] = []
     for position, entry in enumerate(index.pages):
-        label = by_page.get(entry.page_index)
-        if label is None:
+        plannotation = by_page.get(entry.page_index)
+        if plannotation is None:
             continue
         base = json_pointer(["pages", position])
-        reached = conformance_level(label)
+        reached = conformance_level(plannotation)
         if entry.level is not reached:
             found.append(
                 finding(
                     "PL-CAR-001",
                     message=(
                         f"page {entry.page_index} is indexed as {entry.level.value}, but "
-                        f"its label reaches {reached.value}"
+                        f"its plannotation reaches {reached.value}"
                     ),
                     path=f"{base}/level",
                     source=source,
                 )
             )
-        if entry.sheet_id != label.sheet.sheet_id:
+        if entry.sheet_id != plannotation.sheet.sheet_id:
             found.append(
                 finding(
                     "PL-CAR-002",
                     message=(
                         f"page {entry.page_index} is indexed as sheet "
-                        f"{entry.sheet_id!r}, but its label prints "
-                        f"{label.sheet.sheet_id!r}"
+                        f"{entry.sheet_id!r}, but its plannotation prints "
+                        f"{plannotation.sheet.sheet_id!r}"
                     ),
                     path=f"{base}/sheetId",
                     source=source,
                 )
             )
-        found += _check_entry_text(entry.title, label.sheet.title, "title", base, source)
-        found += _check_entry_text(entry.revision, label.sheet.revision, "revision", base, source)
+        found += _check_entry_text(entry.title, plannotation.sheet.title, "title", base, source)
+        found += _check_entry_text(
+            entry.revision, plannotation.sheet.revision, "revision", base, source
+        )
     return found
 
 
@@ -293,40 +297,41 @@ def _check_entry_text(
 
 
 def check_page_identity(
-    label: Plannotation,
+    plannotation: Plannotation,
     *,
     page_count: int,
     attached_to: int | None = None,
     source: str,
 ) -> list[Finding]:
-    """Check that a label's ``page.index`` names the page it describes.
+    """Check that a plannotation's ``page.index`` names the page it describes.
 
     One rule with two faces, and one code, because they are the same claim failing in
-    the two carriers. In a PDF the label is attached to a page, and 4.5 says the
-    attachment is the fact while ``page.index`` is a claim inside the label; the claim
-    must agree with it. In a sidecar there is no attachment, so ``page.index`` is all
-    there is -- and 6.5.5 (1) requires a validator to report a label whose
+    the two carriers. In a PDF the plannotation is attached to a page, and 4.5 says the
+    attachment is the fact while ``page.index`` is a claim inside the plannotation; the
+    claim must agree with it. In a sidecar there is no attachment, so ``page.index`` is
+    all there is -- and 6.5.5 (1) requires a validator to report a plannotation whose
     ``page.index`` is not a page of the document at all.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         page_count: How many pages the document has.
-        attached_to: The page the label was found attached to, for a PDF. None for a
-            sidecar, where nothing but the label says which page it describes.
+        attached_to: The page the plannotation was found attached to, for a PDF. None
+            for a sidecar, where nothing but the plannotation says which page it
+            describes.
         source: Which document it is, for the findings.
 
     Returns:
         A single finding when the claim does not hold.
     """
-    claimed = label.page.index
+    claimed = plannotation.page.index
     if attached_to is not None and claimed != attached_to:
         return [
             finding(
                 "PL-REF-008",
                 message=(
-                    f"the label attached to page {attached_to} declares page.index "
-                    f"{claimed}; the page a label is attached to is a fact about the "
-                    f"document and page.index is a claim inside the label"
+                    f"the plannotation attached to page {attached_to} declares "
+                    f"page.index {claimed}; the page a plannotation is attached to is a fact "
+                    f"about the document and page.index is a claim inside the plannotation"
                 ),
                 path="/page/index",
                 source=source,
@@ -338,9 +343,9 @@ def check_page_identity(
         finding(
             "PL-REF-008",
             message=(
-                f"this label describes page {claimed}, which this {page_count}-page "
-                f"document does not have; a reader pairing a payload with a document "
-                f"treats such a label as absent"
+                f"this plannotation describes page {claimed}, which this "
+                f"{page_count}-page document does not have; a reader pairing a payload "
+                f"with a document treats such a plannotation as absent"
             ),
             path="/page/index",
             source=source,
@@ -349,7 +354,7 @@ def check_page_identity(
 
 
 def check_pairing(
-    labels: Sequence[tuple[int, Plannotation]],
+    plannotations: Sequence[tuple[int, Plannotation]],
     *,
     page_count: int,
     source: str,
@@ -357,25 +362,26 @@ def check_pairing(
     """Check 6.5.5 (3): a payload must pair with the document it was given with.
 
     Args:
-        labels: Every page label read, paired with the page it claims or was found on.
+        plannotations: Every plannotation read, paired with the page it claims or was
+            found on.
         page_count: How many pages the document has.
         source: Which document it is, for the finding.
 
     Returns:
-        A single finding when no label pairs with any page. The per-label halves of
-        6.5.5 are PL-REF-008 and PL-GEO-001; this is the whole-payload one, which no
-        single label can fail.
+        A single finding when no plannotation pairs with any page. The per-plannotation
+        halves of 6.5.5 are PL-REF-008 and PL-GEO-001; this is the whole-payload one,
+        which no single plannotation can fail.
     """
-    if not labels:
+    if not plannotations:
         return []
-    if any(0 <= page_index < page_count for page_index, _ in labels):
+    if any(0 <= page_index < page_count for page_index, _ in plannotations):
         return []
-    claimed = ", ".join(str(page_index) for page_index, _ in labels)
+    claimed = ", ".join(str(page_index) for page_index, _ in plannotations)
     return [
         finding(
             "PL-CAR-007",
             message=(
-                f"no page label pairs with a page of this {page_count}-page document; "
+                f"no plannotation pairs with a page of this {page_count}-page document; "
                 f"the payload describes page(s) {claimed}. A payload that pairs with "
                 f"nothing was written for another document, and a reader must treat the "
                 f"whole of it as absent"
@@ -386,18 +392,18 @@ def check_pairing(
     ]
 
 
-def check_declaration(*, present: bool, labelled: bool, source: str) -> list[Finding]:
-    """Check that a labelled PDF carries the XMP PDF Declaration.
+def check_declaration(*, present: bool, plannotated: bool, source: str) -> list[Finding]:
+    """Check that a plannotated PDF carries the XMP PDF Declaration.
 
     Args:
         present: Whether a declaration naming the Plannotation specification was found.
-        labelled: Whether the document carries any Plannotation payload at all.
+        plannotated: Whether the document carries any Plannotation payload at all.
         source: Which document it is, for the finding.
 
     Returns:
-        A single warning when a labelled document carries no declaration.
+        A single warning when a plannotated document carries no declaration.
     """
-    if present or not labelled:
+    if present or not plannotated:
         return []
     return [
         finding(

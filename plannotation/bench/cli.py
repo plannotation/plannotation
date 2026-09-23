@@ -4,8 +4,8 @@
 ::
 
     plannotation-bench questions                    # merge samples/*/groundtruth.jsonl
-    plannotation-bench run --condition plain    --model claude-opus-5 --n 100
-    plannotation-bench run --condition labelled --model claude-opus-5 --n 100
+    plannotation-bench run --condition plain       --model claude-opus-5 --n 100
+    plannotation-bench run --condition plannotated --model claude-opus-5 --n 100
     plannotation-bench report --model claude-opus-5 # -> bench/results/<date>-<model>.md
     plannotation-bench readme --model claude-opus-5 # the table between the README's markers
 
@@ -46,7 +46,7 @@ CACHE: Final = Path("bench/cache")
 
 app = typer.Typer(
     name="plannotation-bench",
-    help="Measure what a page label is worth to a model reading a drawing.",
+    help="Measure what a plannotation is worth to a model reading a drawing.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -85,7 +85,7 @@ def _log_file(results: Path, model: str, condition: str) -> Path:
 def main(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Log each request.")] = False,
 ) -> None:
-    """Measure what a page label is worth to a model reading a drawing."""
+    """Measure what a plannotation is worth to a model reading a drawing."""
     logging.basicConfig(
         level=logging.INFO if verbose else logging.WARNING,
         format="%(message)s",
@@ -115,7 +115,7 @@ def questions_command(
 
 @app.command("run")
 def run_command(
-    condition: Annotated[str, typer.Option("--condition", "-c", help="plain or labelled.")],
+    condition: Annotated[str, typer.Option("--condition", "-c", help="plain or plannotated.")],
     model: Annotated[str, typer.Option("--model", "-m", help="The model id.")] = DEFAULT_MODEL,
     n: Annotated[
         int | None, typer.Option("--n", min=1, help="Ask at most this many questions.")
@@ -140,7 +140,7 @@ def run_command(
     if condition not in CONDITIONS:
         msg = f"--condition must be one of {', '.join(CONDITIONS)}, not {condition!r}"
         raise _fail(msg)
-    chosen: Condition = "plain" if condition == "plain" else "labelled"
+    chosen: Condition = "plain" if condition == "plain" else "plannotated"
     config = RunConfig(condition=chosen, model=model, n=n, effort=effort, cache_dir=cache)
     try:
         question_set = load_questions(questions)
@@ -179,10 +179,10 @@ def report_command(
     Raises:
         typer.Exit: With 2 when neither condition has been run.
     """
-    plain, labelled = _load_runs(results, model)
+    plain, plannotated = _load_runs(results, model)
     day = date or datetime.now(UTC).date().isoformat()
     path = results / f"{day}-{model}.md"
-    path.write_text(render_report(model, day, plain, labelled), encoding="utf-8")
+    path.write_text(render_report(model, day, plain, plannotated), encoding="utf-8")
     console.print(f"report written to {path}")
 
 
@@ -202,7 +202,7 @@ def readme_command(
     Raises:
         typer.Exit: With 2 when there is nothing to report or no markers to write between.
     """
-    plain, labelled = _load_runs(results, model)
+    plain, plannotated = _load_runs(results, model)
     day = date or datetime.now(UTC).date().isoformat()
     report = results / f"{day}-{model}.md"
     try:
@@ -210,7 +210,7 @@ def readme_command(
     except ValueError:
         link = report.as_posix()
     try:
-        changed = update_readme(readme, render_readme_section(model, link, plain, labelled))
+        changed = update_readme(readme, render_readme_section(model, link, plain, plannotated))
     except ValueError as error:
         raise _fail(str(error)) from error
     console.print(f"{readme} {'updated' if changed else 'already up to date'}")
@@ -224,7 +224,7 @@ def _load_runs(results: Path, model: str) -> tuple[list[Record], list[Record]]:
         model: The model.
 
     Returns:
-        The plain and labelled records; either may be empty.
+        The plain and plannotated records; either may be empty.
 
     Raises:
         typer.Exit: With 2 when neither log exists.
@@ -233,5 +233,5 @@ def _load_runs(results: Path, model: str) -> tuple[list[Record], list[Record]]:
     if not any(log.is_file() for log in logs):
         msg = f"no run logs for {model} in {results}; run `plannotation-bench run` first"
         raise _fail(msg)
-    plain, labelled = (read_records(log) if log.is_file() else [] for log in logs)
-    return plain, labelled
+    plain, plannotated = (read_records(log) if log.is_file() else [] for log in logs)
+    return plain, plannotated

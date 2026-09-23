@@ -2,17 +2,17 @@
 """Pydantic v2 models mirroring the Plannotation JSON Schemas.
 
 The two JSON Schemas shipped in :mod:`plannotation.schema` are the single source of
-truth for the label format. The models here follow them and never the other way
+truth for the Plannotation format. The models here follow them and never the other way
 round: if this module and a schema disagree, the schema is right and this module is
 a bug.
 
 What lives here
 ---------------
-* One model per object in ``plannotation-0.1.json`` (the page label) and in
+* One model per object in ``plannotation-0.1.json`` (the plannotation) and in
   ``plannotation-index-0.1.json`` (the document-level index), plus the enumerations and
   constrained scalars the schemas define under ``$defs``.
 * :class:`Sidecar`, the root of ``plannotation-sidecar-0.1.json``: an index and every
-  page label of one document in one file, which is what the sidecar carrier writes
+  plannotation of one document in one file, which is what the sidecar carrier writes
   beside a document that cannot or must not carry them itself.
 * The Phase 1 rules from the design brief as pure functions with thin model
   properties over them: :func:`aggregate_provenance`, :func:`conformance_level`,
@@ -45,7 +45,7 @@ round trip. Use :attr:`Page.effective_rotation` when the applied default is want
 
 For the same reason ``plannotation`` is required rather than defaulted to its one legal
 value: the schema lists it in ``required``, and a model that supplied it silently
-would load any JSON object at all as a label. Writers pass
+would load any JSON object at all as a plannotation. Writers pass
 :data:`plannotation.constants.SCHEMA_VERSION`, whose ``Final`` literal type mypy checks
 against the ``Literal["0.1"]`` on the field, so the two cannot drift apart unnoticed.
 
@@ -160,7 +160,7 @@ __all__ = [
 #: Import path of the package that carries the schema files as package data.
 _SCHEMA_PACKAGE = "plannotation.schema"
 
-#: Filename of the page-label schema inside that package.
+#: Filename of the plannotation schema inside that package.
 _PAGE_SCHEMA_FILE = f"plannotation-{SCHEMA_VERSION}.json"
 
 #: Filename of the document-level index schema inside that package.
@@ -183,7 +183,7 @@ SIDECAR_SCHEMA_ID: Final = f"{BASE_URL}/schema/{SCHEMA_VERSION}/plannotation-sid
 # Enumerations
 # ---------------------------------------------------------------------------
 class Provenance(StrEnum):
-    """Where a label, an element or an annotation came from.
+    """Where a plannotation, an element or an annotation came from.
 
     Mirrors ``#/$defs/provenance``. ``authored`` means written from the model by the
     authoring tool; ``inferred`` means reconstructed from the drawing by a reader,
@@ -197,7 +197,7 @@ class Provenance(StrEnum):
 
 
 class ConformanceLevel(StrEnum):
-    """How much of the label format a page label actually fills in.
+    """How much of the format a plannotation actually fills in.
 
     ``L1`` is page and sheet (plus viewports, when there are any); ``L2`` adds
     elements; ``L3`` adds annotations that link to something. The index schema stores
@@ -359,8 +359,8 @@ shape a writer should emit -- but it is a description, not a constraint. Typing 
 as ``dict[str, dict[str, JsonValue]]`` would make the reference implementation
 reject property bags that a conforming third-party writer may legitimately produce
 (a flat bag, or a pset carried with no value), and for a format whose whole purpose
-is that any program can read the label, a reader stricter than the format is the
-worse failure. Use :meth:`Element.pset` for typed access to the nested shape."""
+is that any program can read the plannotation, a reader stricter than the format
+is the worse failure. Use :meth:`Element.pset` for typed access to the nested shape."""
 
 Rotation = Annotated[Literal[0, 90, 180, 270], _NUMERIC]
 """Value set of ``page.rotation``, in degrees. ``_NUMERIC`` is what stops ``false``
@@ -394,7 +394,7 @@ class _PlannotationModel(BaseModel):
 
 
 class Generator(_PlannotationModel):
-    """The tool that wrote a label. Mirrors the ``generator`` object of both schemas.
+    """The tool that wrote a plannotation. Mirrors the ``generator`` object of both schemas.
 
     ``created`` is a date-time string. It stays a string rather than becoming a
     :class:`datetime.datetime`, because JSON Schema's ``format`` is an annotation
@@ -409,10 +409,10 @@ class Generator(_PlannotationModel):
 
 
 class Page(_PlannotationModel):
-    """The PDF page a label describes. Mirrors the root ``page`` object.
+    """The PDF page a plannotation describes. Mirrors the root ``page`` object.
 
     The page is the leading document: these three required numbers say which page and
-    how big it is, and everything else in the label is positioned against them.
+    how big it is, and everything else in the plannotation is positioned against them.
     """
 
     index: PageIndex
@@ -459,9 +459,9 @@ class Sheet(_PlannotationModel):
 
 
 class Model(_PlannotationModel):
-    """The source model the label was written from. Mirrors the ``model`` object.
+    """The source model the plannotation was written from. Mirrors the ``model`` object.
 
-    The same shape appears in the page-label schema and in the index schema, which is
+    The same shape appears in the plannotation schema and in the index schema, which is
     why one class serves both.
     """
 
@@ -561,8 +561,8 @@ class Element(_ProvenancedItem):
         """Return one IFC property set from :attr:`properties`, if it is one.
 
         ``properties`` is typed exactly as the schema constrains it -- a bare object
-        -- so that no conforming label is unreadable. This accessor gives back the
-        nested ``PsetName -> {property: value}`` shape the schema *describes*, and
+        -- so that no conforming plannotation is unreadable. This accessor gives back
+        the nested ``PsetName -> {property: value}`` shape the schema *describes*, and
         returns None rather than raising when a writer emitted something else.
 
         Args:
@@ -620,7 +620,7 @@ class Annotation(_ProvenancedItem):
 
     Mirrors ``#/$defs/annotation``. An annotation that links to something -- through
     ``measures``, ``shows``, ``target``, ``axis`` or ``ifcGuid`` -- is what lifts a
-    label to :attr:`ConformanceLevel.L3`; see :func:`annotation_has_link`.
+    plannotation to :attr:`ConformanceLevel.L3`; see :func:`annotation_has_link`.
     """
 
     annotation_type: AnnotationType = Field(alias="type")
@@ -637,7 +637,7 @@ class Annotation(_ProvenancedItem):
 
 
 class Plannotation(_PlannotationModel):
-    """The label of one drawing page: the root of ``plannotation-0.1.json``.
+    """The plannotation of one drawing page: the root of ``plannotation-0.1.json``.
 
     The PDF page stays the leading document; this object is auxiliary and may be
     removed without changing what the page shows or prints.
@@ -659,7 +659,7 @@ class Plannotation(_PlannotationModel):
         """Enforce that every ``localId`` on the page is unique.
 
         Returns:
-            The validated label.
+            The validated plannotation.
 
         Raises:
             ValueError: If a ``localId`` is used more than once, counting viewports,
@@ -679,7 +679,7 @@ class Plannotation(_PlannotationModel):
 
     @property
     def aggregate_provenance(self) -> Provenance | None:
-        """Return the provenance the top level of this label ought to declare.
+        """Return the provenance the top level of this plannotation ought to declare.
 
         Returns:
             The aggregate over every element and annotation, as
@@ -696,9 +696,9 @@ class Plannotation(_PlannotationModel):
         """Report whether the declared provenance matches the page's own items.
 
         This is the provenance rule as the Phase 3 validator will apply it. It is a
-        report rather than a validation error, because a label that misreports itself
-        is still a well-formed label: the schema does not constrain the aggregate,
-        and refusing to load such a document would leave no way to inspect it.
+        report rather than a validation error, because a plannotation that misreports
+        itself is still a well-formed plannotation: the schema does not constrain the
+        aggregate, and refusing to load such a document would leave no way to inspect it.
 
         Returns:
             True when the aggregate agrees with :attr:`provenance`, and True as well
@@ -710,7 +710,7 @@ class Plannotation(_PlannotationModel):
 
     @property
     def level(self) -> ConformanceLevel:
-        """Return the conformance level this label reaches.
+        """Return the conformance level this plannotation reaches.
 
         Returns:
             The level, as :func:`conformance_level` computes it.
@@ -719,9 +719,9 @@ class Plannotation(_PlannotationModel):
 
 
 class IndexPage(_PlannotationModel):
-    """One labelled page as the document index lists it.
+    """One plannotated page as the document index lists it.
 
-    Mirrors ``pages.items`` of ``plannotation-index-0.1.json``. Unlabelled pages are
+    Mirrors ``pages.items`` of ``plannotation-index-0.1.json``. Unplannotated pages are
     absent from the index rather than listed as empty.
     """
 
@@ -736,7 +736,7 @@ class IndexPage(_PlannotationModel):
 class PlannotationIndex(_PlannotationModel):
     """The document-level index: the root of ``plannotation-index-0.1.json``.
 
-    It exists so that a reader can see what is labelled, and at which level, without
+    It exists so that a reader can see what is plannotated, and at which level, without
     opening every page attachment.
     """
 
@@ -749,20 +749,20 @@ class PlannotationIndex(_PlannotationModel):
 
 
 class Sidecar(_PlannotationModel):
-    """A whole document's labels in one file: the root of ``plannotation-sidecar-0.1.json``.
+    """A whole document's plannotations in one file: the root of ``plannotation-sidecar-0.1.json``.
 
-    The sidecar is the third carrier. It holds exactly what a labelled PDF holds --
-    the document-level index and one page label per labelled page -- as a single JSON
-    file written beside the document as ``X.plannotation.json``. It exists for two
+    The sidecar is the third carrier. It holds exactly what a plannotated PDF holds --
+    the document-level index and one plannotation per plannotated page -- as a single
+    JSON file written beside the document as ``X.plannotation.json``. It exists for two
     consumers: one that cannot read PDF attachments, and one that must not rewrite the
     document at all, a signed PDF above all.
 
     Carrying the index as well as the pages is what makes the sidecar a twin rather
-    than a bag of labels: a reader can see which pages are labelled and at what level
-    without parsing every page, exactly as it could from the embedded index.
+    than a bag of plannotations: a reader can see which pages are plannotated and at
+    what level without parsing every page, exactly as it could from the embedded index.
 
     ``index`` is required because a sidecar is written by a program that has all the
-    labels in front of it, and can therefore always derive an index from them. A
+    plannotations in front of it, and can therefore always derive an index from them. A
     sidecar whose index is missing would be a weaker document than the PDF it stands
     in for.
     """
@@ -775,38 +775,40 @@ class Sidecar(_PlannotationModel):
 
     @model_validator(mode="after")
     def _one_plannotation_per_page(self) -> Self:
-        """Enforce that no two page labels claim the same page.
+        """Enforce that no two plannotations claim the same page.
 
         Returns:
             The validated sidecar.
 
         Raises:
-            ValueError: If two labels carry the same ``page.index``. The schema cannot
-                express this, and a reader keying labels by page -- which is the only
-                useful way to read them -- would silently lose one of the two.
+            ValueError: If two plannotations carry the same ``page.index``. The schema
+                cannot express this, and a reader keying plannotations by page -- which is
+                the only useful way to read them -- would silently lose one of the two.
         """
         seen: set[int] = set()
         duplicates: set[int] = set()
-        for label in self.pages:
-            if label.page.index in seen:
-                duplicates.add(label.page.index)
-            seen.add(label.page.index)
+        for plannotation in self.pages:
+            if plannotation.page.index in seen:
+                duplicates.add(plannotation.page.index)
+            seen.add(plannotation.page.index)
         if duplicates:
             listed = ", ".join(str(index) for index in sorted(duplicates))
-            msg = f"two page labels claim the same page; repeated page.index: {listed}"
+            msg = f"two plannotations claim the same page; repeated page.index: {listed}"
             raise ValueError(msg)
         return self
 
     @property
     def levels(self) -> dict[int, ConformanceLevel]:
-        """Return the conformance level of each page label, keyed by page index.
+        """Return the conformance level of each plannotation, keyed by page index.
 
         Returns:
-            One entry per label in :attr:`pages`, as :func:`conformance_level` grades
-            it. The index's own ``level`` values are a claim inside a document; these
-            are computed from the labels themselves.
+            One entry per plannotation in :attr:`pages`, as :func:`conformance_level`
+            grades it. The index's own ``level`` values are a claim inside a document;
+            these are computed from the plannotations themselves.
         """
-        return {label.page.index: conformance_level(label) for label in self.pages}
+        return {
+            plannotation.page.index: conformance_level(plannotation) for plannotation in self.pages
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -816,12 +818,12 @@ def _inherited_provenance(declared: Provenance | None) -> Provenance:
     """Return the provenance an item inherits when it declares none.
 
     Args:
-        declared: The label's top-level provenance, or None if unknown.
+        declared: The plannotation's top-level provenance, or None if unknown.
 
     Returns:
-        The declared value, ``inferred`` when the label declares ``mixed`` (reading
-        silence conservatively rather than as ``authored``), and ``authored`` when
-        there is no declaration to inherit.
+        The declared value, ``inferred`` when the plannotation declares ``mixed``
+        (reading silence conservatively rather than as ``authored``), and ``authored``
+        when there is no declaration to inherit.
     """
     if declared is None:
         return Provenance.AUTHORED
@@ -843,25 +845,25 @@ def aggregate_provenance(
     boundary cases are resolved as follows.
 
     *No elements and no annotations at all.* Nothing is aggregated and the answer is
-    None: this rule does not determine such a document's provenance, and the label's
-    own declaration stands unchallenged. Reading it as ``inferred`` would force an L1
-    sheet written straight from the model -- a title block and a few empty viewports
-    -- to describe itself as reconstructed, which is false; reading it as
-    ``authored`` would let a sheet recovered from a legacy PDF claim it came from a
-    model, which is equally false. With no items there is no evidence either way, and
-    a format whose principle is that the page leads and the label is auxiliary should
-    not invent one. The literal reading is one line away, in this function, if the
-    specification later decides otherwise.
+    None: this rule does not determine such a document's provenance, and the
+    plannotation's own declaration stands unchallenged. Reading it as ``inferred``
+    would force an L1 sheet written straight from the model -- a title block and a
+    few empty viewports -- to describe itself as reconstructed, which is false;
+    reading it as ``authored`` would let a sheet recovered from a legacy PDF claim it
+    came from a model, which is equally false. With no items there is no evidence
+    either way, and a format whose principle is that the page leads and the
+    plannotation is auxiliary should not invent one. The literal reading is one line
+    away, in this function, if the specification later decides otherwise.
 
     *Items that omit ``provenance``.* The property is optional on an item and
-    required at the top level, so an item that does not say **inherits the label's
-    own declaration**. That makes the top-level value load-bearing rather than
-    decorative, and it is the only reading under which a wholly reconstructed label
-    need not repeat ``"provenance": "inferred"`` on every one of its items. Where the
-    top level is ``mixed`` the inherited value is ``inferred``, because nothing in
-    the format could say which half an unmarked item came from and reading silence
-    as ``authored`` would overstate what the writer knew. With no declaration to
-    inherit, silence means ``authored``.
+    required at the top level, so an item that does not say **inherits the
+    plannotation's own declaration**. That makes the top-level value load-bearing
+    rather than decorative, and it is the only reading under which a wholly
+    reconstructed plannotation need not repeat ``"provenance": "inferred"`` on every
+    one of its items. Where the top level is ``mixed`` the inherited value is
+    ``inferred``, because nothing in the format could say which half an unmarked item
+    came from and reading silence as ``authored`` would overstate what the writer
+    knew. With no declaration to inherit, silence means ``authored``.
 
     *Elements authored, annotations inferred.* Both kinds are items and are counted
     together, so this is ``mixed`` -- as is any other combination.
@@ -873,8 +875,8 @@ def aggregate_provenance(
     Args:
         items: The ``provenance`` of every element and annotation on the page, in any
             order, with ``None`` for an item that omits it.
-        declared: The label's own top-level provenance, which items that omit theirs
-            inherit. None when there is no declaration to inherit from.
+        declared: The plannotation's own top-level provenance, which items that omit
+            theirs inherit. None when there is no declaration to inherit from.
 
     Returns:
         ``authored`` when there is at least one item and every item is authored,
@@ -915,7 +917,7 @@ def annotation_has_link(annotation: Annotation) -> bool:
     )
 
 
-def local_ids(label: Plannotation) -> list[str]:
+def local_ids(plannotation: Plannotation) -> list[str]:
     """Collect every ``localId`` declared on a page, in document order.
 
     Viewports, elements and annotations share one identifier space. They must,
@@ -927,37 +929,37 @@ def local_ids(label: Plannotation) -> list[str]:
     :class:`Plannotation` enforces.
 
     Args:
-        label: The page label to read.
+        plannotation: The plannotation to read.
 
     Returns:
         The identifiers, with any duplicates still present, viewports first, then
         elements, then annotations.
     """
-    collected = [viewport.local_id for viewport in (label.viewports or [])]
-    collected += [element.local_id for element in (label.elements or [])]
-    collected += [annotation.local_id for annotation in (label.annotations or [])]
+    collected = [viewport.local_id for viewport in (plannotation.viewports or [])]
+    collected += [element.local_id for element in (plannotation.elements or [])]
+    collected += [annotation.local_id for annotation in (plannotation.annotations or [])]
     return collected
 
 
-def conformance_level(label: Plannotation) -> ConformanceLevel:
-    """Return the conformance level a page label reaches.
+def conformance_level(plannotation: Plannotation) -> ConformanceLevel:
+    """Return the conformance level a plannotation reaches.
 
     ``L1`` is page and sheet, plus viewports when there are any. Both are required by
-    the schema, so every valid label reaches L1 and L1 is the floor rather than a
-    test. ``L2`` adds elements with ``ifcClass`` and ``paperBBox``; both are required
-    on an element, so one element is enough. ``L3`` adds annotations with at least one
-    link, and one linked annotation is enough -- a sheet is not demoted because its
-    north arrow links to nothing.
+    the schema, so every valid plannotation reaches L1 and L1 is the floor rather
+    than a test. ``L2`` adds elements with ``ifcClass`` and ``paperBBox``; both are
+    required on an element, so one element is enough. ``L3`` adds annotations with at
+    least one link, and one linked annotation is enough -- a sheet is not demoted
+    because its north arrow links to nothing.
 
     Args:
-        label: The page label to grade.
+        plannotation: The plannotation to grade.
 
     Returns:
-        The highest level the label satisfies.
+        The highest level the plannotation satisfies.
     """
-    if not label.elements:
+    if not plannotation.elements:
         return ConformanceLevel.L1
-    if any(annotation_has_link(item) for item in (label.annotations or [])):
+    if any(annotation_has_link(item) for item in (plannotation.annotations or [])):
         return ConformanceLevel.L3
     return ConformanceLevel.L2
 
@@ -1060,7 +1062,7 @@ def canonical_bytes(model: BaseModel) -> bytes:
     """Serialise a model to canonical JSON encoded as UTF-8.
 
     This is the form that goes into a PDF as an embedded file and onto disk as a
-    sidecar, so that the checksum of a label does not depend on who wrote it.
+    sidecar, so that the checksum of a plannotation does not depend on who wrote it.
 
     Args:
         model: Any Plannotation model.
@@ -1101,16 +1103,16 @@ def _loads(text: str | bytes) -> object:
 
 
 def load_plannotation(text: str | bytes) -> Plannotation:
-    """Parse and validate the label of one page.
+    """Parse and validate the plannotation of one page.
 
-    The inverse of :func:`canonical_json` for a page label: for canonical text,
+    The inverse of :func:`canonical_json` for a plannotation: for canonical text,
     ``canonical_json(load_plannotation(text)) == text``, byte for byte.
 
     Args:
-        text: The label document, as text or as UTF-8 bytes.
+        text: The plannotation document, as text or as UTF-8 bytes.
 
     Returns:
-        The validated label.
+        The validated plannotation.
 
     Raises:
         ValueError: If the text is not valid JSON.
@@ -1179,11 +1181,11 @@ def _schema_text(filename: str) -> str:
 
 
 def page_schema() -> dict[str, JsonValue]:
-    """Load the page-label JSON Schema.
+    """Load the plannotation JSON Schema.
 
     Returns:
         ``plannotation-0.1.json`` parsed, as a fresh object the caller may keep or
-        mutate. It is the single source of truth for what a label may contain.
+        mutate. It is the single source of truth for what a plannotation may contain.
     """
     return cast("dict[str, JsonValue]", json.loads(_schema_text(_PAGE_SCHEMA_FILE)))
 
@@ -1201,7 +1203,7 @@ def index_schema() -> dict[str, JsonValue]:
 def sidecar_schema() -> dict[str, JsonValue]:
     """Load the sidecar JSON Schema.
 
-    The sidecar schema inlines the page-label and index schemas rather than
+    The sidecar schema inlines the plannotation and index schemas rather than
     referencing them, so that a reader can validate a sidecar with this one document
     and no network access. The three are generated from one source and cannot drift
     apart unnoticed: the inlined copies are the other two files verbatim.

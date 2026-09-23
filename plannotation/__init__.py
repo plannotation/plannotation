@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Plannotation: machine-readable semantics for 2D construction drawings.
 
-Plannotation attaches a small JSON label to each page of a drawing PDF describing the
-sheet, its viewports and their paper-to-model transforms, the elements shown and the
-annotations placed on them.
+Plannotation attaches a plannotation, a small JSON document, to each page of a drawing
+PDF, describing the sheet, its viewports and their paper-to-model transforms, the
+elements shown and the annotations placed on them.
 
 The governing principle, from which every design decision follows: **the PDF page is
-the leading document and the label is auxiliary**. Writing a label never changes how
-a page looks or prints.
+the leading document and the plannotation is auxiliary**. Writing a plannotation never
+changes how a page looks or prints.
 """
 
 from __future__ import annotations

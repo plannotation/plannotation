@@ -4,7 +4,7 @@
 Two corpora share one manifest shape and are therefore tested by one module:
 
 ``tests/fixtures/plannotations/``
-    12 valid and 12 invalid page labels -- the Phase 1 gate.
+    12 valid and 12 invalid plannotations -- the Phase 1 gate.
 
 ``tests/fixtures/index/``
     3 valid and 3 invalid document indexes.
@@ -109,7 +109,7 @@ class TestManifestsMatchDisk:
 
     @pytest.mark.parametrize("corpus", ["plannotations", "index"])
     def test_counts(self, corpus: str) -> None:
-        """The Phase 1 gate fixes the label counts at 12 and 12."""
+        """The Phase 1 gate fixes the plannotation counts at 12 and 12."""
         expected_valid, expected_invalid = EXPECTED_COUNTS[corpus]
         man = manifest(corpus)
         assert len(man["valid"]) == expected_valid
@@ -170,8 +170,8 @@ class TestValidFixtures:
     @pytest.mark.parametrize("entry", cases("plannotations", "valid"))
     def test_conformance_level_matches_the_manifest(self, entry: dict[str, Any]) -> None:
         """The level a fixture claims is the level the rules actually yield."""
-        label = load_plannotation(text_of("plannotations", entry))
-        assert conformance_level(label).value == entry["level"]
+        plannotation = load_plannotation(text_of("plannotations", entry))
+        assert conformance_level(plannotation).value == entry["level"]
 
     @pytest.mark.parametrize("entry", cases("plannotations", "valid"))
     def test_filename_matches_the_level(self, entry: dict[str, Any]) -> None:
@@ -216,7 +216,7 @@ class TestInvalidFixtures:
         assert len(pointers) == len(entries)
 
     def test_negative_keyword_coverage_is_broad(self) -> None:
-        """The label negatives span the schema's keyword families, not one or two."""
+        """The plannotation negatives span the schema's keyword families, not one or two."""
         keywords = {e["keyword"] for e in manifest("plannotations")["invalid"]}
         # `type` and `minimum` were added deliberately: `type` has the most sites in
         # the schema and a wrong JSON type is the likeliest real exporter bug.
@@ -224,10 +224,10 @@ class TestInvalidFixtures:
 
 
 class TestCorporaAgree:
-    """The index fixtures describe the label fixtures, so the two must not drift."""
+    """The index fixtures describe the plannotation fixtures, so the two must not drift."""
 
-    def test_index_levels_match_the_labels_they_describe(self) -> None:
-        """A level recorded in an index is the level that label actually reaches."""
+    def test_index_levels_match_the_plannotations_they_describe(self) -> None:
+        """A level recorded in an index is the level that plannotation actually reaches."""
         by_sheet = {
             load_plannotation(text_of("plannotations", e)).sheet.sheet_id: conformance_level(
                 load_plannotation(text_of("plannotations", e))
@@ -242,4 +242,4 @@ class TestCorporaAgree:
                 if page["sheetId"] in by_sheet:
                     assert page["level"] == by_sheet[page["sheetId"]], page["sheetId"]
                     checked += 1
-        assert checked, "no index entry referred to a known label fixture"
+        assert checked, "no index entry referred to a known plannotation fixture"

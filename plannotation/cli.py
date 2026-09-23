@@ -11,7 +11,7 @@
                           [--report md|json]
     plannotation samples build [--out samples] [--only NAME] [--inkscape-fallback]
     plannotation inspect file.pdf [--page N] [--json]
-    plannotation infer old.pdf -o labelled.pdf [--ifc model.ifc]
+    plannotation infer old.pdf -o plannotated.pdf [--ifc model.ifc]
     plannotation from-svg sheet.svg sheet.pdf -o out.pdf --sheet-id A-101 [--ifc model.ifc]
 
 Two output modes, and they are kept apart on purpose. Without ``--json`` the
@@ -91,7 +91,7 @@ app = typer.Typer(
     name="plannotation",
     help=(
         "Machine-readable semantics for 2D construction drawings. "
-        "The PDF page stays the leading document; the label is auxiliary."
+        "The PDF page stays the leading document; the plannotation is auxiliary."
     ),
     no_args_is_help=True,
     add_completion=True,
@@ -232,17 +232,17 @@ def _read_json(path: Path) -> object:
 
 
 def _load_plannotations(path: Path) -> tuple[list[Plannotation], PlannotationIndex | None]:
-    """Read a labels file in any of the three shapes a person may reasonably have.
+    """Read a plannotations file in any of the three shapes a person may reasonably have.
 
-    A sidecar document carries both the labels and an index; a bare array carries
-    several labels; a single object carries one. All three are accepted, because all
-    three are things a writer in this project produces.
+    A sidecar document carries both the plannotations and an index; a bare array
+    carries several plannotations; a single object carries one. All three are
+    accepted, because all three are things a writer in this project produces.
 
     Args:
-        path: The labels file.
+        path: The plannotations file.
 
     Returns:
-        The page labels, and the index when the file carried one.
+        The plannotations, and the index when the file carried one.
 
     Raises:
         typer.Exit: If the file is not one of the three shapes, or does not validate.
@@ -260,9 +260,9 @@ def _load_plannotations(path: Path) -> tuple[list[Plannotation], PlannotationInd
         msg = f"{path} is not a valid Plannotation document:\n{exc}"
         raise _fail(msg) from exc
     msg = (
-        f"{path} does not look like labels. Pass a page label, an array of page "
-        "labels, or a sidecar document ({'plannotation', 'index', 'pages'}). An index "
-        "on its own goes to --index"
+        f"{path} does not look like plannotations. Pass a plannotation, an array of "
+        "plannotations, or a sidecar document ({'plannotation', 'index', 'pages'}). An "
+        "index on its own goes to --index"
     )
     raise _fail(msg)
 
@@ -304,13 +304,13 @@ def _carrier(source: Path, *, strict: bool = True) -> CarrierReport:
 
     Args:
         source: The document or sidecar to read.
-        strict: Whether an invalid label is an error.
+        strict: Whether an invalid plannotation is an error.
 
     Returns:
         The report.
 
     Raises:
-        typer.Exit: If the file cannot be read or a label does not validate.
+        typer.Exit: If the file cannot be read or a plannotation does not validate.
     """
     try:
         return embed.carrier_report(source, strict=strict)
@@ -360,28 +360,28 @@ def _index_line(index: PlannotationIndex | None) -> str:
 
 
 def _summary_table(report: CarrierReport) -> Table:
-    """Build the table of labelled pages shown by ``plannotation read``.
+    """Build the table of plannotated pages shown by ``plannotation read``.
 
     Args:
         report: What the carrier holds.
 
     Returns:
-        A rich table, one row per labelled page.
+        A rich table, one row per plannotated page.
     """
     table = Table(title=None, header_style="bold", box=None, pad_edge=False)
     for column in ("page", "sheet", "level", "provenance", "viewports", "elements", "annotations"):
         table.add_column(column, justify="right" if column != "sheet" else "left")
     table.add_column("title", overflow="fold")
-    for page_index, label in sorted(report.labels.pages.items()):
+    for page_index, plannotation in sorted(report.plannotations.pages.items()):
         table.add_row(
             str(page_index),
-            label.sheet.sheet_id,
-            conformance_level(label).value,
-            label.provenance.value,
-            str(len(label.viewports or [])),
-            str(len(label.elements or [])),
-            str(len(label.annotations or [])),
-            label.sheet.title or "",
+            plannotation.sheet.sheet_id,
+            conformance_level(plannotation).value,
+            plannotation.provenance.value,
+            str(len(plannotation.viewports or [])),
+            str(len(plannotation.elements or [])),
+            str(len(plannotation.annotations or [])),
+            plannotation.sheet.title or "",
         )
     return table
 
@@ -391,18 +391,20 @@ def _summary_table(report: CarrierReport) -> Table:
 # ---------------------------------------------------------------------------
 @app.command()
 def attach(
-    pdf_in: Annotated[Path, typer.Argument(help="The drawing PDF to label.", exists=True)],
-    labels: Annotated[
+    pdf_in: Annotated[Path, typer.Argument(help="The drawing PDF to plannotate.", exists=True)],
+    plannotations_file: Annotated[
         Path,
         typer.Argument(
-            help="A page label, an array of page labels, or a sidecar document.",
+            help="A plannotation, an array of plannotations, or a sidecar document.",
             exists=True,
         ),
     ],
-    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the labelled PDF.")],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the plannotated PDF.")],
     index: Annotated[
         Path | None,
-        typer.Option("--index", help="A separate index file. Derived from the labels if omitted."),
+        typer.Option(
+            "--index", help="A separate index file. Derived from the plannotations if omitted."
+        ),
     ] = None,
     mod_date: Annotated[
         str | None,
@@ -418,27 +420,29 @@ def attach(
         bool,
         typer.Option(
             "--break-signature",
-            help="Label a signed document anyway, accepting that its signature is voided.",
+            help="Plannotate a signed document anyway, accepting that its signature is voided.",
         ),
     ] = False,
     no_compress: Annotated[
         bool,
-        typer.Option("--no-compress", help="Store the embedded labels as plain, readable JSON."),
+        typer.Option(
+            "--no-compress", help="Store the embedded plannotations as plain, readable JSON."
+        ),
     ] = False,
     as_json: Annotated[
         bool, typer.Option("--json", help="Report what was written as JSON.")
     ] = False,
 ) -> None:
-    """Attach page labels to a PDF, leaving every page exactly as it looks now."""
+    """Attach plannotations to a PDF, leaving every page exactly as it looks now."""
     moment = _resolve_mod_date(mod_date)
-    plannotations, carried_index = _load_plannotations(labels)
+    plannotations, carried_index = _load_plannotations(plannotations_file)
     if index is not None and carried_index is not None:
-        msg = f"{labels} already carries an index; pass one or the other, not both"
+        msg = f"{plannotations_file} already carries an index; pass one or the other, not both"
         raise _fail(msg)
     document_index = _load_index(index) if index is not None else carried_index
     if document_index is None:
         document_index = embed.build_index(plannotations, generator=_generator(moment))
-        _LOGGER.info("no index given; derived one from the %d label(s)", len(plannotations))
+        _LOGGER.info("no index given; derived one from the %d plannotation(s)", len(plannotations))
     try:
         report = embed.attach(
             pdf_in,
@@ -468,7 +472,7 @@ def attach(
             }
         )
         return
-    console.print(f"[bold green]labelled[/bold green] {out}")
+    console.print(f"[bold green]plannotated[/bold green] {out}")
     console.print(f"  pages    {', '.join(str(page) for page in report.page_indices)}")
     console.print(f"  files    {', '.join(report.filenames)}")
     console.print(
@@ -489,7 +493,7 @@ class LengthUnitChoice(StrEnum):
 def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not carry
     svg: Annotated[Path, typer.Argument(help="The sheet SVG.", exists=True)],
     pdf_in: Annotated[Path, typer.Argument(help="The PDF rendered from that SVG.", exists=True)],
-    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the labelled PDF.")],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the plannotated PDF.")],
     sheet_id: Annotated[str, typer.Option("--sheet-id", help="The sheet number.")],
     title: Annotated[str | None, typer.Option("--title", help="The sheet title.")] = None,
     ifc: Annotated[
@@ -508,13 +512,15 @@ def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not 
         str | None,
         typer.Option("--mod-date", help="ISO 8601 timestamp; SOURCE_DATE_EPOCH, then now."),
     ] = None,
-    as_json: Annotated[bool, typer.Option("--json", help="Print the label as JSON.")] = False,
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Print the plannotation as JSON.")
+    ] = False,
 ) -> None:
-    """Label a PDF from the IfcOpenShell SVG it was rendered from.
+    """Plannotate a PDF from the IfcOpenShell SVG it was rendered from.
 
     Every product's GlobalId and class, and every view's paper-to-model transform, are
     read from the markers IfcOpenShell's serializer already writes into the SVG, so the
-    label is authored, at level L2. This is what the Bonsai operator runs.
+    plannotation is authored, at level L2. This is what the Bonsai operator runs.
 
     Raises:
         typer.Exit: With 1 when the SVG cannot be read or does not match the PDF.
@@ -535,16 +541,17 @@ def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not 
             source = SheetSource(
                 sheet_id=sheet_id, unit_scale_to_m=scale, length_unit=unit.value, title=title
             )
-        label = attach_from_svg(svg, pdf_in, out, source, mod_date=moment)
+        plannotation = attach_from_svg(svg, pdf_in, out, source, mod_date=moment)
     except (PlannotationError, ValueError) as exc:
         raise _fail(str(exc)) from exc
     if as_json:
-        typer.echo(canonical_json(label), nl=False)
+        typer.echo(canonical_json(plannotation), nl=False)
         return
-    console.print(f"[bold green]labelled[/bold green] {out}")
+    console.print(f"[bold green]plannotated[/bold green] {out}")
     console.print(
-        f"  {len(label.elements or [])} element(s) in {len(label.viewports or [])} viewport(s); "
-        f"level {conformance_level(label).value}"
+        f"  {len(plannotation.elements or [])} element(s) in "
+        f"{len(plannotation.viewports or [])} viewport(s); "
+        f"level {conformance_level(plannotation).value}"
     )
 
 
@@ -555,7 +562,7 @@ def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not 
 def read(
     source: Annotated[
         Path,
-        typer.Argument(help="A labelled PDF, or a sidecar JSON file.", exists=True),
+        typer.Argument(help="A plannotated PDF, or a sidecar JSON file.", exists=True),
     ],
     page: Annotated[
         int | None,
@@ -563,47 +570,47 @@ def read(
     ] = None,
     as_json: Annotated[
         bool,
-        typer.Option("--json", help="Write the labels to standard output as JSON."),
+        typer.Option("--json", help="Write the plannotations to standard output as JSON."),
     ] = False,
     lenient: Annotated[
         bool,
         typer.Option(
             "--lenient",
-            help="Skip labels that do not validate instead of failing, as a reader must.",
+            help="Skip plannotations that do not validate instead of failing, as a reader must.",
         ),
     ] = False,
 ) -> None:
-    """Read the labels a document carries, from either carrier."""
+    """Read the plannotations a document carries, from either carrier."""
     report = _carrier(source, strict=not lenient)
-    labels = report.labels
-    if labels.is_empty:
+    plannotations = report.plannotations
+    if plannotations.is_empty:
         msg = (
             f"{source} carries no Plannotation data. `plannotation attach` puts some there; "
-            "a document that was never labelled is not an error, only empty"
+            "a document that was never plannotated is not an error, only empty"
         )
         raise _fail(msg)
-    if page is not None and page not in labels.pages:
-        listed = ", ".join(str(index) for index in sorted(labels.pages)) or "none"
-        msg = f"page {page} carries no label; labelled page(s): {listed}"
+    if page is not None and page not in plannotations.pages:
+        listed = ", ".join(str(index) for index in sorted(plannotations.pages)) or "none"
+        msg = f"page {page} carries no plannotation; plannotated page(s): {listed}"
         raise _fail(msg)
 
     if as_json:
         if page is not None:
-            typer.echo(canonical_json(labels.pages[page]), nl=False)
+            typer.echo(canonical_json(plannotations.pages[page]), nl=False)
             return
-        typer.echo(canonical_json(labels.to_sidecar()), nl=False)
+        typer.echo(canonical_json(plannotations.to_sidecar()), nl=False)
         return
 
     console.print(f"[bold]{source}[/bold]")
     console.print(f"  carrier {_carrier_line(report)}")
-    console.print(f"  index   {_index_line(labels.index)}")
+    console.print(f"  index   {_index_line(plannotations.index)}")
     if page is None:
         console.print(_summary_table(report))
         console.print(f"  files   {', '.join(report.filenames)}")
         return
     console.print(_summary_table(report))
     console.print()
-    typer.echo(canonical_json(labels.pages[page]), nl=False)
+    typer.echo(canonical_json(plannotations.pages[page]), nl=False)
 
 
 # ---------------------------------------------------------------------------
@@ -611,7 +618,7 @@ def read(
 # ---------------------------------------------------------------------------
 @app.command()
 def strip(
-    pdf_in: Annotated[Path, typer.Argument(help="The labelled PDF.", exists=True)],
+    pdf_in: Annotated[Path, typer.Argument(help="The plannotated PDF.", exists=True)],
     out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the stripped PDF.")],
     as_json: Annotated[
         bool, typer.Option("--json", help="Report what was removed as JSON.")
@@ -665,20 +672,20 @@ def sidecar(
         Path | None,
         typer.Option("--out", "-o", help="Where to write it. Defaults to X.plannotation.json."),
     ] = None,
-    labels: Annotated[
+    plannotations_file: Annotated[
         Path | None,
         typer.Option(
-            "--labels",
+            "--plannotations",
             help=(
-                "Labels for a PDF that does not carry any -- a signed document, say. "
-                "Read from the PDF itself when omitted."
+                "Plannotations for a PDF that does not carry any -- a signed document, "
+                "say. Read from the PDF itself when omitted."
             ),
             exists=True,
         ),
     ] = None,
     index: Annotated[
         Path | None,
-        typer.Option("--index", help="An index to write with --labels. Derived if omitted."),
+        typer.Option("--index", help="An index to write with --plannotations. Derived if omitted."),
     ] = None,
     mod_date: Annotated[
         str | None,
@@ -692,20 +699,20 @@ def sidecar(
     moment = _resolve_mod_date(mod_date)
     plannotations: list[Plannotation] | None = None
     document_index: PlannotationIndex | None = None
-    if labels is not None:
-        plannotations, carried_index = _load_plannotations(labels)
+    if plannotations_file is not None:
+        plannotations, carried_index = _load_plannotations(plannotations_file)
         if index is not None and carried_index is not None:
-            msg = f"{labels} already carries an index; pass one or the other, not both"
+            msg = f"{plannotations_file} already carries an index; pass one or the other, not both"
             raise _fail(msg)
         document_index = _load_index(index) if index is not None else carried_index
     elif index is not None:
-        msg = "--index only makes sense with --labels"
+        msg = "--index only makes sense with --plannotations"
         raise _fail(msg)
     try:
         written = embed.write_sidecar(
             pdf_in,
             out,
-            labels=plannotations,
+            plannotations=plannotations,
             index=document_index,
             generator=_generator(moment),
         )
@@ -727,7 +734,7 @@ def sidecar(
         return
     console.print(f"[bold green]wrote[/bold green] {written}")
     console.print(
-        f"  {len(written_plannotations.pages)} page label(s), {written.stat().st_size} bytes; "
+        f"  {len(written_plannotations.pages)} plannotation(s), {written.stat().st_size} bytes; "
         "the PDF was not modified"
     )
 
@@ -740,7 +747,7 @@ def validate(
     source: Annotated[
         Path,
         typer.Argument(
-            help="A labelled PDF, a sidecar, a page label, an array of them, or an index.",
+            help="A plannotated PDF, a sidecar, a plannotation, an array of them, or an index.",
             exists=True,
         ),
     ],
@@ -771,12 +778,12 @@ def validate(
         ),
     ] = False,
 ) -> None:
-    """Validate a label against the schema, the page, its own references and a model.
+    """Validate a plannotation against the schema, the page, its own references and a model.
 
     Exits 0 when there are no errors, 1 when there are, and 2 when the input could not
     be validated at all -- it is not a Plannotation document, or a check that was asked
-    for could not be made. A label with warnings and no errors is conforming and exits
-    0; pass --strict to hold it to the SHOULDs as well.
+    for could not be made. A plannotation with warnings and no errors is conforming and
+    exits 0; pass --strict to hold it to the SHOULDs as well.
     """
     try:
         result = run_validation(source, ifc_model=ifc, strict=strict, run_verapdf=verapdf)
@@ -838,7 +845,7 @@ def samples_build(
         ),
     ] = False,
 ) -> None:
-    """Build the sample drawings: model, sheet, PDF, labels and ground truth.
+    """Build the sample drawings: model, sheet, PDF, plannotations and ground truth.
 
     Each set is written from its IFC model every time, so the drawings cannot drift
     from the code that makes them. The output is reproducible: rebuild it tomorrow and
@@ -876,17 +883,17 @@ def samples_build(
 def inspect(
     source: Annotated[
         Path,
-        typer.Argument(help="A labelled PDF, a sidecar, or a labels file.", exists=True),
+        typer.Argument(help="A plannotated PDF, a sidecar, or a plannotations file.", exists=True),
     ],
     page: Annotated[
         int | None,
         typer.Option("--page", help="Show one page by its zero-based index."),
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", help="Emit the labels as JSON instead of a table.")
+        bool, typer.Option("--json", help="Emit the plannotations as JSON instead of a table.")
     ] = False,
 ) -> None:
-    """Show what a labelled document says, as a table.
+    """Show what a plannotated document says, as a table.
 
     The same information the single-file inspector draws over the page, for a terminal
     and for a pipe. Where the browser shows where things are, this shows what they are.
@@ -894,10 +901,10 @@ def inspect(
     Raises:
         typer.Exit: With 2 when the document cannot be read.
     """
-    # Read leniently, so that one unreadable label among several does not hide the
-    # rest (SPEC 4.3 (2)). But a document that yields nothing at all may be a document
-    # with no labels or one this reader could not parse, and those are different
-    # answers: the strict read is what tells them apart.
+    # Read leniently, so that one unreadable plannotation among several does not hide
+    # the rest (SPEC 4.3 (2)). But a document that yields nothing at all may be a
+    # document with no plannotations or one this reader could not parse, and those are
+    # different answers: the strict read is what tells them apart.
     try:
         found = embed.read(source, strict=False)
         if not found.pages:
@@ -908,9 +915,9 @@ def inspect(
 
     pages = dict(sorted(found.pages.items()))
     if page is not None:
-        pages = {index: label for index, label in pages.items() if index == page}
+        pages = {index: plannotation for index, plannotation in pages.items() if index == page}
         if not pages:
-            errors.print(f"[bold red]error[/bold red] page {page} carries no label")
+            errors.print(f"[bold red]error[/bold red] page {page} carries no plannotation")
             raise typer.Exit(2)
 
     if json_output:
@@ -918,41 +925,42 @@ def inspect(
             {
                 "source": str(source),
                 "pages": {
-                    str(index): json.loads(canonical_json(label)) for index, label in pages.items()
+                    str(index): json.loads(canonical_json(plannotation))
+                    for index, plannotation in pages.items()
                 },
             }
         )
         return
 
     if not pages:
-        console.print("[yellow]no Plannotation labels found[/yellow]")
+        console.print("[yellow]no plannotations found[/yellow]")
         return
 
-    for index, label in pages.items():
-        _print_page(index, label)
+    for index, plannotation in pages.items():
+        _print_page(index, plannotation)
 
 
-def _print_page(index: int, label: Plannotation) -> None:
-    """Print one page label as a set of tables.
+def _print_page(index: int, plannotation: Plannotation) -> None:
+    """Print one plannotation as a set of tables.
 
     Args:
         index: The zero-based page index.
-        label: The label to print.
+        plannotation: The plannotation to print.
     """
-    sheet = label.sheet
+    sheet = plannotation.sheet
     scale = f"1:{sheet.scale:.0f}" if sheet.scale else "—"
     console.print(
         f"\n[bold]page {index}[/bold]  "
         f"[cyan]{sheet.sheet_id}[/cyan] {sheet.title or ''}  "
-        f"[dim]{scale} - {label.page.width_mm:g} x {label.page.height_mm:g} mm - "
-        f"{conformance_level(label).value} - {label.provenance.value}[/dim]"
+        f"[dim]{scale} - {plannotation.page.width_mm:g} x {plannotation.page.height_mm:g} mm - "
+        f"{conformance_level(plannotation).value} - {plannotation.provenance.value}[/dim]"
     )
     for title, rows, columns in (
         (
             "viewports",
             [
                 (vp.local_id, vp.kind, f"1:{vp.scale:.0f}" if vp.scale else "—", vp.name or "")
-                for vp in label.viewports or []
+                for vp in plannotation.viewports or []
             ],
             ("id", "kind", "scale", "name"),
         ),
@@ -960,7 +968,7 @@ def _print_page(index: int, label: Plannotation) -> None:
             "elements",
             [
                 (el.local_id, el.ifc_class, el.tag or "", el.name or "", el.ifc_guid or "")
-                for el in label.elements or []
+                for el in plannotation.elements or []
             ],
             ("id", "ifcClass", "tag", "name", "GlobalId"),
         ),
@@ -973,7 +981,7 @@ def _print_page(index: int, label: Plannotation) -> None:
                     an.text or "",
                     _link_of(an),
                 )
-                for an in label.annotations or []
+                for an in plannotation.annotations or []
             ],
             ("id", "type", "text", "links to"),
         ),
@@ -1020,9 +1028,10 @@ def _link_of(annotation: Annotation) -> str:
 @app.command()
 def infer(
     source: Annotated[
-        Path, typer.Argument(help="An unlabelled PDF to reconstruct labels for.", exists=True)
+        Path,
+        typer.Argument(help="An unplannotated PDF to reconstruct plannotations for.", exists=True),
     ],
-    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the labelled copy.")],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Where to write the plannotated copy.")],
     ifc: Annotated[
         Path | None,
         typer.Option(
@@ -1045,7 +1054,7 @@ def infer(
         bool, typer.Option("--json", help="Report what was inferred as JSON.")
     ] = False,
 ) -> None:
-    """Reconstruct labels for a legacy PDF and write a labelled copy.
+    """Reconstruct plannotations for a legacy PDF and write a plannotated copy.
 
     Reads what is printed on each page -- the title block, grid bubbles, dimensions,
     marks and callouts -- and records what it finds as ``inferred``, each item with a

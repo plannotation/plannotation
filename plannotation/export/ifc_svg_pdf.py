@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The authored exporter: a model in, a labelled drawing out.
+"""The authored exporter: a model in, a plannotated drawing out.
 
 Every value this writes is computed from the model, which is what makes the output
 ``authored`` rather than ``inferred`` (SPEC 4.6). A dimension's value is the distance
@@ -11,14 +11,14 @@ cross-section is the ``Reference`` of its common property set. Nothing here read
 drawing to find out what the drawing says.
 
 The model's length unit is read from the model, never assumed: ``model.lengthUnit``,
-``paperToPlane``, ``plane`` and ``cutHeight`` are all in it (SPEC 3.5), and a label that
-named one unit while the file used another would put every coordinate a factor of a
-thousand out.
+``paperToPlane``, ``plane`` and ``cutHeight`` are all in it (SPEC 3.5), and a
+plannotation that named one unit while the file used another would put every coordinate
+a factor of a thousand out.
 
 The sheet is composed rather than rendered whole: the serializer draws the building --
 a plan cut, or a vertical section -- and this module puts a frame, a title block, grid
 lines and bubbles, level marks, dimensions, tags and a callout around it. Those are
-the parts a label has something to say about, and a sample without them would
+the parts a plannotation has something to say about, and a sample without them would
 exercise nothing beyond L2.
 """
 
@@ -151,8 +151,8 @@ class SheetSpec:
         grids: The grid lines to draw and dimension between.
         callout_to: The sheet the callout points at.
         drawing_type: What kind of drawing this is. It is stated rather than assumed:
-            a position plan labelled as an architectural plan is a false statement
-            about the sheet, and it is exactly the one inference caught.
+            a plannotation calling a position plan an architectural plan makes a false
+            statement about the sheet, and it is exactly the one inference caught.
         discipline: The discipline the drawing belongs to.
     """
 
@@ -171,12 +171,12 @@ class ExportedSheet:
 
     Attributes:
         svg: The composed sheet.
-        label: The page label describing it.
+        plannotation: The plannotation describing it.
         ground_truth: Questions with answers taken from the model.
     """
 
     svg: str
-    label: Plannotation
+    plannotation: Plannotation
     ground_truth: tuple[Question, ...]
 
 
@@ -254,7 +254,7 @@ def export_sheet(
         page_size: A key of :data:`plannotation.export.sheet.PAPER_SIZES`.
 
     Returns:
-        The composed sheet, its label, and its ground truth.
+        The composed sheet, its plannotation, and its ground truth.
 
     Raises:
         ExportError: If the view draws no element.
@@ -332,7 +332,7 @@ def export_sheet(
             else None
         ),
     )
-    label = Plannotation(
+    plannotation = Plannotation(
         plannotation=SCHEMA_VERSION,
         generator=Generator(name="plannotation", version=generator_version),
         provenance=Provenance.AUTHORED,
@@ -358,8 +358,8 @@ def export_sheet(
     )
     return ExportedSheet(
         svg=sheet.render(),
-        label=label,
-        ground_truth=tuple(_ground_truth(label, spec.sheet_id, spec.grids)),
+        plannotation=plannotation,
+        ground_truth=tuple(_ground_truth(plannotation, spec.sheet_id, spec.grids)),
     )
 
 
@@ -1142,25 +1142,25 @@ def _draw_title_block(
 # Ground truth
 # ---------------------------------------------------------------------------
 def _ground_truth(
-    label: Plannotation, sheet_id: str, grids: tuple[GridAxis, ...]
+    plannotation: Plannotation, sheet_id: str, grids: tuple[GridAxis, ...]
 ) -> list[Question]:
     """Derive questions whose answers come from the model, not from the drawing.
 
     Every question but one kind is about what the sheet shows, so a reader of the
-    page alone can in principle answer it; the label is meant to make that easier,
-    not possible. The exception is the GlobalId of a marked element: only the label
-    carries it, and those questions say so with ``requiresPlannotation``.
+    page alone can in principle answer it; the plannotation is meant to make that
+    easier, not possible. The exception is the GlobalId of a marked element: only the
+    plannotation carries it, and those questions say so with ``requiresPlannotation``.
 
     Args:
-        label: The page label.
+        plannotation: The sheet's plannotation.
         sheet_id: The sheet number.
         grids: The grid lines.
 
     Returns:
         One question per fact worth asking about, in a stable order.
     """
-    elements = label.elements or []
-    annotations = label.annotations or []
+    elements = plannotation.elements or []
+    annotations = plannotation.annotations or []
     drawn = {element.ifc_class for element in elements}
     questions: list[Question] = [
         {
@@ -1179,7 +1179,7 @@ def _ground_truth(
             "sheet": sheet_id,
             "category": "sheet",
             "question": f"What is the drawing scale of sheet {sheet_id}? Answer as 1:n.",
-            "answer": label.sheet.scale,
+            "answer": plannotation.sheet.scale,
         },
         {
             "sheet": sheet_id,
@@ -1188,7 +1188,7 @@ def _ground_truth(
                 f"What kind of drawing is sheet {sheet_id}? Answer with one of: "
                 f"{', '.join(_DRAWING_TYPES)}."
             ),
-            "answer": label.sheet.drawing_type,
+            "answer": plannotation.sheet.drawing_type,
         },
     ]
     questions += _dimension_questions(annotations, sheet_id)
@@ -1356,22 +1356,22 @@ def write_sample(
     """Write one complete sample set.
 
     Args:
-        exported: The composed sheet and its label.
+        exported: The composed sheet and its plannotation.
         built: The model it was drawn from.
         out_dir: The directory to write into, which is created.
         mod_date: The timestamp to stamp, so the output is reproducible.
         inkscape_fallback: Convert with Inkscape when CairoSVG cannot run.
 
     Returns:
-        The labelled PDF's path.
+        The plannotated PDF's path.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "sheet.svg").write_text(exported.svg, encoding="utf-8")
     plannotations_path = out_dir / "plannotations.json"
-    plannotations_path.write_text(canonical_json(exported.label), encoding="utf-8")
+    plannotations_path.write_text(canonical_json(exported.plannotation), encoding="utf-8")
 
-    width = exported.label.page.width_mm
-    height = exported.label.page.height_mm
+    width = exported.plannotation.page.width_mm
+    height = exported.plannotation.page.height_mm
     plain = svg_to_pdf(
         exported.svg,
         out_dir / "sheet.pdf",
@@ -1380,9 +1380,9 @@ def write_sample(
         mod_date=mod_date,
         inkscape_fallback=inkscape_fallback,
     )
-    labelled = out_dir / "sheet.plannotated.pdf"
-    index = embed.build_index([exported.label])
-    embed.attach(plain, [exported.label], index, labelled, mod_date=mod_date)
+    plannotated = out_dir / "sheet.plannotated.pdf"
+    index = embed.build_index([exported.plannotation])
+    embed.attach(plain, [exported.plannotation], index, plannotated, mod_date=mod_date)
 
     (out_dir / "groundtruth.jsonl").write_text(
         "".join(
@@ -1393,4 +1393,4 @@ def write_sample(
     )
     if built.path.resolve() != (out_dir / "model.ifc").resolve():
         (out_dir / "model.ifc").write_bytes(built.path.read_bytes())
-    return labelled
+    return plannotated

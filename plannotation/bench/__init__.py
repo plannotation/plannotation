@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Measure what a page label is worth to a model reading a drawing.
+"""Measure what a plannotation is worth to a model reading a drawing.
 
 The benchmark asks a model questions about the sample sheets under two conditions
 that differ in one thing only:
 
 ``plain``
     The page rendered at 150 dpi, and the text extracted from it.
-``labelled``
-    The same, followed by the page's Plannotation label, supplied as the result of a
+``plannotated``
+    The same, followed by the page's plannotation, supplied as the result of a
     ``get_plannotation`` tool call -- the way an MCP host would hand it over.
 
 Every answer comes from the model the drawing was exported from, never from reading

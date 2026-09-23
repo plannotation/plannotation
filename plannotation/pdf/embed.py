@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 """Write and read Plannotation data in a PDF, without changing how the PDF looks.
 
-This module is the project's central claim in code: a label can be attached to a
-drawing, and taken off again, without the drawing changing. Everything here is
+This module is the project's central claim in code: a plannotation can be attached
+to a drawing, and taken off again, without the drawing changing. Everything here is
 arranged around that.
 
-What a labelled document carries
---------------------------------
-For each labelled page, one embedded file named ``plannotation-pNNNN.json``
+What a plannotated document carries
+-----------------------------------
+For each plannotated page, one embedded file named ``plannotation-pNNNN.json``
 (:func:`plannotation.constants.plannotation_filename`) holding
-:func:`plannotation.model.canonical_bytes` of the page label, with ``/Subtype``
+:func:`plannotation.model.canonical_bytes` of the page's plannotation, with ``/Subtype``
 ``application/json``, ``/AFRelationship /Data`` and a ``/Desc``. The file is listed
 in that page's ``/AF`` array **and** in the document's ``EmbeddedFiles`` name tree.
 One further embedded file, ``plannotation-index.json``, holds the document-level index
@@ -35,20 +35,20 @@ own declaration. Rendering any page of the output is bit-identical to rendering 
 same page of the input (:mod:`plannotation.pdf.render` is where that is asserted).
 
 The file's bytes necessarily change. qpdf rewrites a document in full, so object
-numbers are renumbered and the ``/ID`` changes; a labelled PDF is never a byte-wise
+numbers are renumbered and the ``/ID`` changes; a plannotated PDF is never a byte-wise
 superset of its input. The guarantee is about the page, not about the file.
 
 What this reader will decode, and what it will not
 --------------------------------------------------
-An embedded label and the catalog's XMP packet arrive from the same untrusted file, so
-both are read under a bound -- :data:`_MAX_PLANNOTATION_BYTES` and :data:`_MAX_XMP_BYTES` --
-and both are decoded here rather than by the PDF library: a single ``/FlateDecode``,
-inflated incrementally, with its ``/DecodeParms`` predictor applied to output that is
-already inside the bound. Any other filter chain is refused, by name. Section 4.3 (7)
-of the specification requires a reader to bound what it spends, and a bound applied
-after the library has decoded the stream is not a bound at all, because the document
-chooses the filter. A label this reader will not decode is a label that is absent
-(4.3 (2)).
+An embedded plannotation and the catalog's XMP packet arrive from the same untrusted
+file, so both are read under a bound -- :data:`_MAX_PLANNOTATION_BYTES` and
+:data:`_MAX_XMP_BYTES` -- and both are decoded here rather than by the PDF library: a
+single ``/FlateDecode``, inflated incrementally, with its ``/DecodeParms`` predictor
+applied to output that is already inside the bound. Any other filter chain is refused,
+by name. Section 4.3 (7) of the specification requires a reader to bound what it
+spends, and a bound applied after the library has decoded the stream is not a bound at
+all, because the document chooses the filter. A plannotation this reader will not
+decode is a plannotation that is absent (4.3 (2)).
 
 The predictor parameters are part of that input and are checked before they are used:
 ``/Predictor``, ``/Colors``, ``/BitsPerComponent`` and ``/Columns`` must each be an
@@ -207,7 +207,7 @@ NS_PDFA_EXTENSION: Final = "http://www.aiim.org/pdfa/ns/extension/"
 #: The parts of PDF/A whose conformance a bare PDF Declaration puts at risk.
 _PDFA_EXTENSION_PARTS: Final = frozenset({1, 2, 3})
 
-#: How far a label's page dimensions may differ from the page it is attached to
+#: How far a plannotation's page dimensions may differ from the page it is attached to
 #: before :func:`attach` refuses, in millimetres. The specification's geometric
 #: tolerance (section 4.4) is the same 0.5 mm.
 PAGE_DIMENSION_TOLERANCE_MM: Final = 0.5
@@ -218,11 +218,11 @@ PAGE_DIMENSION_TOLERANCE_MM: Final = 0.5
 #: Anchored with ``\A`` and ``\Z`` and never with ``^`` and ``$``. In Python's dialect
 #: ``$`` also matches immediately *before* a trailing newline, so ``^...$`` accepted
 #: ``"plannotation-p0000.json\n"`` -- a name a document is free to write and which is not
-#: one of Plannotation's. The consequences ran both ways: :func:`attach` refused to label a
-#: document over a file it did not own, and :func:`strip` deleted that file. Section 3
-#: of the specification already notes this difference between Python ``re`` and the Rust
-#: engine pydantic validates with, which has no such rule; ``\Z`` means the same thing
-#: in both.
+#: one of Plannotation's. The consequences ran both ways: :func:`attach` refused to
+#: plannotate a document over a file it did not own, and :func:`strip` deleted that file.
+#: Section 3 of the specification already notes this difference between Python ``re``
+#: and the Rust engine pydantic validates with, which has no such rule; ``\Z`` means the
+#: same thing in both.
 _PLANNOTATION_FILENAME: Final = re.compile(r"\Aplannotation-p\d{4}\.json\Z")
 
 #: An upper bound on the form-field nodes the signature walk will visit. The field
@@ -230,25 +230,25 @@ _PLANNOTATION_FILENAME: Final = re.compile(r"\Aplannotation-p\d{4}\.json\Z")
 #: the specification requires a reader to bound what it spends.
 _MAX_FIELD_NODES: Final = 10_000
 
-#: An upper bound on the bytes one embedded label may decompress to, for the same
-#: reason. Section 4.3 (7) and section 9 are normative: a reader must bound what it
-#: spends parsing, and must treat a label it will not accept as absent.
+#: An upper bound on the bytes one embedded plannotation may decompress to, for the
+#: same reason. Section 4.3 (7) and section 9 are normative: a reader must bound what
+#: it spends parsing, and must treat a plannotation it will not accept as absent.
 #:
-#: Sixteen mebibytes is deliberately generous. A page label is a few kilobytes -- the
+#: Sixteen mebibytes is deliberately generous. A plannotation is a few kilobytes -- the
 #: largest fixture in this repository is about one -- and a document's whole index is
 #: smaller still, so nothing legitimate comes close. Every reading function takes
-#: ``max_plannotation_bytes`` so that a caller with a genuinely enormous label is inconvenienced
-#: rather than stopped.
+#: ``max_plannotation_bytes`` so that a caller with a genuinely enormous plannotation is
+#: inconvenienced rather than stopped.
 _MAX_PLANNOTATION_BYTES: Final = 16 * 1024 * 1024
 
 #: An upper bound on the bytes the catalog's XMP packet may decompress to.
 #:
-#: The packet is the same attacker-controlled input as a label -- it arrives in the
-#: same file, from the same producer -- and it is read on every operation: to decide
-#: whether a declaration is already there, whether one could be spliced in, and what
-#: part of PDF/A the document claims. Bounding the label and not the packet bounds
-#: nothing, because a document carrying a 522 KB metadata stream that inflates to half
-#: a gibibyte is as easy to write as one carrying a label that does.
+#: The packet is the same attacker-controlled input as a plannotation -- it arrives in
+#: the same file, from the same producer -- and it is read on every operation: to
+#: decide whether a declaration is already there, whether one could be spliced in, and
+#: what part of PDF/A the document claims. Bounding the plannotation and not the packet
+#: bounds nothing, because a document carrying a 522 KB metadata stream that inflates
+#: to half a gibibyte is as easy to write as one carrying a plannotation that does.
 #:
 #: One mebibyte is generous by two orders of magnitude and deliberately far below
 #: :data:`_MAX_PLANNOTATION_BYTES`: a real packet is a few kilobytes, and the largest thing
@@ -389,9 +389,9 @@ def is_plannotation_filename(name: str) -> bool:
             gives it.
 
     Returns:
-        True for the document index and for a page label's zero-padded name. A file
-        Plannotation did not write is never removed, so this predicate is what keeps
-        :func:`strip` honest.
+        True for the document index and for the zero-padded name of a page's
+        plannotation. A file Plannotation did not write is never removed, so this
+        predicate is what keeps :func:`strip` honest.
 
     Examples:
         >>> is_plannotation_filename("plannotation-p0007.json")
@@ -522,15 +522,15 @@ def _opened(path: Path, *, allow_overwriting_input: bool = False) -> Iterator[Pd
     except pikepdf.PasswordError as exc:
         msg = (
             f"{path} is encrypted with a password, so it cannot be opened at all: {exc}. "
-            "Remove the encryption with a tool meant for it and label the result, or "
-            "write a sidecar, which does not touch the document"
+            "Remove the encryption with a tool meant for it and plannotate the result, "
+            "or write a sidecar, which does not touch the document"
         )
         raise EncryptedPdfError(msg) from exc
     except pikepdf.PikepdfError as exc:
         msg = (
             f"{path} is not a PDF this library will read: {exc}. The file is damaged "
-            "beyond what qpdf repairs, so there is nothing here to read a label out of "
-            "or to write one into"
+            "beyond what qpdf repairs, so there is nothing here to read a plannotation "
+            "out of or to write one into"
         )
         raise CarrierError(msg) from exc
 
@@ -608,7 +608,7 @@ def _validator(kind: Literal["page", "index", "sidecar"]) -> Draft202012Validato
 
     Returns:
         A draft 2020-12 validator. Compiling one costs more than validating with it,
-        and a reader opens many labels, so the validators are built once.
+        and a reader opens many plannotations, so the validators are built once.
     """
     schema = {"page": page_schema, "index": index_schema, "sidecar": sidecar_schema}[kind]()
     return Draft202012Validator(schema)
@@ -846,7 +846,7 @@ def _signed_field_names(roots: object) -> list[str]:
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class PageGeometry:
-    """The unrotated size of one page, in the terms a label uses.
+    """The unrotated size of one page, in the terms a plannotation uses.
 
     Section 3.1 of the specification defines a page as the box that is displayed and
     printed -- the ``CropBox``, falling back to the ``MediaBox`` -- and section 3.7
@@ -936,10 +936,10 @@ def _effective_rotation(page: Dictionary, page_index: int) -> int:
 
 
 def page_geometry(pdf: Pdf, page_index: int) -> PageGeometry:
-    """Measure one page the way a label must describe it.
+    """Measure one page the way a plannotation must describe it.
 
     The crop box is clipped to the media box first, as a viewer clips it, so that a
-    crop box larger than the sheet cannot inflate a label's page size.
+    crop box larger than the sheet cannot inflate a plannotation's page size.
 
     Args:
         pdf: An open document.
@@ -997,9 +997,9 @@ def page_geometry(pdf: Pdf, page_index: int) -> PageGeometry:
 #: applies the limit after the memory has been spent, which is not a limit at all.
 #: Decoding here, incrementally, is what makes it real, and Flate is the only filter
 #: worth implementing that way -- everything Plannotation writes is stored either as it is
-#: or Flate-encoded, and a JSON label arriving under LZW, RunLength or a chain of two
-#: filters is either hostile or broken. Section 4.3 (2) says what becomes of a label
-#: this reader will not accept: it is absent.
+#: or Flate-encoded, and a JSON plannotation arriving under LZW, RunLength or a chain of
+#: two filters is either hostile or broken. Section 4.3 (2) says what becomes of a
+#: plannotation this reader will not accept: it is absent.
 _FLATE_ONLY: Final = [str(Name.FlateDecode)]
 
 #: Where an oversize was noticed, which decides how the message describes it: the
@@ -1015,12 +1015,12 @@ _MEASURED_PHRASE: Final = {
     "decoded": "expands to",
 }
 
-#: What to tell someone whose *label* would not fit inside the bound.
+#: What to tell someone whose *plannotation* would not fit inside the bound.
 _PLANNOTATION_ADVICE: Final = (
-    "A Plannotation label is a few kilobytes, so this is either damage or a decompression "
+    "A plannotation is a few kilobytes, so this is either damage or a decompression "
     "bomb, and section 4.3 (7) of the specification requires a reader to bound what it "
-    "spends parsing. Pass max_plannotation_bytes to raise the limit if a label really is this "
-    "large"
+    "spends parsing. Pass max_plannotation_bytes to raise the limit if a plannotation "
+    "really is this large"
 )
 
 #: What to tell someone whose *XMP packet* would not, where there is no such parameter
@@ -1072,10 +1072,10 @@ _MAX_COLORS: Final = 32
 #: with numpy in one pass per row, or in one pass for the whole stream. Average and
 #: Paeth are not. Each reconstructed byte is an input to the next byte in the same row,
 #: so undoing them is a sequential loop in Python at roughly a tenth of a microsecond a
-#: byte, and at that rate :data:`_MAX_PLANNOTATION_BYTES` is a bound on memory and not a bound
-#: on time -- sixteen mebibytes of Paeth cost seconds, and the document chooses how many
-#: labels a reader opens. Section 4.3 (7) asks for both bounds, so the two sequential
-#: predictors get a tighter one.
+#: byte, and at that rate :data:`_MAX_PLANNOTATION_BYTES` is a bound on memory and not a
+#: bound on time -- sixteen mebibytes of Paeth cost seconds, and the document chooses how
+#: many plannotations a reader opens. Section 4.3 (7) asks for both bounds, so the two
+#: sequential predictors get a tighter one.
 #:
 #: One mebibyte is about a tenth of a second and is three orders of magnitude above any
 #: real payload. Nothing legitimately stores a JSON file under a PNG Average or Paeth
@@ -1096,7 +1096,7 @@ def _oversize(
             claim by whoever wrote the file, and is worth an early refusal and nothing
             as reassurance; the other two were measured here.
         advice: What the reader should be told to do about it, which differs between a
-            label and the document's metadata.
+            plannotation and the document's metadata.
 
     Returns:
         The error to raise. It is returned rather than raised so that the call site
@@ -1126,8 +1126,9 @@ def _unsupported_filter(source: str, filters: Sequence[str]) -> InvalidPlannotat
         "conforming writer stores an embedded file either unencoded or under a single "
         "/FlateDecode, and decoding anything else would mean handing an "
         "attacker-chosen filter chain to the PDF library and applying the bound "
-        "afterwards -- which is not a bound (section 4.3 (7) and section 9). A label "
-        "this reader will not accept is a label that is absent (section 4.3 (2))"
+        "afterwards -- which is not a bound (section 4.3 (7) and section 9). A "
+        "plannotation this reader will not accept is a plannotation that is absent "
+        "(section 4.3 (2))"
     )
     return InvalidPlannotationError(msg)
 
@@ -1196,8 +1197,8 @@ def _bounded_inflate(raw: bytes, *, limit: int, source: str, advice: str) -> byt
     msg = (
         f"{source} is stored under /FlateDecode and zlib will not decompress it, as a "
         "zlib stream or as raw deflate. The stream is damaged, and section 4.3 (2) of "
-        "the specification requires a label a reader will not accept to be treated as "
-        "absent rather than repaired"
+        "the specification requires a plannotation a reader will not accept to be "
+        "treated as absent rather than repaired"
     )
     raise InvalidPlannotationError(msg)
 
@@ -1318,8 +1319,8 @@ def _out_of_range(source: str, key: Name, value: int, allowed: str) -> InvalidPl
         f"{source} has a /DecodeParms {key} of {value}, and {allowed}. The parameters "
         "are read and checked before anything is allocated, because they are three "
         "integers the document chooses and they multiply straight into the size of the "
-        "allocation (section 4.3 (7) and section 9). A label this reader will not "
-        "accept is a label that is absent (section 4.3 (2))"
+        "allocation (section 4.3 (7) and section 9). A plannotation this reader will "
+        "not accept is a plannotation that is absent (section 4.3 (2))"
     )
     return InvalidPlannotationError(msg)
 
@@ -1586,7 +1587,7 @@ def _sequential_predictor_refusal(source: str, tag: int) -> InvalidPlannotationE
         f"PNG {name} predictor, which this reader undoes one byte at a time because each "
         "reconstructed byte is an input to the next. A cap on bytes alone would bound "
         "the memory and not the time, and section 4.3 (7) asks for both. Nothing "
-        "legitimately stores a JSON label this way: store it unencoded, or under "
+        "legitimately stores a JSON plannotation this way: store it unencoded, or under "
         "/FlateDecode with no predictor, or with /Predictor 12"
     )
     return InvalidPlannotationError(msg)
@@ -1661,8 +1662,8 @@ def _declared_length(stream: Object) -> int | None:
         in a PDF carries one -- it is how the parser found the end of the stream -- so
         this answers "how much is stored here" without copying a byte of it. The previous
         reader answered the same question with ``len(bytes(stream.read_raw_bytes()))``,
-        which copies the whole stored stream into Python first: a 256 MiB label cost
-        567 MB to find out it was too large.
+        which copies the whole stored stream into Python first: a 256 MiB plannotation
+        cost 567 MB to find out it was too large.
     """
     length = cast("object", stream.stream_dict.get(Name.Length))
     if length is None or not isinstance(length, int) or isinstance(length, bool):
@@ -1682,8 +1683,8 @@ def _bounded_stream_bytes(
     * a ``/Length`` over the bound is refused next. It is a claim about the stored size,
       like the one before it, and it is the answer the stream dictionary already holds:
       the previous reader copied the whole stored stream into a Python ``bytes`` object
-      to measure the same thing, at 567 MB for a 256 MiB label. A ``/Length`` that
-      understates the stream is caught by the measurement below instead;
+      to measure the same thing, at 567 MB for a 256 MiB plannotation. A ``/Length``
+      that understates the stream is caught by the measurement below instead;
     * stored bytes that turn out to be over the bound are refused once read. Reading them
       costs what the file itself carries -- the bytes are in the file, so a document that
       makes this expensive is a document that is itself that large -- and decoding them
@@ -1726,8 +1727,8 @@ def _bounded_stream_bytes(
     except pikepdf.PdfError as exc:
         msg = (
             f"{source} cannot be read out of the document at all: {exc}. The stream is "
-            "damaged, and section 4.3 (2) of the specification requires a label a "
-            "reader will not accept to be treated as absent"
+            "damaged, and section 4.3 (2) of the specification requires a plannotation "
+            "a reader will not accept to be treated as absent"
         )
         raise InvalidPlannotationError(msg) from exc
     if len(raw) > limit:
@@ -2165,7 +2166,7 @@ def _without_declaration(packet: bytes) -> bytes | None:
     The whole property is looked for first, because it contains the member verbatim.
     It is looked for under the subject the packet now describes and, failing that,
     under the empty subject, so that a packet which has gained an ``rdf:about`` since it
-    was labelled is still restored rather than left with a property nothing removes.
+    was plannotated is still restored rather than left with a property nothing removes.
     The sole member comes next, and takes the ``rdf:Bag`` that was expanded to hold it
     back to the self-closing spelling it had before.
 
@@ -2295,7 +2296,7 @@ def _unreadable_packet() -> DeclarationError:
     """Build the error raised for a document whose XMP will not be read.
 
     Returns:
-        The error. A writer that carried on here would produce a labelled document
+        The error. A writer that carried on here would produce a plannotated document
         with no declaration in it, which section 6.2.1 (4) requires and which a reader
         looking only at metadata would never find; and it would have to decide what to
         do with a packet it never saw. Refusing says both things at once.
@@ -2303,10 +2304,10 @@ def _unreadable_packet() -> DeclarationError:
     msg = (
         "the document's XMP metadata could not be read inside the bound this reader "
         f"places on it ({_MAX_XMP_BYTES} bytes), so the PDF Declaration of section 6.3 "
-        "cannot be added to it and Plannotation will not write a labelled document "
+        "cannot be added to it and Plannotation will not write a plannotated document "
         "without one. The packet is either damaged or hostile: a real one is a few "
-        "kilobytes. Write a sidecar instead (`plannotation sidecar this.pdf --labels "
-        "plannotations.json`), which does not touch the document at all"
+        "kilobytes. Write a sidecar instead (`plannotation sidecar this.pdf "
+        "--plannotations plannotations.json`), which does not touch the document at all"
     )
     return DeclarationError(msg)
 
@@ -2344,7 +2345,7 @@ def _can_splice(packet: _Packet) -> None:
 
     :func:`attach_in_place` writes the embedded files, the ``/AF`` arrays and the name
     tree before it adds the declaration. Discovering only then that the packet cannot
-    take one would leave the caller's open document half-labelled, so the question is
+    take one would leave the caller's open document half-plannotated, so the question is
     asked first, beside the other refusals and before anything is written.
 
     Args:
@@ -2449,7 +2450,7 @@ def _remove_declaration(packet: _Packet) -> bool:
 def _drop_plannotation_packet(pdf: Pdf, packet: _Packet) -> bool:
     """Delete an XMP packet that Plannotation created and that now says nothing.
 
-    A document that had no metadata before being labelled must have none after being
+    A document that had no metadata before being plannotated must have none after being
     stripped: an empty packet is a trace of Plannotation, and the point of
     :func:`strip` is to leave none. Only a packet byte-identical to the one
     :func:`add_declaration` synthesises is removed, so a packet anything else has
@@ -2494,7 +2495,7 @@ def _embed_file(
 
     ``/Params /Size`` and ``/CheckSum`` are computed once, at construction, from the
     plaintext, and are never recomputed. That is why the stream is compressed
-    afterwards rather than before: the checksum stays the MD5 of the label as the
+    afterwards rather than before: the checksum stays the MD5 of the plannotation as the
     format requires, while the stored bytes are small enough that the whole document
     can be saved without compressing anything else.
 
@@ -2554,11 +2555,11 @@ def _append_af(owner: Object, spec: Object) -> None:
 
 
 def _page_description(page_index: int) -> str:
-    """Return the ``/Desc`` of a page label's embedded file.
+    """Return the ``/Desc`` of the embedded file holding a page's plannotation.
 
     The page number is the zero-based PDF page index, the same number that appears in
-    the filename and in the label's own ``page.index``. The design brief does not say
-    which counting to use; one of the two has to be chosen, and a description that
+    the filename and in the plannotation's own ``page.index``. The design brief does not
+    say which counting to use; one of the two has to be chosen, and a description that
     disagreed with the filename beside it in the attachment pane would be worse than
     one that counts from zero.
 
@@ -2568,7 +2569,7 @@ def _page_description(page_index: int) -> str:
     Returns:
         The description text.
     """
-    return f"Plannotation {SCHEMA_VERSION} label for page {page_index}"
+    return f"Plannotation {SCHEMA_VERSION} for page {page_index}"
 
 
 def save_plannotated(pdf: Pdf, path: Path | str) -> None:
@@ -2583,8 +2584,8 @@ def save_plannotated(pdf: Pdf, path: Path | str) -> None:
       no pixels, which is exactly why the appearance test cannot catch it.
     * ``compress_streams=False`` -- the default Flate-encodes a page's previously
       uncompressed content stream, so its raw bytes change although its meaning does
-      not. Streams that arrived compressed stay compressed either way, and the label
-      streams are compressed by hand, so this costs almost nothing.
+      not. Streams that arrived compressed stay compressed either way, and the
+      plannotation streams are compressed by hand, so this costs almost nothing.
     * ``deterministic_id=True`` -- the default ``/ID`` is seeded from the clock, and
       two identical runs would produce different files.
 
@@ -2616,64 +2617,68 @@ def save_plannotated(pdf: Pdf, path: Path | str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Building an index and a sidecar from page labels
+# Building an index and a sidecar from plannotations
 # ---------------------------------------------------------------------------
-def _shared_model(labels: Sequence[Plannotation]) -> Model | None:
-    """Return the source model every label agrees on, if there is one.
+def _shared_model(plannotations: Sequence[Plannotation]) -> Model | None:
+    """Return the source model every plannotation agrees on, if there is one.
 
     Args:
-        labels: The page labels of one document.
+        plannotations: The plannotations of one document.
 
     Returns:
-        The common :class:`~plannotation.model.Model`, or None when the labels name
-        different models or none at all. Nothing is merged or guessed: a document
+        The common :class:`~plannotation.model.Model`, or None when the plannotations
+        name different models or none at all. Nothing is merged or guessed: a document
         whose pages came from two models has no single source model, and saying so is
         the truthful answer.
     """
-    models = [label.source_model for label in labels if label.source_model is not None]
-    if len(models) != len(labels) or not models:
+    models = [
+        plannotation.source_model
+        for plannotation in plannotations
+        if plannotation.source_model is not None
+    ]
+    if len(models) != len(plannotations) or not models:
         return None
     first = canonical_json(models[0])
     return models[0] if all(canonical_json(model) == first for model in models[1:]) else None
 
 
 def build_index(
-    labels: Iterable[Plannotation],
+    plannotations: Iterable[Plannotation],
     *,
     generator: Generator | None = None,
     with_filenames: bool = True,
 ) -> PlannotationIndex:
-    """Derive a document-level index from the page labels it describes.
+    """Derive a document-level index from the plannotations it describes.
 
-    Nothing is invented. Every value is copied from a label: the sheet number, title
-    and revision from ``sheet``, the conformance level computed from the label
-    itself, the filename from the page index, the provenance aggregated over the
-    pages exactly as section 4.6.4 of the specification requires, and the source
-    model only where every page agrees on one.
+    Nothing is invented. Every value is copied from a plannotation: the sheet number,
+    title and revision from ``sheet``, the conformance level computed from the
+    plannotation itself, the filename from the page index, the provenance aggregated
+    over the pages exactly as section 4.6.4 of the specification requires, and the
+    source model only where every page agrees on one.
 
     Args:
-        labels: The page labels of one document, in any order.
+        plannotations: The plannotations of one document, in any order.
         generator: The tool to record as having written the index, if any.
         with_filenames: Whether to record each entry's embedded filename. True for a
             PDF, where the file exists; False for a sidecar, where naming a file that
             is not there would mislead a reader.
 
     Returns:
-        An index listing every label given, ascending by page index.
+        An index listing every plannotation given, ascending by page index.
     """
-    ordered = sorted(labels, key=lambda label: label.page.index)
+    ordered = sorted(plannotations, key=lambda plannotation: plannotation.page.index)
     entries = [
         IndexPage(
-            pageIndex=label.page.index,
-            sheetId=label.sheet.sheet_id,
-            title=label.sheet.title,
-            revision=label.sheet.revision,
-            level=conformance_level(label),
-            file=plannotation_filename(label.page.index) if with_filenames else None,
+            pageIndex=plannotation.page.index,
+            sheetId=plannotation.sheet.sheet_id,
+            title=plannotation.sheet.title,
+            revision=plannotation.sheet.revision,
+            level=conformance_level(plannotation),
+            file=plannotation_filename(plannotation.page.index) if with_filenames else None,
         )
-        for label in ordered
+        for plannotation in ordered
     ]
-    provenance = aggregate_provenance(label.provenance for label in ordered)
+    provenance = aggregate_provenance(plannotation.provenance for plannotation in ordered)
     return PlannotationIndex(
         plannotation=SCHEMA_VERSION,
         generator=generator,
@@ -2684,7 +2689,7 @@ def build_index(
 
 
 def build_sidecar(
-    labels: Iterable[Plannotation],
+    plannotations: Iterable[Plannotation],
     index: PlannotationIndex | None = None,
     *,
     generator: Generator | None = None,
@@ -2692,17 +2697,17 @@ def build_sidecar(
     """Assemble the sidecar document for one PDF.
 
     Args:
-        labels: Every page label of the document.
-        index: The document's index. When None, one is derived from the labels with
-            :func:`build_index`, since a program holding every label can always say
-            what is labelled.
+        plannotations: Every plannotation of the document.
+        index: The document's index. When None, one is derived from the plannotations
+            with :func:`build_index`, since a program holding every plannotation can
+            always say what is plannotated.
         generator: The tool to record as having written the sidecar file.
 
     Returns:
         The sidecar, with its pages ascending by page index so that two runs over the
-        same labels produce the same bytes.
+        same plannotations produce the same bytes.
     """
-    ordered = sorted(labels, key=lambda label: label.page.index)
+    ordered = sorted(plannotations, key=lambda plannotation: plannotation.page.index)
     return Sidecar(
         plannotation=SCHEMA_VERSION,
         generator=generator,
@@ -2734,15 +2739,15 @@ class AttachReport:
     """What :func:`attach` wrote.
 
     Attributes:
-        page_indices: The zero-based pages that were labelled, ascending.
+        page_indices: The zero-based pages that were plannotated, ascending.
         filenames: The embedded files that were written, in the order written, the
             index last when there is one.
         index_written: Whether a document-level index was embedded.
         declaration_added: Whether the XMP PDF Declaration was added. False when the
             document already carried one.
-        pdf_version: The document's PDF version, unchanged by labelling.
+        pdf_version: The document's PDF version, unchanged by plannotating.
         pdfa_part: The part of PDF/A the input claimed conformance to, or None when it
-            claimed none. Labelling never changes it.
+            claimed none. Plannotating never changes it.
         pdfa_extension_schema_missing: Whether the output's PDF Declaration is a
             property that the document's PDF/A part requires an XMP extension schema
             for and does not have. True only for parts 1, 2 and 3; part 4 dropped
@@ -2759,126 +2764,129 @@ class AttachReport:
     pdfa_extension_schema_missing: bool
 
 
-def _plannotations_by_page(labels: Iterable[Plannotation]) -> dict[int, Plannotation]:
-    """Key the labels by the page each one claims.
+def _plannotations_by_page(plannotations: Iterable[Plannotation]) -> dict[int, Plannotation]:
+    """Key the plannotations by the page each one claims.
 
     Args:
-        labels: The labels to attach.
+        plannotations: The plannotations to attach.
 
     Returns:
-        The labels keyed by ``page.index``, which is where each one goes. The page a
-        label describes is stated in the label, so a caller cannot staple a label to
-        the wrong page by passing the list in the wrong order.
+        The plannotations keyed by ``page.index``, which is where each one goes. The
+        page a plannotation describes is stated in the plannotation, so a caller cannot
+        staple a plannotation to the wrong page by passing the list in the wrong order.
 
     Raises:
-        ValueError: If there are no labels at all.
-        PlannotationMismatchError: If two labels claim the same page.
+        ValueError: If there are no plannotations at all.
+        PlannotationMismatchError: If two plannotations claim the same page.
     """
     by_page: dict[int, Plannotation] = {}
-    for label in labels:
-        page_index = label.page.index
+    for plannotation in plannotations:
+        page_index = plannotation.page.index
         if page_index in by_page:
             msg = (
-                f"two labels claim page {page_index}; a page carries at most one "
-                "label, and page.index is what says which page a label belongs to"
+                f"two plannotations claim page {page_index}; a page carries at most one "
+                "plannotation, and page.index is what says which page a plannotation "
+                "belongs to"
             )
             raise PlannotationMismatchError(msg)
-        by_page[page_index] = label
+        by_page[page_index] = plannotation
     if not by_page:
-        msg = "no labels were given, so there is nothing to attach"
+        msg = "no plannotations were given, so there is nothing to attach"
         raise ValueError(msg)
     return by_page
 
 
 def check_plannotations_against(
-    pdf: Pdf, labels: Iterable[Plannotation]
+    pdf: Pdf, plannotations: Iterable[Plannotation]
 ) -> dict[int, Plannotation]:
-    """Check a set of labels against the document they describe.
+    """Check a set of plannotations against the document they describe.
 
     This is the check :func:`attach` makes before it writes anything, exposed so that
     a writer which is not going to touch the document -- :func:`write_sidecar` on a
     signed PDF, say -- can make exactly the same one.
 
     Args:
-        pdf: The document the labels describe.
-        labels: The page labels. Each describes the page its ``page.index`` names.
+        pdf: The document the plannotations describe.
+        plannotations: The plannotations. Each describes the page its ``page.index``
+            names.
 
     Returns:
-        The labels keyed by page index.
+        The plannotations keyed by page index.
 
     Raises:
-        ValueError: If there are no labels at all.
-        PlannotationMismatchError: If two labels claim one page, or a label names a page the
-            document does not have, or its dimensions or rotation disagree with that
-            page.
+        ValueError: If there are no plannotations at all.
+        PlannotationMismatchError: If two plannotations claim one page, or a plannotation
+            names a page the document does not have, or its dimensions or rotation
+            disagree with that page.
     """
-    by_page = _plannotations_by_page(labels)
+    by_page = _plannotations_by_page(plannotations)
     _check_pages(pdf, by_page)
     return by_page
 
 
 def _check_pages(pdf: Pdf, by_page: dict[int, Plannotation]) -> None:
-    """Check every label against the page it claims.
+    """Check every plannotation against the page it claims.
 
-    A label that misstates its page is worse than no label: a reader that trusts it
-    reads geometry against the wrong sheet. Rather than write one, :func:`attach`
-    refuses and says which number disagrees with which.
+    A plannotation that misstates its page is worse than no plannotation: a reader that
+    trusts it reads geometry against the wrong sheet. Rather than write one,
+    :func:`attach` refuses and says which number disagrees with which.
 
     Args:
-        pdf: The document being labelled.
-        by_page: The labels, keyed by the page each claims.
+        pdf: The document being plannotated.
+        by_page: The plannotations, keyed by the page each claims.
 
     Raises:
-        PlannotationMismatchError: If a label names a page the document does not have, or
-            its page dimensions differ from that page's by more than
+        PlannotationMismatchError: If a plannotation names a page the document does not
+            have, or its page dimensions differ from that page's by more than
             :data:`PAGE_DIMENSION_TOLERANCE_MM`, or its rotation differs from the
             page's ``/Rotate``.
     """
     page_count = len(pdf.pages)
-    for page_index, label in sorted(by_page.items()):
+    for page_index, plannotation in sorted(by_page.items()):
         if page_index >= page_count:
             msg = (
-                f"the label for page {page_index} cannot be attached to a document of "
-                f"{page_count} page(s); page.index is a zero-based index into this document"
+                f"the plannotation for page {page_index} cannot be attached to a document "
+                f"of {page_count} page(s); page.index is a zero-based index into this "
+                "document"
             )
             raise PlannotationMismatchError(msg)
         geometry = page_geometry(pdf, page_index)
-        _check_one_page(label, geometry)
+        _check_one_page(plannotation, geometry)
 
 
-def _check_one_page(label: Plannotation, geometry: PageGeometry) -> None:
-    """Compare one label's page block with the page itself.
+def _check_one_page(plannotation: Plannotation, geometry: PageGeometry) -> None:
+    """Compare one plannotation's page block with the page itself.
 
     Args:
-        label: The label being attached.
+        plannotation: The plannotation being attached.
         geometry: The measured page, from :func:`page_geometry`.
 
     Raises:
         PlannotationMismatchError: If the dimensions or the rotation disagree.
     """
     index = geometry.page_index
-    width_off = abs(label.page.width_mm - geometry.width_mm)
-    height_off = abs(label.page.height_mm - geometry.height_mm)
+    width_off = abs(plannotation.page.width_mm - geometry.width_mm)
+    height_off = abs(plannotation.page.height_mm - geometry.height_mm)
     if max(width_off, height_off) > PAGE_DIMENSION_TOLERANCE_MM:
         swapped = (
-            " -- the label's width and height look swapped, which is what happens when"
-            " a rotated page is measured as it is displayed rather than as it is stored"
-            if abs(label.page.width_mm - geometry.height_mm) <= PAGE_DIMENSION_TOLERANCE_MM
-            and abs(label.page.height_mm - geometry.width_mm) <= PAGE_DIMENSION_TOLERANCE_MM
+            " -- the plannotation's width and height look swapped, which is what happens"
+            " when a rotated page is measured as it is displayed rather than as it is stored"
+            if abs(plannotation.page.width_mm - geometry.height_mm) <= PAGE_DIMENSION_TOLERANCE_MM
+            and abs(plannotation.page.height_mm - geometry.width_mm) <= PAGE_DIMENSION_TOLERANCE_MM
             else ""
         )
         msg = (
-            f"the label for page {index} says the page is "
-            f"{label.page.width_mm:g} x {label.page.height_mm:g} mm, but its "
+            f"the plannotation for page {index} says the page is "
+            f"{plannotation.page.width_mm:g} x {plannotation.page.height_mm:g} mm, but its "
             f"{geometry.box_source} is {geometry.width_mm:g} x {geometry.height_mm:g} mm "
             f"(/UserUnit {geometry.user_unit:g}); paper dimensions are unrotated and "
             f"measured from the displayed box{swapped}"
         )
         raise PlannotationMismatchError(msg)
-    if label.page.effective_rotation != geometry.rotation:
+    if plannotation.page.effective_rotation != geometry.rotation:
         msg = (
-            f"the label for page {index} records rotation "
-            f"{label.page.effective_rotation}, but the page's /Rotate is "
+            f"the plannotation for page {index} records rotation "
+            f"{plannotation.page.effective_rotation}, but the page's /Rotate is "
             f"{geometry.rotation}"
         )
         raise PlannotationMismatchError(msg)
@@ -2887,51 +2895,51 @@ def _check_one_page(label: Plannotation, geometry: PageGeometry) -> None:
 def _check_index(
     index: PlannotationIndex, by_page: dict[int, Plannotation], *, with_filenames: bool = True
 ) -> None:
-    """Check that the index describes the labels being written.
+    """Check that the index describes the plannotations being written.
 
     Args:
         index: The index to write.
-        by_page: The labels, keyed by page.
+        by_page: The plannotations, keyed by page.
         with_filenames: Whether an entry's ``file`` must name the embedded file the
-            label will be stored in. True for a PDF, where that file exists; False for
-            a sidecar, which embeds nothing, so a filename in its index describes some
+            plannotation will be stored in. True for a PDF, where that file exists; False
+            for a sidecar, which embeds nothing, so a filename in its index describes some
             other carrier rather than contradicting this one. This is the same
             distinction :func:`build_index` makes.
 
     Raises:
-        PlannotationMismatchError: If the index lists a page that is not being labelled, or
-            names an embedded file that will not exist, or records a conformance
-            level that the label does not reach.
+        PlannotationMismatchError: If the index lists a page that is not being
+            plannotated, or names an embedded file that will not exist, or records a
+            conformance level that the plannotation does not reach.
     """
     for entry in index.pages:
-        label = by_page.get(entry.page_index)
-        if label is None:
+        plannotation = by_page.get(entry.page_index)
+        if plannotation is None:
             listed = ", ".join(str(page) for page in sorted(by_page))
             msg = (
-                f"the index lists page {entry.page_index}, but no label was given for "
-                f"it; labels were given for page(s) {listed}"
+                f"the index lists page {entry.page_index}, but no plannotation was given "
+                f"for it; plannotations were given for page(s) {listed}"
             )
             raise PlannotationMismatchError(msg)
         expected_file = plannotation_filename(entry.page_index)
         if with_filenames and entry.file is not None and entry.file != expected_file:
             msg = (
-                f"the index says page {entry.page_index}'s label is in {entry.file!r}, "
-                f"but it will be embedded as {expected_file!r}"
+                f"the index says page {entry.page_index}'s plannotation is in "
+                f"{entry.file!r}, but it will be embedded as {expected_file!r}"
             )
             raise PlannotationMismatchError(msg)
-        reached = conformance_level(label)
+        reached = conformance_level(plannotation)
         if entry.level != reached:
             msg = (
                 f"the index records page {entry.page_index} as {entry.level.value}, but "
-                f"its label reaches {reached.value}"
+                f"its plannotation reaches {reached.value}"
             )
             raise PlannotationMismatchError(msg)
     missing = sorted(set(by_page) - {entry.page_index for entry in index.pages})
     if missing:
         listed = ", ".join(str(page) for page in missing)
         _LOGGER.warning(
-            "the index does not list page(s) %s although a label is being attached to "
-            "each; readers that consult only the index will not find them",
+            "the index does not list page(s) %s although a plannotation is being attached "
+            "to each; readers that consult only the index will not find them",
             listed,
         )
 
@@ -2940,12 +2948,12 @@ def _plannotation_spec_names(key: str, spec: Object) -> list[str]:
     """Return every Plannotation-owned name one name-tree entry carries.
 
     This is the single predicate that decides both what :func:`attach` refuses to
-    label over and what :func:`strip` removes, and it is one function because the two
-    must not drift apart. When they did, a file specification whose ``/UF`` was a
+    plannotate over and what :func:`strip` removes, and it is one function because the
+    two must not drift apart. When they did, a file specification whose ``/UF`` was a
     Plannotation name but which was filed under some other key was refused by
     :func:`attach` and left behind by :func:`strip`, so the document could be neither
-    labelled nor repaired and the refusal's advice -- run ``plannotation strip`` -- was
-    false.
+    plannotated nor repaired and the refusal's advice -- run ``plannotation strip`` --
+    was false.
 
     Args:
         key: The name-tree key the specification is filed under.
@@ -2974,13 +2982,13 @@ def _is_plannotation_spec(spec: Object) -> bool:
 def _existing_plannotation_files(pdf: Pdf) -> dict[str, set[str]]:
     """Find every Plannotation-owned filename the document already carries, and where.
 
-    Both registrations are scanned, because both are places a label lives and
-    :func:`read_pdf` consults both. A document whose label files are reachable only
-    from ``/AF`` -- which is what is left after a tool rebuilds the name tree -- reads
-    perfectly well, so it is a document that is already labelled.
+    Both registrations are scanned, because both are places a plannotation lives and
+    :func:`read_pdf` consults both. A document whose plannotation files are reachable
+    only from ``/AF`` -- which is what is left after a tool rebuilds the name tree --
+    reads perfectly well, so it is a document that is already plannotated.
 
     Args:
-        pdf: The document being labelled.
+        pdf: The document being plannotated.
 
     Returns:
         Each Plannotation-owned filename found, mapped to the places it was found in.
@@ -3014,17 +3022,17 @@ def _existing_plannotation_files(pdf: Pdf) -> dict[str, set[str]]:
 
 
 def _refuse_conflicts(pdf: Pdf) -> None:
-    """Refuse to label a document that already carries a Plannotation file.
+    """Refuse to plannotate a document that already carries a Plannotation file.
 
     Assigning to the attachments mapping replaces an existing file of the same name
     silently, so a foreign file called ``plannotation-index.json`` would be destroyed
     here and deleted by a later :func:`strip` as though Plannotation had written it. And a
-    file that is not in the name tree at all is not protected by that mapping: labelling
-    over it appends a second ``plannotation-p0000.json`` to the same page's ``/AF``, after
-    which :func:`read_pdf` returns whichever of the two comes first.
+    file that is not in the name tree at all is not protected by that mapping:
+    plannotating over it appends a second ``plannotation-p0000.json`` to the same page's
+    ``/AF``, after which :func:`read_pdf` returns whichever of the two comes first.
 
     Args:
-        pdf: The document being labelled.
+        pdf: The document being plannotated.
 
     Raises:
         AttachmentConflictError: If the document already carries any file Plannotation
@@ -3049,7 +3057,7 @@ def _refuse_signed(pdf: Pdf, *, break_signature: bool) -> None:
     """Refuse to rewrite a signed document unless explicitly told to.
 
     Args:
-        pdf: The document being labelled.
+        pdf: The document being plannotated.
         break_signature: Whether the caller has accepted that the signature will be
             invalidated.
 
@@ -3071,9 +3079,9 @@ def _refuse_signed(pdf: Pdf, *, break_signature: bool) -> None:
         "the signature: pikepdf and qpdf rewrite a PDF in full and cannot append an "
         "incremental update, so the bytes the signature covers cannot be preserved. "
         "Two options: write a sidecar, which does not touch the document at all "
-        "(`plannotation sidecar this.pdf --labels plannotations.json`, or "
-        "write_sidecar(..., labels=...)), or pass --break-signature "
-        "(break_signature=True) to label it anyway and void the signature"
+        "(`plannotation sidecar this.pdf --plannotations plannotations.json`, or "
+        "write_sidecar(..., plannotations=...)), or pass --break-signature "
+        "(break_signature=True) to plannotate it anyway and void the signature"
     )
     raise SignedPdfError(msg)
 
@@ -3082,42 +3090,43 @@ def _refuse_encrypted(pdf: Pdf) -> None:
     """Refuse to rewrite an encrypted document.
 
     Args:
-        pdf: The document being labelled.
+        pdf: The document being plannotated.
 
     Raises:
         EncryptedPdfError: If the document is encrypted. Saving would either drop the
             encryption or re-encrypt with parameters Plannotation chose, and neither is
-            a decision a labelling tool may take quietly; a deterministic ``/ID``
+            a decision a tool that plannotates may take quietly; a deterministic ``/ID``
             is not available for an encrypted file either.
     """
     if not pdf.is_encrypted:
         return
     msg = (
-        "this document is encrypted. Labelling it would rewrite its encryption, "
+        "this document is encrypted. Plannotating it would rewrite its encryption, "
         "which is not Plannotation's decision to make. Write a sidecar instead "
-        "(`plannotation sidecar this.pdf --labels plannotations.json`), or remove the "
-        "encryption first with a tool meant for it and label the result"
+        "(`plannotation sidecar this.pdf --plannotations plannotations.json`), or remove "
+        "the encryption first with a tool meant for it and plannotate the result"
     )
     raise EncryptedPdfError(msg)
 
 
 def attach_in_place(
     pdf: Pdf,
-    labels: Iterable[Plannotation],
+    plannotations: Iterable[Plannotation],
     index: PlannotationIndex | None = None,
     *,
     mod_date: datetime,
     break_signature: bool = False,
     compress_plannotations: bool = True,
 ) -> AttachReport:
-    """Embed labels into an open document, changing nothing else about it.
+    """Embed plannotations into an open document, changing nothing else about it.
 
     The document is modified but not saved; use :func:`save_plannotated` to write it,
     or :func:`attach`, which does both.
 
     Args:
         pdf: An open document, modified in place.
-        labels: The page labels. Each goes on the page its ``page.index`` names.
+        plannotations: The plannotations. Each goes on the page its ``page.index``
+            names.
         index: The document-level index, or None to embed none.
         mod_date: The timestamp recorded on every embedded file. Injected rather than
             read from the clock, so that the output is reproducible.
@@ -3130,11 +3139,11 @@ def attach_in_place(
         A report of what was written.
 
     Raises:
-        ValueError: If no labels were given, or ``mod_date`` is naive.
+        ValueError: If no plannotations were given, or ``mod_date`` is naive.
         EncryptedPdfError: If the document is encrypted.
         SignedPdfError: If the document is signed and ``break_signature`` is False.
-        PlannotationMismatchError: If a label contradicts its page, or the index contradicts
-            the labels.
+        PlannotationMismatchError: If a plannotation contradicts its page, or the index
+            contradicts the plannotations.
         AttachmentConflictError: If a file of the same name is already attached.
     """
     stamp = pdf_date(mod_date)
@@ -3142,7 +3151,7 @@ def attach_in_place(
     _refuse_signed(pdf, break_signature=break_signature)
     packet = _read_packet(pdf)
     _can_splice(packet)
-    by_page = check_plannotations_against(pdf, labels)
+    by_page = check_plannotations_against(pdf, plannotations)
     if index is not None:
         _check_index(index, by_page)
     _refuse_conflicts(pdf)
@@ -3152,10 +3161,10 @@ def attach_in_place(
     if index is not None:
         planned.append(INDEX_FILENAME)
 
-    for page_index, label in sorted(by_page.items()):
+    for page_index, plannotation in sorted(by_page.items()):
         spec = _embed_file(
             pdf,
-            canonical_bytes(label),
+            canonical_bytes(plannotation),
             filename=plannotation_filename(page_index),
             description=_page_description(page_index),
             mod_date=stamp,
@@ -3188,7 +3197,7 @@ def attach_in_place(
             NS_PDFD,
             pdfa_part,
         )
-    _LOGGER.info("labelled %d page(s): %s", len(by_page), ", ".join(planned))
+    _LOGGER.info("plannotated %d page(s): %s", len(by_page), ", ".join(planned))
     return AttachReport(
         page_indices=tuple(sorted(by_page)),
         filenames=tuple(planned),
@@ -3202,7 +3211,7 @@ def attach_in_place(
 
 def attach(
     pdf_in: Path | str,
-    labels: Iterable[Plannotation],
+    plannotations: Iterable[Plannotation],
     index: PlannotationIndex | None,
     pdf_out: Path | str,
     *,
@@ -3210,7 +3219,7 @@ def attach(
     break_signature: bool = False,
     compress_plannotations: bool = True,
 ) -> AttachReport:
-    """Write a labelled copy of a PDF.
+    """Write a plannotated copy of a PDF.
 
     Guarantees, all of them testable: every page of ``pdf_out`` rasterises to pixels
     identical to the same page of ``pdf_in``; no content stream, annotation, page box
@@ -3222,10 +3231,11 @@ def attach(
     qpdf rewrites the document, so object numbers and the ``/ID`` change.
 
     Args:
-        pdf_in: The document to label.
-        labels: The page labels. Each goes on the page its ``page.index`` names.
+        pdf_in: The document to plannotate.
+        plannotations: The plannotations. Each goes on the page its ``page.index``
+            names.
         index: The document-level index to embed, or None for none.
-        pdf_out: Where to write the labelled copy. May be ``pdf_in``, in which case
+        pdf_out: Where to write the plannotated copy. May be ``pdf_in``, in which case
             the input is opened for overwriting.
         mod_date: The timestamp recorded on every embedded file.
         break_signature: Proceed although the input is signed, accepting that the
@@ -3236,11 +3246,11 @@ def attach(
         A report of what was written.
 
     Raises:
-        ValueError: If no labels were given, or ``mod_date`` is naive.
+        ValueError: If no plannotations were given, or ``mod_date`` is naive.
         EncryptedPdfError: If the input is encrypted.
         SignedPdfError: If the input is signed and ``break_signature`` is False.
-        PlannotationMismatchError: If a label contradicts its page, or the index contradicts
-            the labels.
+        PlannotationMismatchError: If a plannotation contradicts its page, or the index
+            contradicts the plannotations.
         AttachmentConflictError: If a file of the same name is already attached.
     """
     source = _as_path(pdf_in)
@@ -3249,7 +3259,7 @@ def attach(
     with _opened(source, allow_overwriting_input=overwriting) as pdf:
         report = attach_in_place(
             pdf,
-            labels,
+            plannotations,
             index,
             mod_date=mod_date,
             break_signature=break_signature,
@@ -3265,27 +3275,27 @@ def attach(
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class PlannotationSet:
-    """Everything a carrier holds: the index, and the labels keyed by page.
+    """Everything a carrier holds: the index, and the plannotations keyed by page.
 
     It unpacks as a two-tuple, so the reading functions can be used exactly as the
     design brief writes them, while a caller that wants either half by name -- or the
     levels -- can ask for it instead::
 
         index, pages = read("drawings/TWP-101.pdf")
-        labels = read("drawings/TWP-101.pdf")
-        labels.pages[0].sheet.sheet_id
+        plannotations = read("drawings/TWP-101.pdf")
+        plannotations.pages[0].sheet.sheet_id
 
     A type checker gives the unpacked names the union of the two member types, so
     typed code should prefer the attributes.
 
     Attributes:
         index: The document-level index, or None when the carrier has none. A reader
-            must not conclude from a missing index that there are no labels, nor from
-            an index that every page it lists is present.
-        pages: The page labels, keyed by the **page they were found on**, not by the
+            must not conclude from a missing index that there are no plannotations, nor
+            from an index that every page it lists is present.
+        pages: The plannotations, keyed by the **page they were found on**, not by the
             ``page.index`` inside them. Section 4.5 of the specification is explicit:
-            where the two disagree the attachment is the fact and the label's own
-            number is a claim.
+            where the two disagree the attachment is the fact and the plannotation's
+            own number is a claim.
     """
 
     index: PlannotationIndex | None
@@ -3305,19 +3315,22 @@ class PlannotationSet:
         """Report whether the carrier held nothing at all.
 
         Returns:
-            True when there is neither an index nor a single page label.
+            True when there is neither an index nor a single plannotation.
         """
         return self.index is None and not self.pages
 
     @property
     def levels(self) -> dict[int, ConformanceLevel]:
-        """Return the conformance level each page label reaches.
+        """Return the conformance level each plannotation reaches.
 
         Returns:
-            One entry per label, computed from the label itself rather than taken
-            from the index, which only records what a writer claimed.
+            One entry per plannotation, computed from the plannotation itself rather
+            than taken from the index, which only records what a writer claimed.
         """
-        return {index: conformance_level(label) for index, label in sorted(self.pages.items())}
+        return {
+            index: conformance_level(plannotation)
+            for index, plannotation in sorted(self.pages.items())
+        }
 
     def to_sidecar(self, *, generator: Generator | None = None) -> Sidecar:
         """Assemble the sidecar document for this carrier's contents.
@@ -3326,17 +3339,17 @@ class PlannotationSet:
             generator: The tool to record as having written the sidecar.
 
         Returns:
-            The sidecar, carrying this index -- or one derived from the labels when
-            there is none -- and every page label, ascending by page.
+            The sidecar, carrying this index -- or one derived from the plannotations
+            when there is none -- and every plannotation, ascending by page.
 
         Raises:
             PlannotationNotFoundError: If there is nothing to write.
         """
         if self.is_empty:
-            msg = "there are no labels to write"
+            msg = "there are no plannotations to write"
             raise PlannotationNotFoundError(msg)
-        labels = [self.pages[index] for index in sorted(self.pages)]
-        return build_sidecar(labels, self.index, generator=generator)
+        plannotations = [self.pages[index] for index in sorted(self.pages)]
+        return build_sidecar(plannotations, self.index, generator=generator)
 
 
 def _spec_filename(spec: Object) -> str:
@@ -3370,8 +3383,8 @@ def _spec_bytes(spec: Object, *, limit: int, source: str) -> bytes | None:
             malformed. A file specification comes from an untrusted document and may
             hold anything under ``/EF``; reaching for a stream's members on whatever is
             there raises out of the PDF library, which reaches a person as a traceback
-            rather than as a message, and which no caller can treat as a label being
-            absent.
+            rather than as a message, and which no caller can treat as a plannotation
+            being absent.
     """
     if not isinstance(spec, Dictionary):
         return None
@@ -3407,7 +3420,8 @@ def _read_spec(spec: Object, *, limit: int, source: str, strict: bool) -> bytes 
         source: The file being read, for the message.
         strict: Whether a file this reader will not decompress is an error. When False
             it is reported and skipped, which is what section 4.3 requires of a
-            conforming reader: a label it will not accept is a label that is absent.
+            conforming reader: a plannotation it will not accept is a plannotation that
+            is absent.
 
     Returns:
         The embedded file's contents, or None when there are none or they were skipped.
@@ -3420,7 +3434,7 @@ def _read_spec(spec: Object, *, limit: int, source: str, strict: bool) -> bytes 
     except InvalidPlannotationError as exc:
         if strict:
             raise
-        _LOGGER.warning("ignoring a label this reader will not decompress: %s", exc)
+        _LOGGER.warning("ignoring a plannotation this reader will not decompress: %s", exc)
         return None
 
 
@@ -3435,7 +3449,7 @@ def _from_associated_files(
         strict: Whether a file that exceeds the bound is an error rather than absent.
 
     Returns:
-        The page label bytes keyed by the page whose ``/AF`` named them, and the
+        The plannotation bytes keyed by the page whose ``/AF`` named them, and the
         index bytes from the catalog's ``/AF`` if it names one. A None entry inside
         an ``/AF`` array is skipped rather than fatal: it is what a dangling
         reference looks like after somebody deleted an attachment.
@@ -3474,7 +3488,7 @@ def _from_name_tree(
         strict: Whether a file that exceeds the bound is an error rather than absent.
 
     Returns:
-        The page label bytes keyed by the page index in their filename, and the index
+        The plannotation bytes keyed by the page index in their filename, and the index
         bytes. This is the fallback path, needed because a producer may have written
         only one of the two registrations and a later tool may have dropped the other.
 
@@ -3497,7 +3511,8 @@ def _from_name_tree(
     ]
     if orphans:
         _LOGGER.warning(
-            "the document carries label file(s) %s for pages it does not have; ignoring them",
+            "the document carries plannotation file(s) %s for pages it does not have; "
+            "ignoring them",
             ", ".join(sorted(orphans)),
         )
     index = (
@@ -3519,8 +3534,8 @@ def read_pdf(
     """Read every Plannotation file a document carries.
 
     Page-level ``/AF`` is preferred, because it is the association the format is
-    built on and it says which page a label belongs to. The ``EmbeddedFiles`` name
-    tree is the fallback, by filename. Both are needed: a document may carry only one
+    built on and it says which page a plannotation belongs to. The ``EmbeddedFiles``
+    name tree is the fallback, by filename. Both are needed: a document may carry only one
     of them, and a reader that consulted only one would find nothing in a file that
     is perfectly readable.
 
@@ -3529,15 +3544,16 @@ def read_pdf(
 
     Args:
         pdf: An open document.
-        strict: Raise on a label that does not validate. When False, an invalid label
-            is reported and skipped, which is the behaviour section 4.3 requires of a
-            conforming reader: an invalid label is to be treated as absent.
+        strict: Raise on a plannotation that does not validate. When False, an invalid
+            plannotation is reported and skipped, which is the behaviour section 4.3
+            requires of a conforming reader: an invalid plannotation is to be treated as
+            absent.
         max_plannotation_bytes: The most one embedded file may decompress to. The default,
             :data:`_MAX_PLANNOTATION_BYTES`, is generous by three orders of magnitude; raise it
-            for a genuinely enormous label rather than going without a bound.
+            for a genuinely enormous plannotation rather than going without a bound.
 
     Returns:
-        The index and the page labels, keyed by the page they were found on.
+        The index and the plannotations, keyed by the page they were found on.
 
     Raises:
         InvalidPlannotationError: If a document does not validate or exceeds
@@ -3558,22 +3574,22 @@ def read_pdf(
     for page_index in sorted(raw_pages):
         source = f"{plannotation_filename(page_index)} (page {page_index})"
         try:
-            label = _load_model(raw_pages[page_index], "page", source, load_plannotation)
+            plannotation = _load_model(raw_pages[page_index], "page", source, load_plannotation)
         except InvalidPlannotationError as exc:
             if strict:
                 raise
-            _LOGGER.warning("ignoring an invalid label: %s", exc)
+            _LOGGER.warning("ignoring an invalid plannotation: %s", exc)
             continue
-        if label.page.index != page_index:
+        if plannotation.page.index != page_index:
             _LOGGER.warning(
-                "the label attached to page %d says it describes page %d; the "
+                "the plannotation attached to page %d says it describes page %d; the "
                 "attachment is the fact and page.index is a claim, so it is being "
                 "read as page %d",
                 page_index,
-                label.page.index,
+                plannotation.page.index,
                 page_index,
             )
-        pages[page_index] = label
+        pages[page_index] = plannotation
 
     index: PlannotationIndex | None = None
     if index_bytes is not None:
@@ -3595,8 +3611,8 @@ def read_sidecar(source: Path | str | bytes, *, strict: bool = True) -> Plannota
             sidecar reads as empty, as section 4.3 requires.
 
     Returns:
-        The index and page labels the sidecar carries, keyed by each label's own
-        ``page.index`` -- in a sidecar that number is all there is to key by.
+        The index and plannotations the sidecar carries, keyed by each plannotation's
+        own ``page.index`` -- in a sidecar that number is all there is to key by.
 
     Raises:
         InvalidPlannotationError: If the sidecar does not validate and ``strict`` is True.
@@ -3615,7 +3631,7 @@ def read_sidecar(source: Path | str | bytes, *, strict: bool = True) -> Plannota
         return PlannotationSet(index=None, pages={})
     return PlannotationSet(
         index=sidecar.index,
-        pages={label.page.index: label for label in sidecar.pages},
+        pages={plannotation.page.index: plannotation for plannotation in sidecar.pages},
     )
 
 
@@ -3640,17 +3656,17 @@ def read(
     strict: bool = True,
     max_plannotation_bytes: int = _MAX_PLANNOTATION_BYTES,
 ) -> PlannotationSet:
-    """Read labels from either carrier: a PDF, or a sidecar JSON file.
+    """Read plannotations from either carrier: a PDF, or a sidecar JSON file.
 
     Args:
         source: The document or sidecar to read.
-        strict: Raise on a label that does not validate, rather than skipping it.
+        strict: Raise on a plannotation that does not validate, rather than skipping it.
         max_plannotation_bytes: The most one embedded file in a PDF may decompress to. A
             sidecar is plain JSON on disk with nothing to expand, so this does not
             apply to one.
 
     Returns:
-        The index and the page labels.
+        The index and the plannotations.
 
     Raises:
         FileNotFoundError: If there is no such file.
@@ -3673,7 +3689,7 @@ class CarrierReport:
     Attributes:
         source: The file read.
         carrier: ``"pdf"`` or ``"sidecar"``.
-        labels: The index and page labels found.
+        plannotations: The index and plannotations found.
         declaration: Whether a PDF Declaration naming the Plannotation specification is
             present. Only a PDF can carry one.
         signature: What the document says about being signed, or None for a sidecar.
@@ -3684,7 +3700,7 @@ class CarrierReport:
 
     source: Path
     carrier: Literal["pdf", "sidecar"]
-    labels: PlannotationSet
+    plannotations: PlannotationSet
     declaration: bool
     signature: SignatureReport | None
     page_count: int | None
@@ -3697,11 +3713,11 @@ def carrier_report(
     strict: bool = True,
     max_plannotation_bytes: int = _MAX_PLANNOTATION_BYTES,
 ) -> CarrierReport:
-    """Describe a carrier: its labels, its declaration, and whether it is signed.
+    """Describe a carrier: its plannotations, its declaration, and whether it is signed.
 
     Args:
         source: The document or sidecar to examine.
-        strict: Raise on a label that does not validate, rather than skipping it.
+        strict: Raise on a plannotation that does not validate, rather than skipping it.
         max_plannotation_bytes: The most one embedded file in a PDF may decompress to.
 
     Returns:
@@ -3715,11 +3731,11 @@ def carrier_report(
     """
     path = _as_path(source)
     if not _looks_like_pdf(path):
-        labels = read_sidecar(path, strict=strict)
+        plannotations = read_sidecar(path, strict=strict)
         return CarrierReport(
             source=path,
             carrier="sidecar",
-            labels=labels,
+            plannotations=plannotations,
             declaration=False,
             signature=None,
             page_count=None,
@@ -3729,7 +3745,9 @@ def carrier_report(
         return CarrierReport(
             source=path,
             carrier="pdf",
-            labels=read_pdf(pdf, strict=strict, max_plannotation_bytes=max_plannotation_bytes),
+            plannotations=read_pdf(
+                pdf, strict=strict, max_plannotation_bytes=max_plannotation_bytes
+            ),
             declaration=has_declaration(pdf),
             signature=signature_report(pdf),
             page_count=len(pdf.pages),
@@ -3783,7 +3801,7 @@ def _clear_associations(pdf: Pdf, victims: set[tuple[int, int]]) -> int:
 
     An entry is dropped when it is one of the specifications being deleted, or when it
     names a Plannotation file by either of its two filenames -- the same predicate
-    :func:`_refuse_conflicts` refuses on, so that what cannot be labelled over can
+    :func:`_refuse_conflicts` refuses on, so that what cannot be plannotated over can
     always be removed.
 
     A specification that is being *unregistered* rather than deleted -- one shared with
@@ -3845,9 +3863,9 @@ def _prune_name_tree(pdf: Pdf) -> bool:
 
     An emptied name tree is residue of exactly the kind this module removes everywhere
     else: :func:`_clear_associations` deletes an ``/AF`` key it has emptied, and
-    :func:`_drop_plannotation_packet` deletes an XMP packet Plannotation created. A document
-    that had no attachments before it was labelled must have no ``/Names`` after it is
-    stripped.
+    :func:`_drop_plannotation_packet` deletes an XMP packet Plannotation created. A
+    document that had no attachments before it was plannotated must have no ``/Names``
+    after it is stripped.
 
     Args:
         pdf: An open document, modified in place.
@@ -3918,8 +3936,8 @@ def strip_in_place(pdf: Pdf) -> StripReport:
     What is removed is decided by :func:`_plannotation_spec_names`, which is also what
     :func:`_refuse_conflicts` refuses on. The two are one predicate on purpose: a file
     that attach will not write over and strip will not remove is a document that can be
-    neither labelled nor repaired, and the refusal's advice -- run ``plannotation strip``
-    -- would be false.
+    neither plannotated nor repaired, and the refusal's advice -- run
+    ``plannotation strip`` -- would be false.
 
     Aliasing is the exception the predicate cannot express on its own. One file
     specification may be registered in the name tree under several keys, and only some
@@ -3991,12 +4009,12 @@ def strip(pdf_in: Path | str, pdf_out: Path | str) -> StripReport:
     """Write a copy of a PDF with every trace of Plannotation removed.
 
     The output is the input without Plannotation: same pages, same pixels, same
-    annotations, same foreign attachments, same metadata. Embedded label streams that
-    nothing references any more are dropped by qpdf on save, so the label text does
-    not survive anywhere in the file.
+    annotations, same foreign attachments, same metadata. Embedded plannotation streams
+    that nothing references any more are dropped by qpdf on save, so the plannotation
+    text does not survive anywhere in the file.
 
     Args:
-        pdf_in: The labelled document.
+        pdf_in: The plannotated document.
         pdf_out: Where to write the stripped copy. May be ``pdf_in``.
 
     A signed document is stripped rather than refused -- taking Plannotation's files
@@ -4039,7 +4057,7 @@ def write_sidecar(
     pdf: Path | str,
     out: Path | str | None = None,
     *,
-    labels: Iterable[Plannotation] | None = None,
+    plannotations: Iterable[Plannotation] | None = None,
     index: PlannotationIndex | None = None,
     generator: Generator | None = None,
     strict: bool = True,
@@ -4047,48 +4065,53 @@ def write_sidecar(
     """Write the sidecar twin of a document.
 
     The sidecar carries the same payload as the embedded files -- the index and every
-    page label -- in one JSON file beside the document, for a consumer that cannot
+    plannotation -- in one JSON file beside the document, for a consumer that cannot
     read PDF attachments and for a document that must not be rewritten at all. The
     document is opened read-only and is never modified, whichever way this is called.
 
-    There are two ways to call it. With no ``labels``, the labels already embedded in
-    the document are copied out. With ``labels``, they are written for a document
-    that carries none -- which is the answer for a signed PDF, where attaching would
-    void the signature. In that case the labels are checked against the document
-    first, and the index against the labels, exactly as :func:`attach` checks them, so
-    that a sidecar cannot claim a page size the document contradicts or list a page no
-    label was given for. This is the route the signed-document refusal names, so an
-    artefact written here must be one :func:`attach` would have written from the same
-    inputs. The one relaxation is the file-name rule: a sidecar embeds nothing, so an
-    index entry naming an embedded file describes some other carrier.
+    There are two ways to call it. With no ``plannotations``, the plannotations already
+    embedded in the document are copied out. With ``plannotations``, they are written
+    for a document that carries none -- which is the answer for a signed PDF, where
+    attaching would void the signature. In that case the plannotations are checked
+    against the document first, and the index against the plannotations, exactly as
+    :func:`attach` checks them, so that a sidecar cannot claim a page size the document
+    contradicts or list a page no plannotation was given for. This is the route the
+    signed-document refusal names, so an artefact written here must be one
+    :func:`attach` would have written from the same inputs. The one relaxation is the
+    file-name rule: a sidecar embeds nothing, so an index entry naming an embedded file
+    describes some other carrier.
 
     The assembled document is validated against the packaged sidecar schema before it
     is written, so this cannot produce a file its own reader would reject.
 
     Args:
-        pdf: The document. Read for its labels, or, when ``labels`` is given, opened
-            only to check them.
+        pdf: The document. Read for its plannotations, or, when ``plannotations`` is
+            given, opened only to check them.
         out: Where to write the sidecar. Defaults to :func:`sidecar_path` of the
             document.
-        labels: The page labels to write, for a document that does not carry them.
-        index: The index to write beside them. Derived from the labels when omitted.
+        plannotations: The plannotations to write, for a document that does not carry
+            them.
+        index: The index to write beside them. Derived from the plannotations when
+            omitted.
         generator: The tool to record as having written the sidecar.
-        strict: Raise on an embedded label that does not validate, rather than
-            skipping it. Not consulted when ``labels`` is given.
+        strict: Raise on an embedded plannotation that does not validate, rather than
+            skipping it. Not consulted when ``plannotations`` is given.
 
     Returns:
         The path written.
 
     Raises:
-        PlannotationNotFoundError: If no labels were given and the document carries none.
-        PlannotationMismatchError: If a given label contradicts the page it claims.
-        InvalidPlannotationError: If a label does not validate, or -- which would be a bug
-            here -- the assembled sidecar does not.
+        PlannotationNotFoundError: If no plannotations were given and the document
+            carries none.
+        PlannotationMismatchError: If a given plannotation contradicts the page it
+            claims.
+        InvalidPlannotationError: If a plannotation does not validate, or -- which would
+            be a bug here -- the assembled sidecar does not.
     """
     source = _as_path(pdf)
-    if labels is not None:
+    if plannotations is not None:
         with _opened(source) as document:
-            by_page = check_plannotations_against(document, labels)
+            by_page = check_plannotations_against(document, plannotations)
         if index is not None:
             _check_index(index, by_page, with_filenames=False)
         sidecar = build_sidecar(by_page.values(), index, generator=generator)
@@ -4097,9 +4120,9 @@ def write_sidecar(
         if found.is_empty:
             msg = (
                 f"{source} carries no Plannotation data, so there is nothing to write a "
-                "sidecar from. Pass the labels themselves (labels=..., or "
-                "`plannotation sidecar this.pdf --labels plannotations.json`) to write a sidecar "
-                "for a document that does not carry any"
+                "sidecar from. Pass the plannotations themselves (plannotations=..., or "
+                "`plannotation sidecar this.pdf --plannotations plannotations.json`) to "
+                "write a sidecar for a document that does not carry any"
             )
             raise PlannotationNotFoundError(msg)
         sidecar = found.to_sidecar(generator=generator)
@@ -4107,5 +4130,5 @@ def write_sidecar(
     _check_schema(json.loads(data.decode("utf-8")), "sidecar", "the assembled sidecar")
     target = sidecar_path(source) if out is None else _as_path(out)
     target.write_bytes(data)
-    _LOGGER.info("wrote %s (%d page label(s))", target, len(sidecar.pages))
+    _LOGGER.info("wrote %s (%d plannotation(s))", target, len(sidecar.pages))
     return target

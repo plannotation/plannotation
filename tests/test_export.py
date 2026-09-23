@@ -145,7 +145,7 @@ class TestTheYFlip:
 
 
 class TestPaperGeometry:
-    """What a label records about where something was drawn."""
+    """What a plannotation records about where something was drawn."""
 
     def test_a_path_becomes_paper_points(self) -> None:
         """The serializer writes moves and lines; both arrive as points."""
@@ -236,7 +236,7 @@ class TestPdfConversion:
         return sheet.render(), width, height
 
     def test_an_a3_sheet_converts_to_an_a3_page(self, tmp_path: Path) -> None:
-        """An A3 that comes out 396 mm wide is not an A3, and every label on it is wrong."""
+        """An A3 that comes out 396 mm wide is not an A3, and its plannotation is wrong."""
         from plannotation.export.to_pdf import svg_to_pdf
 
         svg, width, height = self._sheet()
@@ -356,8 +356,9 @@ class TestTheSampleModel:
     def test_a_rebuilt_model_is_byte_identical(self, tmp_path: Path) -> None:
         """Every entity gets a fresh GlobalId from the API, so they are reseeded.
 
-        Without that, nothing downstream -- the SVG, the labels, the ground truth --
-        could be reproducible, and the benchmark's answers would change every run.
+        Without that, nothing downstream -- the SVG, the plannotations, the ground
+        truth -- could be reproducible, and the benchmark's answers would change every
+        run.
         """
         from plannotation.export.models import build_floorplan
 
@@ -445,8 +446,8 @@ class TestTheSampleModel:
 
         The external walls are built 240 mm thick and 6.0 and 8.0 metres long, the
         internal one 115 mm thick and 5.52 metres long. Measuring them off the drawing
-        has to give those numbers back, or the label describes a different building
-        from the one it was made from.
+        has to give those numbers back, or the plannotation describes a different
+        building from the one it was made from.
         """
         from plannotation.export.models import build_floorplan
         from plannotation.export.svg_render import render_view
@@ -484,8 +485,8 @@ class TestTheSampleModel:
 class TestTheSampleSets:
     """Design brief section 9: three sets, reproducible, and every one L3 and clean.
 
-    These are slow -- three models built, drawn, converted and labelled -- and they are
-    the only tests that exercise the whole chain at once. Everything later in the
+    These are slow -- three models built, drawn, converted and plannotated -- and they
+    are the only tests that exercise the whole chain at once. Everything later in the
     project points at them: the inspector renders them, the MCP server serves them, the
     inference pass is measured against them stripped, and the benchmark asks questions
     whose answers came from the models.
@@ -499,7 +500,7 @@ class TestTheSampleSets:
             root: Where to build them.
 
         Returns:
-            The labelled PDFs.
+            The plannotated PDFs.
         """
         from plannotation.export.samples import build_samples
 
@@ -531,18 +532,18 @@ class TestTheSampleSets:
         """
         from plannotation.validate import validate
 
-        for labelled in self._build(tmp_path):
-            report = validate(labelled)
+        for plannotated in self._build(tmp_path):
+            report = validate(plannotated)
             assert list(report.findings) == [], (
-                f"{labelled.parent.name}: {[f.code for f in report.findings]}"
+                f"{plannotated.parent.name}: {[f.code for f in report.findings]}"
             )
 
     def test_every_sample_reaches_l3(self, tmp_path: Path) -> None:
         """Section 9's gate. L3 needs elements and a linked annotation on every sheet."""
         from plannotation.validate import validate
 
-        for labelled in self._build(tmp_path):
-            assert [page.level.value for page in validate(labelled).pages] == ["L3"]
+        for plannotated in self._build(tmp_path):
+            assert [page.level.value for page in validate(plannotated).pages] == ["L3"]
 
     def test_a_rebuild_is_byte_identical(self, tmp_path: Path) -> None:
         """Section 9: reproducible. Every file, not just the deterministic-looking ones.
@@ -558,7 +559,7 @@ class TestTheSampleSets:
                 twin = second / path.relative_to(first)
                 assert path.read_bytes() == twin.read_bytes(), f"{path.name} differs"
 
-    def test_the_labelled_pdf_looks_the_same_as_the_plain_one(self, tmp_path: Path) -> None:
+    def test_the_plannotated_pdf_looks_the_same_as_the_plain_one(self, tmp_path: Path) -> None:
         """The project's central claim, on the project's own drawings."""
         from plannotation.pdf.render import assert_same_appearance
 
@@ -590,9 +591,11 @@ class TestTheSampleSets:
         self._build(tmp_path)
         targets = {}
         for name in ("floorplan", "positionsplan", "section"):
-            label = json_module.loads((tmp_path / name / "plannotations.json").read_text("utf-8"))
-            callout = next(a for a in label["annotations"] if a["type"] == "callout")
-            targets[label["sheet"]["id"]] = callout["target"]["sheetId"]
+            plannotation = json_module.loads(
+                (tmp_path / name / "plannotations.json").read_text("utf-8")
+            )
+            callout = next(a for a in plannotation["annotations"] if a["type"] == "callout")
+            targets[plannotation["sheet"]["id"]] = callout["target"]["sheetId"]
         assert targets == {"ARC-101": "TWP-201", "TWP-201": "ARC-301", "ARC-301": "ARC-101"}
 
     def test_building_one_set_by_name_builds_only_it(self, tmp_path: Path) -> None:
@@ -630,13 +633,13 @@ needs_samples = pytest.mark.skipif(
 
 
 def _sample(name: str) -> dict[str, Any]:
-    """Load one built sample's label as JSON.
+    """Load one built sample's plannotation as JSON.
 
     Args:
         name: The sample.
 
     Returns:
-        Its label.
+        Its plannotation.
     """
     return json.loads((SAMPLES / name / "plannotations.json").read_text("utf-8"))
 
@@ -660,8 +663,8 @@ class TestWhatTheDesignBriefAsksOfTheSamples:
     """Design brief section 9, sheet by sheet."""
 
     @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
-    def test_the_label_states_the_model_s_own_unit(self, name: str) -> None:
-        """A label naming metres for a millimetre model is out by a factor of a thousand."""
+    def test_the_plannotation_states_the_model_s_own_unit(self, name: str) -> None:
+        """A plannotation naming metres for a millimetre model is out by a factor of a thousand."""
         ifcopenshell = pytest.importorskip("ifcopenshell")
         from ifcopenshell.util.unit import calculate_unit_scale
 
@@ -680,53 +683,53 @@ class TestWhatTheDesignBriefAsksOfTheSamples:
 
     def test_the_floor_plan_has_doors_windows_and_a_four_by_four_grid(self) -> None:
         """(a) walls, doors, windows, one storey, grid A-D / 1-4."""
-        label = _sample("floorplan")
-        classes = sorted(e["ifcClass"] for e in label["elements"])
+        plannotation = _sample("floorplan")
+        classes = sorted(e["ifcClass"] for e in plannotation["elements"])
         assert classes.count("IfcDoor") == 2
         assert classes.count("IfcWindow") == 2
-        grids = sorted(a["axis"] for a in label["annotations"] if a["type"] == "grid")
+        grids = sorted(a["axis"] for a in plannotation["annotations"] if a["type"] == "grid")
         assert grids == ["1", "2", "3", "4", "A", "B", "C", "D"]
 
     def test_the_position_plan_numbers_every_member_and_states_its_section(self) -> None:
         """(b) columns, beams, a slab, every one tagged Pos. n with its cross-section."""
-        label = _sample("positionsplan")
-        elements = label["elements"]
+        plannotation = _sample("positionsplan")
+        elements = plannotation["elements"]
         assert {e["ifcClass"] for e in elements} == {"IfcColumn", "IfcBeam", "IfcSlab"}
         assert sorted(int(e["tag"].split()[-1]) for e in elements) == list(range(1, 17))
         shown = {
             a["shows"]["element"]: a["text"]
-            for a in label["annotations"]
+            for a in plannotation["annotations"]
             if a["type"] == "text" and a["shows"]["property"].endswith(".Reference")
         }
         assert {shown[e["id"]] for e in elements} == {"30/30", "30/75", "d = 25 cm"}
 
     def test_the_slab_below_the_cut_is_a_projection(self) -> None:
         """Drawn beyond the cut, and said to be; and written where an SVG reader finds it."""
-        label = _sample("positionsplan")
-        slab = next(e for e in label["elements"] if e["ifcClass"] == "IfcSlab")
+        plannotation = _sample("positionsplan")
+        slab = next(e for e in plannotation["elements"] if e["ifcClass"] == "IfcSlab")
         assert slab["representation"] == "projection"
         svg = (SAMPLES / "positionsplan" / "sheet.svg").read_text("utf-8")
         assert f'ifc:guid="{slab["ifcGuid"]}"' in svg
-        cut = {e["representation"] for e in label["elements"] if e["ifcClass"] != "IfcSlab"}
+        cut = {e["representation"] for e in plannotation["elements"] if e["ifcClass"] != "IfcSlab"}
         assert cut == {"cut"}
 
     def test_the_section_is_a_vertical_cut_with_levels(self) -> None:
         """(c) two storeys and their levels, on a plane that stands up."""
-        label = _sample("section")
-        (viewport,) = label["viewports"]
+        plannotation = _sample("section")
+        (viewport,) = plannotation["viewports"]
         assert viewport["kind"] == "section"
         assert viewport["plane"]["yAxis"] == [0, 0, 1]
-        levels = [a for a in label["annotations"] if a["type"] == "level"]
+        levels = [a for a in plannotation["annotations"] if a["type"] == "level"]
         assert sorted(a["elevation"] for a in levels) == [0, 3, 6]
         assert all(a.get("ifcGuid") for a in levels)
 
     def test_each_level_mark_stands_at_its_elevation(self) -> None:
         """A level's box centre, taken through the viewport, is the height it prints."""
-        label = _sample("section")
-        (viewport,) = label["viewports"]
+        plannotation = _sample("section")
+        (viewport,) = plannotation["viewports"]
         a, b, c, d, e, f = viewport["paperToPlane"]
         plane = viewport["plane"]
-        for level in (x for x in label["annotations"] if x["type"] == "level"):
+        for level in (x for x in plannotation["annotations"] if x["type"] == "level"):
             x0, y0, x1, y1 = level["paperBBox"]
             x, y = (x0 + x1) / 2.0, (y0 + y1) / 2.0
             u, v = a * x + c * y + e, b * x + d * y + f
@@ -736,17 +739,19 @@ class TestWhatTheDesignBriefAsksOfTheSamples:
     @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
     def test_no_mark_sits_on_another_mark_or_on_an_element(self, name: str) -> None:
         """A mark on a cut wall is black on black; two marks on each other are neither."""
-        label = _sample(name)
-        marks = [a["paperBBox"] for a in label["annotations"] if a["type"] in ("tag", "text")]
+        plannotation = _sample(name)
+        marks = [
+            a["paperBBox"] for a in plannotation["annotations"] if a["type"] in ("tag", "text")
+        ]
         content = (
-            min(e["paperBBox"][0] for e in label["elements"]),
-            min(e["paperBBox"][1] for e in label["elements"]),
-            max(e["paperBBox"][2] for e in label["elements"]),
-            max(e["paperBBox"][3] for e in label["elements"]),
+            min(e["paperBBox"][0] for e in plannotation["elements"]),
+            min(e["paperBBox"][1] for e in plannotation["elements"]),
+            max(e["paperBBox"][2] for e in plannotation["elements"]),
+            max(e["paperBBox"][3] for e in plannotation["elements"]),
         )
         small = [
             e["paperBBox"]
-            for e in label["elements"]
+            for e in plannotation["elements"]
             if not (
                 (e["paperBBox"][2] - e["paperBBox"][0]) > 0.5 * (content[2] - content[0])
                 and (e["paperBBox"][3] - e["paperBBox"][1]) > 0.5 * (content[3] - content[1])
@@ -758,13 +763,13 @@ class TestWhatTheDesignBriefAsksOfTheSamples:
             height = min(p[3], q[3]) - max(p[1], q[1])
             return max(0.0, width) * max(0.0, height)
 
-        tags = [a for a in label["annotations"] if a["type"] == "tag"]
+        tags = [a for a in plannotation["annotations"] if a["type"] == "tag"]
         for tag in tags:
             others = [m for m in marks if m is not tag["paperBBox"]]
             reference = next(
                 (
                     a["paperBBox"]
-                    for a in label["annotations"]
+                    for a in plannotation["annotations"]
                     if a["type"] == "text" and a["shows"]["element"] == tag["shows"]["element"]
                 ),
                 None,

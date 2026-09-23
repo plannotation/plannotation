@@ -120,13 +120,13 @@ class TestTheReadingTools:
     """Every read-only tool, on the samples."""
 
     def test_list_sheets_finds_all_three(self, root: Path) -> None:
-        """One labelled sheet per sample, with its level."""
+        """One plannotated sheet per sample, with its level."""
         result = call(ServerConfig(root=root), "list_sheets", path=".")
         sheets = {sheet["sheetId"]: sheet for sheet in result["sheets"]}
         assert set(sheets) == {"ARC-101", "TWP-201", "ARC-301"}
         assert all(sheet["level"] == "L3" for sheet in sheets.values())
 
-    def test_get_label_returns_the_whole_label(self, root: Path) -> None:
+    def test_get_plannotation_returns_the_whole_plannotation(self, root: Path) -> None:
         """Exactly what the carrier holds."""
         result = call(
             ServerConfig(root=root),
@@ -134,12 +134,12 @@ class TestTheReadingTools:
             pdf="floorplan/sheet.plannotated.pdf",
             page=0,
         )
-        assert result["label"]["sheet"]["id"] == "ARC-101"
-        assert len(result["label"]["elements"]) == 9
+        assert result["plannotation"]["sheet"]["id"] == "ARC-101"
+        assert len(result["plannotation"]["elements"]) == 9
 
-    def test_get_label_on_an_unlabelled_page_says_so(self, root: Path) -> None:
-        """And names the pages that are labelled, so the next call can be right."""
-        with pytest.raises(RuntimeError, match="carries no label"):
+    def test_get_plannotation_on_an_unplannotated_page_says_so(self, root: Path) -> None:
+        """And names the pages that are plannotated, so the next call can be right."""
+        with pytest.raises(RuntimeError, match="carries no plannotation"):
             call(
                 ServerConfig(root=root),
                 "get_plannotation",
@@ -234,8 +234,8 @@ class TestReadOnlyByDefault:
 class TestWritingWhenAllowed:
     """With --allow-write, both writing tools work on the samples."""
 
-    def test_attach_writes_a_labelled_copy(self, root: Path) -> None:
-        """Labels from plannotations.json onto the unlabelled sheet."""
+    def test_attach_writes_a_plannotated_copy(self, root: Path) -> None:
+        """Plannotations from plannotations.json onto the unplannotated sheet."""
         config = ServerConfig(root=root, allow_write=True)
         result = call(
             config,
@@ -247,7 +247,7 @@ class TestWritingWhenAllowed:
         assert result["written"] == "floorplan/attached.pdf"
         assert (root / "floorplan" / "attached.pdf").exists()
 
-    def test_infer_writes_a_labelled_copy(self, root: Path) -> None:
+    def test_infer_writes_a_plannotated_copy(self, root: Path) -> None:
         """And reports what it found."""
         config = ServerConfig(root=root, allow_write=True)
         result = call(config, "infer", pdf="positionsplan/sheet.pdf", out="inferred.pdf")

@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Turn the SVG the serializer drew into the paper geometry a label records.
+"""Turn the SVG the serializer drew into the paper geometry a plannotation records.
 
-A product group holds one or more ``d`` attributes in SVG user units, y down. A label
-records a ``paperBBox`` and optional ``paperOutlines`` in paper millimetres, y up, with
-the origin at the bottom-left of the sheet (SPEC 3.1, 3.3). The conversion is the y-flip
-and, when the view has been placed on a sheet, the wrapper transform that placed it.
+A product group holds one or more ``d`` attributes in SVG user units, y down. A
+plannotation records a ``paperBBox`` and optional ``paperOutlines`` in paper millimetres,
+y up, with the origin at the bottom-left of the sheet (SPEC 3.1, 3.3). The conversion is
+the y-flip and, when the view has been placed on a sheet, the wrapper transform that
+placed it.
 
 Paths are parsed with ``svgelements`` rather than by reading the ``d`` string directly.
 The serializer writes only moves and lines today, and a regular expression over ``M``

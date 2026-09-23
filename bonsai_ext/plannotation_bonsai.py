@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Blender add-on: attach a Plannotation page label to a sheet PDF that Bonsai produced.
+"""Blender add-on: attach a plannotation to a sheet PDF that Bonsai produced.
 
 Bonsai draws with IfcOpenShell's SVG serializer, so every sheet SVG it writes already
 carries each product's GlobalId and class and each view's paper-to-model transform.
 This operator reads those from the sheet SVG, takes the units and marks from the IFC
-model Bonsai has open, and attaches the resulting page label to the sheet's PDF. The
-PDF looks and prints exactly as before; the label is an attachment.
+model Bonsai has open, and attaches the resulting plannotation to the sheet's PDF. The
+PDF looks and prints exactly as before; the plannotation is an attachment.
 
 All of the work is done by ``plannotation.svg.derive``, which is tested in Plannotation's own
 CI against the serializer's output. This file is only the Blender side: two operators,
@@ -30,14 +30,14 @@ bl_info = {
     "author": "The Plannotation Authors",
     "version": (0, 1, 0),
     "blender": (4, 2, 0),
-    "location": "File > Export > Plannotation: Attach to Sheet PDF",
-    "description": "Attach a Plannotation page label to a sheet PDF produced by Bonsai",
+    "location": "File > Export > Plannotate sheet PDF",
+    "description": "Attach a plannotation to a sheet PDF produced by Bonsai",
     "category": "Import-Export",
 }
 
 logger = logging.getLogger(__name__)
 
-#: Suffix of the labelled copy written beside the sheet PDF.
+#: Suffix of the plannotated copy written beside the sheet PDF.
 PLANNOTATED_SUFFIX = ".plannotated.pdf"
 
 
@@ -129,7 +129,7 @@ def sheet_files(model_path, identification):
 
 
 def plannotated_path(pdf):
-    """Return where the labelled copy of a PDF goes.
+    """Return where the plannotated copy of a PDF goes.
 
     Args:
         pdf: The sheet PDF.
@@ -141,18 +141,18 @@ def plannotated_path(pdf):
 
 
 def plannotate_sheet(svg, pdf, out, *, sheet_id, title, model):
-    """Attach a label to one sheet PDF. The only place Plannotation is called.
+    """Attach a plannotation to one sheet PDF. The only place Plannotation is called.
 
     Args:
         svg: The sheet SVG Bonsai wrote.
         pdf: The PDF Bonsai rendered from it.
-        out: Where to write the labelled copy.
+        out: Where to write the plannotated copy.
         sheet_id: The sheet number.
         title: The sheet title.
         model: The open IFC model, for units, schema and marks.
 
     Returns:
-        The label that was attached.
+        The plannotation that was attached.
     """
     from plannotation.svg.derive import attach_from_svg, source_from_model  # noqa: PLC0415
 
@@ -167,16 +167,16 @@ def plannotate_sheet(svg, pdf, out, *, sheet_id, title, model):
 # Operators
 # ---------------------------------------------------------------------------
 class PLANNOTATION_OT_attach_to_sheet(bpy.types.Operator):  # noqa: N801 -- Blender's naming
-    """Attach a Plannotation page label to a sheet PDF produced by Bonsai."""
+    """Attach a plannotation to a sheet PDF produced by Bonsai."""
 
     bl_idname = "plannotation.attach_to_sheet"
-    bl_label = "Attach Plannotation to Sheet PDF"
+    bl_label = "Plannotate sheet PDF"
     bl_options = {"REGISTER"}
 
     svg_path: bpy.props.StringProperty(name="Sheet SVG", subtype="FILE_PATH")
     pdf_path: bpy.props.StringProperty(name="Sheet PDF", subtype="FILE_PATH")
     out_path: bpy.props.StringProperty(
-        name="Labelled PDF",
+        name="Plannotated PDF",
         subtype="FILE_PATH",
         description="Leave blank to write <sheet>.plannotated.pdf beside the sheet PDF",
     )
@@ -209,7 +209,7 @@ class PLANNOTATION_OT_attach_to_sheet(bpy.types.Operator):  # noqa: N801 -- Blen
             self.layout.prop(self, name)
 
     def execute(self, context):  # noqa: ARG002 -- Blender's signature
-        """Attach the label, reporting any problem in Blender's status bar."""
+        """Attach the plannotation, reporting any problem in Blender's status bar."""
         try:
             import plannotation  # noqa: F401, PLC0415 -- checks the package is installed
         except ImportError:
@@ -231,26 +231,26 @@ class PLANNOTATION_OT_attach_to_sheet(bpy.types.Operator):  # noqa: N801 -- Blen
         pdf = Path(bpy.path.abspath(self.pdf_path))
         out = Path(bpy.path.abspath(self.out_path)) if self.out_path else plannotated_path(pdf)
         try:
-            label = plannotate_sheet(
+            doc = plannotate_sheet(
                 svg, pdf, out, sheet_id=self.sheet_id, title=self.title, model=model
             )
         except (PlannotationError, OSError, ValueError) as error:
             self.report({"ERROR"}, f"Plannotation: {error}")
             return {"CANCELLED"}
-        count = len(label.elements or [])
-        self.report({"INFO"}, f"Labelled {out.name}: {count} element(s)")
+        count = len(doc.elements or [])
+        self.report({"INFO"}, f"Plannotated {out.name}: {count} element(s)")
         return {"FINISHED"}
 
 
 class PLANNOTATION_OT_create_sheets_and_attach(bpy.types.Operator):  # noqa: N801
-    """Create the active sheet with Bonsai, then attach its Plannotation label."""
+    """Create the active sheet with Bonsai, then attach its plannotation."""
 
     bl_idname = "plannotation.create_sheets_and_attach"
-    bl_label = "Create Sheet and Attach Plannotation"
+    bl_label = "Create and plannotate sheet"
     bl_options = {"REGISTER"}
 
     def execute(self, context):  # noqa: ARG002 -- Blender's signature
-        """Run Bonsai's own sheet creation, then label what it wrote."""
+        """Run Bonsai's own sheet creation, then plannotate what it wrote."""
         create = getattr(getattr(bpy.ops, "bim", None), "create_sheets", None)
         if create is None:
             self.report({"ERROR"}, "Bonsai's Create Sheets operator is not available")
@@ -263,9 +263,7 @@ class PLANNOTATION_OT_create_sheets_and_attach(bpy.types.Operator):  # noqa: N80
 
 def menu_entry(self, context):  # noqa: ARG001 -- Blender's signature
     """Add the operator to File > Export."""
-    self.layout.operator(
-        PLANNOTATION_OT_attach_to_sheet.bl_idname, text="Plannotation: Attach to Sheet PDF"
-    )
+    self.layout.operator(PLANNOTATION_OT_attach_to_sheet.bl_idname, text="Plannotate sheet PDF")
 
 
 CLASSES = (PLANNOTATION_OT_attach_to_sheet, PLANNOTATION_OT_create_sheets_and_attach)

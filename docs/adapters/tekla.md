@@ -8,9 +8,9 @@ arrangement drawings are. API names are from the Tekla Open API
 (`Tekla.Structures.Drawing`, `Tekla.Structures.Model`); check them against the version
 you build for.
 
-## Where each part of a label comes from
+## Where each part of a plannotation comes from
 
-| Label | Tekla Open API |
+| Plannotation | Tekla Open API |
 | --- | --- |
 | `sheet` | `DrawingHandler.GetActiveDrawing()` or `GetDrawings()` → `Drawing`: `Drawing.Mark` (the drawing number), `Drawing.Name`, `Drawing.Title1`–`Title3` |
 | `page.widthMm`, `heightMm` | `Drawing.Layout.SheetSize` |
@@ -19,7 +19,7 @@ you build for.
 | `viewport.scale` | `View.Attributes.Scale` |
 | `viewport.plane` | `View.DisplayCoordinateSystem` (origin, x axis, y axis in model coordinates) |
 | `elements[]` | `View.GetAllObjects(typeof(Part))` → drawing `Part` objects |
-| `element.ifcGuid` | `Part.ModelIdentifier` → `new Model().SelectModelObject(identifier)` → `ModelObject.Identifier.GUID`, a `Guid` encoded to 22 characters as `plannotation.svg.carrier.guid_from_uuid` does. Tekla's IFC export uses the same GUID, so the label and an IFC export agree |
+| `element.ifcGuid` | `Part.ModelIdentifier` → `new Model().SelectModelObject(identifier)` → `ModelObject.Identifier.GUID`, a `Guid` encoded to 22 characters as `plannotation.svg.carrier.guid_from_uuid` does. Tekla's IFC export uses the same GUID, so the plannotation and an IFC export agree |
 | `element.ifcClass` | Tekla's IFC export mapping for the part (beam, column, plate, slab), or the part's IFC entity setting where one is set |
 | `element.tag` | The part or assembly position: `ModelObject.GetReportProperty("ASSEMBLY_POS", ref value)` or `"PART_POS"` |
 | `tag` annotations | `Mark` objects; `Mark.GetRelatedObjects()` gives the marked part, so `shows.element` is exact, not guessed |
@@ -51,7 +51,7 @@ the model's length unit. `plane` is the display coordinate system's origin and a
 A small .NET console application against the Open API, run with Tekla open:
 
 1. For each selected drawing, collect the sheet, views, parts, marks and dimensions as
-   above, and write one label per drawing as JSON, with `provenance: "authored"`.
+   above, and write one plannotation per drawing as JSON, with `provenance: "authored"`.
 2. Print the drawing to PDF.
 3. Run `plannotation attach` and `plannotation validate`.
 

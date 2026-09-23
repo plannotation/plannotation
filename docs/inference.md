@@ -1,7 +1,7 @@
-# Inferring labels for legacy PDFs
+# Inferring plannotations for legacy PDFs
 
-A drawing office has decades of PDFs and none of them has a label. `plannotation infer`
-reads what is printed on each page and writes a labelled copy.
+A drawing office has decades of PDFs and none of them has a plannotation.
+`plannotation infer` reads what is printed on each page and writes a plannotated copy.
 
 ```bash
 plannotation infer old-drawing.pdf -o old-drawing.plannotated.pdf
@@ -37,11 +37,12 @@ SPEC 4.6.6 forbids promoting reconstructed data to `authored` however good the m
 
 ## How well it works
 
-Measured on the three sample drawings with their labels stripped, against the authored
-labels written from the models (design brief section 12). The drawings carry 32 marks,
-21 dimensions, 18 grid lines and 3 levels between them. A dimension counts as found only
-when its value is right *and* it measures the same two grids or levels the authored one
-does: the right number linked to the wrong grids states a false distance.
+Measured on the three sample drawings with their plannotations stripped, against the
+authored plannotations written from the models (design brief section 12). The drawings
+carry 32 marks, 21 dimensions, 18 grid lines and 3 levels between them. A dimension
+counts as found only when its value is right *and* it measures the same two grids or
+levels the authored one does: the right number linked to the wrong grids states a false
+distance.
 
 | Category | Recall | Precision | Gate |
 | --- | ---: | ---: | --- |

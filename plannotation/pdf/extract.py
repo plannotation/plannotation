@@ -2,8 +2,8 @@
 """Extract words, lines and circles from a PDF page, in paper millimetres.
 
 This is what the inference pass reads. It returns everything in the coordinate system
-a label uses -- millimetres, origin bottom-left, y up (SPEC 3.1) -- so that nothing
-downstream has to know pdfplumber measures from the top of the page in points.
+a plannotation uses -- millimetres, origin bottom-left, y up (SPEC 3.1) -- so that
+nothing downstream has to know pdfplumber measures from the top of the page in points.
 
 pdfplumber (MIT) does the reading. It is chosen over PyMuPDF because PyMuPDF is AGPL,
 which the project's licence policy forbids outright; pdfplumber reads text with its
@@ -177,7 +177,7 @@ def extract_page(path: Path, page_index: int) -> PageContent:
 def page_text(path: Path, page_index: int) -> str:
     """Return a page's text as a PDF reader would copy it out, in reading order.
 
-    This is the text a model gets when it is handed a PDF with no label: pdfplumber's
+    This is the text a model gets when it is handed an unplannotated PDF: pdfplumber's
     layout-free extraction, top to bottom and left to right.
 
     Args:

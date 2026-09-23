@@ -1,19 +1,23 @@
 # Plannotation
 
+*Plannotation — construction drawings that machines can read.*
+
 [![check](https://github.com/plannotation/plannotation/actions/workflows/check.yml/badge.svg)](https://github.com/plannotation/plannotation/actions/workflows/check.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-**An open drawing-semantics sidecar for 2D construction drawings.**
+A PDF drawing is a picture as far as a machine is concerned. Plannotation attaches a
+small JSON document, a *plannotation*, to every drawing page that says what is actually
+on it: which sheet it is, which viewports it holds and how their paper maps to model
+coordinates, which elements are drawn — IFC class, GlobalId, mark, outline on the
+paper — and which annotations are present: dimensions and what they measure, marks and
+what they show, levels, grids, callouts and where they point. The page looks and prints
+exactly as it did before, pixel for pixel. Any program can read the plannotation
+without the software that authored the drawing.
 
-A PDF drawing is a picture as far as a machine is concerned. Plannotation attaches a small
-JSON *label* to every drawing page that says what is actually on it: which sheet it
-is, which viewports it holds and how their paper maps to model coordinates, which
-elements are drawn — IFC class, GlobalId, mark, outline on the paper — and which
-annotations are present: dimensions and what they measure, marks and what they show,
-levels, grids, callouts and where they point. The page looks and prints exactly as it
-did before, pixel for pixel. Any program can read the label without the software
-that authored the drawing.
+The name means annotating plans for machines. Plannotation never adds a PDF annotation
+object (`/Annots`) — no comment, stamp or markup — and never changes what the page
+shows; what it adds is an embedded file beside the page, not a mark on it.
 
 > **Status: 0.1, draft.** The specification, schema, library, command line, MCP
 > server, inference and inspector are complete and tested. The format may still change
@@ -32,10 +36,10 @@ depend on.
 
 | Surface | Command or package | What it is |
 | --- | --- | --- |
-| **Library + CLI** | `plannotation` | Attach, read, strip, validate, inspect and export labels. |
-| **MCP server** | `plannotation-mcp` | Serves labelled drawings to Claude Desktop and other MCP hosts, read-only unless told otherwise. |
-| **Inference** | `plannotation infer` | Reconstructs labels for legacy PDFs, marked `inferred` with a confidence. |
-| **Authoring tools** | `plannotation from-svg`, the Bonsai add-on | Labels the PDF an IfcOpenShell-based tool rendered, from the SVG it drew. |
+| **Library + CLI** | `plannotation` | Attach, read, strip, validate, inspect and export plannotations. |
+| **MCP server** | `plannotation-mcp` | Serves plannotated drawings to Claude Desktop and other MCP hosts, read-only unless told otherwise. |
+| **Inference** | `plannotation infer` | Reconstructs plannotations for legacy PDFs, marked `inferred` with a confidence. |
+| **Authoring tools** | `plannotation from-svg`, the Bonsai add-on | Plannotates the PDF an IfcOpenShell-based tool rendered, from the SVG it drew. |
 
 ## 60-second demo
 
@@ -45,12 +49,13 @@ uvx plannotation inspect samples/positionsplan/sheet.plannotated.pdf
 ```
 
 The first command builds three IFC models and draws them — a floor plan, a structural
-position plan and a section — as labelled A3 sheets; it needs a system `libcairo`
+position plan and a section — as plannotated A3 sheets; it needs a system `libcairo`
 (`brew install cairo`, `apt-get install libcairo2`) or Inkscape with
-`--inkscape-fallback`. The second prints what the position plan's label says. For the
-same on a page, open [`inspector/index.html`](inspector/index.html) and choose the PDF:
+`--inkscape-fallback`. The second prints what the position plan's plannotation says.
+For the same on a page, open [`inspector/index.html`](inspector/index.html) and choose
+the PDF:
 
-![The position plan in the inspector: each member's mark and cross-section, the grids, dimensions and viewport, drawn from the label over the page](docs/img/inspector-positionsplan.png)
+![The position plan in the inspector: each member's mark and cross-section, the grids, dimensions and viewport, drawn from the plannotation over the page](docs/img/inspector-positionsplan.png)
 
 From a clone, before the package is on PyPI:
 
@@ -61,12 +66,12 @@ uv run plannotation inspect samples/positionsplan/sheet.plannotated.pdf
 uv run plannotation validate samples/positionsplan/sheet.plannotated.pdf
 ```
 
-## Why a label helps
+## Why a plannotation helps
 
 <!-- BENCHMARK:START -->
 > **Not measured yet.** The harness is in place: 59 questions about the three sample
-> sheets, each answered by the same model with and without the page label, and each
-> keyed to the IFC model the sheet was drawn from ([method](docs/benchmark.md)).
+> sheets, each answered by the same model with and without the plannotation, and
+> each keyed to the IFC model the sheet was drawn from ([method](docs/benchmark.md)).
 > `make bench` runs it with an API key in `.env` and writes the measured table here.
 > Until then there is deliberately no number in this section.
 <!-- BENCHMARK:END -->
@@ -75,8 +80,8 @@ uv run plannotation validate samples/positionsplan/sheet.plannotated.pdf
 
 <!-- PRIOR-ART:START -->
 Plannotation invents as little as it can. Each piece below solved part of the problem;
-the label is the part none of them covers — what a construction drawing shows, in
-IFC's words, travelling with the issued page.
+the plannotation is the part none of them covers — what a construction drawing shows,
+in IFC's words, travelling with the issued page.
 
 | Prior work | What it already solves | What is still missing |
 | --- | --- | --- |
@@ -100,7 +105,7 @@ IFC's words, travelling with the issued page.
   carries a confidence.
 - **The vocabulary is IFC's** — class names, GlobalIds and property-set names — never
   a vendor's.
-- **Labels are data, never executable.** Readers must validate before trusting.
+- **Plannotations are data, never executable.** Readers must validate before trusting.
 
 ## Install
 

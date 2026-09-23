@@ -72,7 +72,7 @@
 <body>
 <header>
   <h1>Plannotation inspector</h1>
-  <label class="file">Open a labelled PDF<input type="file" id="file" accept="application/pdf"></label>
+  <label class="file">Open a plannotated PDF<input type="file" id="file" accept="application/pdf"></label>
   <button id="prev">&larr;</button>
   <span id="pager" class="muted">no document</span>
   <button id="next">&rarr;</button>
@@ -92,7 +92,7 @@
   <aside>
     <div class="card">
       <h2>Sheet</h2>
-      <dl id="sheet"><dd class="muted" style="grid-column:1/-1">Open a labelled PDF to begin.</dd></dl>
+      <dl id="sheet"><dd class="muted" style="grid-column:1/-1">Open a plannotated PDF to begin.</dd></dl>
     </div>
     <div class="card">
       <h2>Show</h2>
@@ -115,7 +115,7 @@ const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs"
 const WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
 
 const el = (id) => document.getElementById(id);
-const state = { doc: null, page: 1, labels: new Map(), scale: 1.5, hit: [], selected: null };
+const state = { doc: null, page: 1, plannotations: new Map(), scale: 1.5, hit: [], selected: null };
 const KINDS = [
   ["element", "elements", "--element"],
   ["annotation", "annotations", "--annotation"],
@@ -123,11 +123,11 @@ const KINDS = [
 ];
 const shown = new Set(KINDS.map(([k]) => k));
 // Per annotation type -- grid, dimension, level, tag, callout -- built from the page's
-// own label, since a section has levels and a plan does not.
+// own plannotation, since a section has levels and a plan does not.
 const hiddenTypes = new Set();
 
-function typeToggles(label) {
-  const types = [...new Set((label?.annotations || []).map((a) => a.type))].sort();
+function typeToggles(plannotation) {
+  const types = [...new Set((plannotation?.annotations || []).map((a) => a.type))].sort();
   const box = el("types");
   box.innerHTML = "";
   for (const type of types) {
@@ -168,12 +168,12 @@ el("file").addEventListener("change", async (event) => {
   const lib = await library();
   const data = new Uint8Array(await file.arrayBuffer());
   state.doc = await lib.getDocument({ data }).promise;
-  state.labels = await readPlannotations(state.doc);
+  state.plannotations = await readPlannotations(state.doc);
   state.page = 1;
   await render();
 });
 
-// A page label travels as an attachment named plannotation-pNNNN.json. pdf.js exposes
+// A plannotation travels as an attachment named plannotation-pNNNN.json. pdf.js exposes
 // the EmbeddedFiles name tree through getAttachments(), which is why Plannotation
 // registers every file there as well as on the page's /AF.
 async function readPlannotations(doc) {
@@ -184,7 +184,7 @@ async function readPlannotations(doc) {
     if (!match) continue;
     try {
       found.set(Number(match[1]) + 1, JSON.parse(new TextDecoder().decode(entry.content)));
-    } catch { /* a label that will not parse is a label that is absent */ }
+    } catch { /* a plannotation that will not parse is a plannotation that is absent */ }
   }
   return found;
 }
@@ -203,15 +203,15 @@ async function render() {
   }
   await page.render({ canvasContext: el("paper").getContext("2d"), viewport }).promise;
   el("pager").textContent = `page ${state.page} of ${state.doc.numPages}` +
-    (state.labels.has(state.page) ? "" : " — no label");
+    (state.plannotations.has(state.page) ? "" : " — no plannotation");
   describe();
   draw();
 }
 
 // Paper is millimetres, y up from the bottom left; a canvas is pixels, y down from the
 // top. One function does the flip, so nothing else has to remember it.
-function toCanvas(x, y, label, canvas) {
-  const w = label.page.widthMm, h = label.page.heightMm;
+function toCanvas(x, y, plannotation, canvas) {
+  const w = plannotation.page.widthMm, h = plannotation.page.heightMm;
   return [x / w * canvas.width, (h - y) / h * canvas.height];
 }
 
@@ -219,8 +219,8 @@ function draw() {
   const canvas = el("overlay"), ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   state.hit = [];
-  const label = state.labels.get(state.page);
-  if (!label) return;
+  const plannotation = state.plannotations.get(state.page);
+  if (!plannotation) return;
   const paint = (items, kind, colour) => {
     if (!shown.has(kind)) return;
     for (const item of items || []) {
@@ -228,8 +228,8 @@ function draw() {
       const stroke = getComputedStyle(document.documentElement).getPropertyValue(colour).trim();
       const box = item.paperBBox;
       if (!box) continue;
-      const [x0, y0] = toCanvas(box[0], box[1], label, canvas);
-      const [x1, y1] = toCanvas(box[2], box[3], label, canvas);
+      const [x0, y0] = toCanvas(box[0], box[1], plannotation, canvas);
+      const [x1, y1] = toCanvas(box[2], box[3], plannotation, canvas);
       const rect = [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
       ctx.strokeStyle = stroke;
       ctx.lineWidth = state.selected === item.id ? 2.5 : 1;
@@ -240,7 +240,7 @@ function draw() {
         for (const outline of item.paperOutlines) {
           ctx.beginPath();
           outline.forEach(([px, py], index) => {
-            const [cx, cy] = toCanvas(px, py, label, canvas);
+            const [cx, cy] = toCanvas(px, py, plannotation, canvas);
             index ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
           });
           ctx.stroke();
@@ -249,7 +249,7 @@ function draw() {
       if (kind === "annotation" && item.geometry) {
         ctx.beginPath();
         item.geometry.forEach(([px, py], index) => {
-          const [cx, cy] = toCanvas(px, py, label, canvas);
+          const [cx, cy] = toCanvas(px, py, plannotation, canvas);
           index ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
         });
         ctx.stroke();
@@ -258,41 +258,42 @@ function draw() {
       state.hit.push({ rect, item, kind });
     }
   };
-  paint(label.viewports, "viewport", "--viewport");
-  paint(label.elements, "element", "--element");
-  paint(label.annotations, "annotation", "--annotation");
+  paint(plannotation.viewports, "viewport", "--viewport");
+  paint(plannotation.elements, "element", "--element");
+  paint(plannotation.annotations, "annotation", "--annotation");
 }
 
 function describe() {
-  const label = state.labels.get(state.page);
+  const plannotation = state.plannotations.get(state.page);
   const sheet = el("sheet"), rows = el("rows");
-  typeToggles(label);
-  if (!label) {
-    sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no Plannotation label.</dd>`;
+  typeToggles(plannotation);
+  if (!plannotation) {
+    sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no plannotation.</dd>`;
     rows.innerHTML = `<tr><td colspan="3" class="empty">nothing to show</td></tr>`;
     return;
   }
-  const level = conformance(label);
+  const level = conformance(plannotation);
   const pairs = [
-    ["sheet", label.sheet?.id], ["title", label.sheet?.title],
-    ["revision", label.sheet?.revision], ["scale", label.sheet?.scale ? `1:${label.sheet.scale}` : null],
-    ["type", label.sheet?.drawingType], ["discipline", label.sheet?.discipline],
-    ["page", `${label.page.widthMm} × ${label.page.heightMm} mm`],
-    ["provenance", label.provenance], ["level", level],
-    ["model", label.model?.file], ["schema", label.plannotation],
+    ["sheet", plannotation.sheet?.id], ["title", plannotation.sheet?.title],
+    ["revision", plannotation.sheet?.revision],
+    ["scale", plannotation.sheet?.scale ? `1:${plannotation.sheet.scale}` : null],
+    ["type", plannotation.sheet?.drawingType], ["discipline", plannotation.sheet?.discipline],
+    ["page", `${plannotation.page.widthMm} × ${plannotation.page.heightMm} mm`],
+    ["provenance", plannotation.provenance], ["level", level],
+    ["model", plannotation.model?.file], ["schema", plannotation.plannotation],
   ].filter(([, value]) => value != null && value !== "");
   sheet.innerHTML = pairs.map(([k, v]) => `<dt>${k}</dt><dd>${escape(String(v))}</dd>`).join("");
 
   const items = [
-    ...(label.viewports || []).map((i) => [i, "viewport", i.kind || "viewport"]),
-    ...(label.elements || []).map((i) => [i, "element", i.ifcClass + (i.tag ? ` · ${i.tag}` : "")]),
-    ...(label.annotations || []).map((i) => [i, "annotation", i.type + (i.text ? ` · ${i.text}` : "")]),
+    ...(plannotation.viewports || []).map((i) => [i, "viewport", i.kind || "viewport"]),
+    ...(plannotation.elements || []).map((i) => [i, "element", i.ifcClass + (i.tag ? ` · ${i.tag}` : "")]),
+    ...(plannotation.annotations || []).map((i) => [i, "annotation", i.type + (i.text ? ` · ${i.text}` : "")]),
   ];
   rows.innerHTML = items.length
     ? items.map(([item, kind, what]) =>
         `<tr data-id="${escape(item.id)}"><td><code>${escape(item.id)}</code></td>` +
         `<td><span class="swatch" style="background:var(--${kind})"></span>${escape(what)}</td>` +
-        `<td class="muted">${escape(item.provenance || label.provenance)}` +
+        `<td class="muted">${escape(item.provenance || plannotation.provenance)}` +
         `${item.confidence != null ? ` ${item.confidence}` : ""}</td></tr>`).join("")
     : `<tr><td colspan="3" class="empty">nothing on this page</td></tr>`;
   for (const row of rows.querySelectorAll("tr[data-id]")) {
@@ -307,11 +308,11 @@ function describe() {
 
 // The levels of SPEC 4.1, computed here so the inspector can say what it is looking at
 // without asking anything else.
-function conformance(label) {
+function conformance(plannotation) {
   const linked = (a) => a.measures?.length || a.shows?.element || a.target?.sheetId ||
     a.target?.pdfPage != null || a.axis || a.ifcGuid;
-  if (!label.elements?.length) return "L1";
-  return (label.annotations || []).some(linked) ? "L3" : "L2";
+  if (!plannotation.elements?.length) return "L1";
+  return (plannotation.annotations || []).some(linked) ? "L3" : "L2";
 }
 
 const escape = (value) => String(value).replace(/[&<>"]/g,
@@ -338,32 +339,32 @@ el("overlay").addEventListener("mousemove", (event) => {
 el("overlay").addEventListener("mouseleave", () => { el("tip").style.display = "none"; });
 
 el("copy").onclick = async () => {
-  const label = state.labels.get(state.page);
-  if (!label) return;
-  await navigator.clipboard.writeText(JSON.stringify(label, null, 2));
+  const plannotation = state.plannotations.get(state.page);
+  if (!plannotation) return;
+  await navigator.clipboard.writeText(JSON.stringify(plannotation, null, 2));
   el("copy").textContent = "Copied";
   setTimeout(() => (el("copy").textContent = "Copy JSON"), 1200);
 };
 
 el("csv").onclick = () => {
-  const label = state.labels.get(state.page);
-  if (!label) return;
+  const plannotation = state.plannotations.get(state.page);
+  if (!plannotation) return;
   const cell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const rows = [["kind", "id", "class_or_type", "name_or_text", "tag", "ifcGuid",
                  "provenance", "confidence", "x0", "y0", "x1", "y1"].join(",")];
   const add = (kind, items, classOf, nameOf) => {
     for (const item of items || []) {
       rows.push([kind, item.id, classOf(item), nameOf(item), item.tag, item.ifcGuid,
-                 item.provenance ?? label.provenance, item.confidence,
+                 item.provenance ?? plannotation.provenance, item.confidence,
                  ...(item.paperBBox || ["", "", "", ""])].map(cell).join(","));
     }
   };
-  add("viewport", label.viewports, (i) => i.kind, (i) => i.name);
-  add("element", label.elements, (i) => i.ifcClass, (i) => i.name);
-  add("annotation", label.annotations, (i) => i.type, (i) => i.text);
+  add("viewport", plannotation.viewports, (i) => i.kind, (i) => i.name);
+  add("element", plannotation.elements, (i) => i.ifcClass, (i) => i.name);
+  add("annotation", plannotation.annotations, (i) => i.type, (i) => i.text);
   const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
   const link = Object.assign(document.createElement("a"),
-    { href: url, download: `${label.sheet?.id || "plannotation"}-page${state.page}.csv` });
+    { href: url, download: `${plannotation.sheet?.id || "plannotation"}-page${state.page}.csv` });
   link.click();
   URL.revokeObjectURL(url);
 };

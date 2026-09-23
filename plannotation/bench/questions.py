@@ -2,8 +2,8 @@
 """The benchmark's questions: merged from the samples' ground truth, and loaded back.
 
 ``bench/questions.jsonl`` is the committed question set. It is built by merging each
-``samples/<name>/groundtruth.jsonl`` and pointing every question at the labelled PDF
-it is about, so the file says everything a run needs except the PDFs themselves,
+``samples/<name>/groundtruth.jsonl`` and pointing every question at the plannotated
+PDF it is about, so the file says everything a run needs except the PDFs themselves,
 which ``plannotation samples build`` regenerates byte for byte.
 """
 
@@ -36,9 +36,9 @@ class Question:
         document: The PDF to show, relative to the directory the run starts in.
         page: The one-based page of that PDF.
         unit: The unit a numeric answer is in, when it has one.
-        requires_plannotation: True when only the label carries the answer, such as an IFC
-            GlobalId. Such questions are reported apart, since the plain condition
-            cannot be expected to get them right.
+        requires_plannotation: True when only the plannotation carries the answer, such
+            as an IFC GlobalId. Such questions are reported apart, since the plain
+            condition cannot be expected to get them right.
     """
 
     id: str

@@ -6,17 +6,18 @@ everything this library raises deliberately with a single ``except`` clause, and
 distinguish it from the ``OSError`` of an unreadable file or the
 ``pydantic.ValidationError`` of a malformed model.
 
-Three branches hang off it: :class:`CarrierError` for anything about getting label
-data into or out of a document, :class:`RenderError` for anything about rasterising
-one, and :class:`ValidatorError` for a validation run that could not be made at all.
-Each leaf names a failure a caller can actually do something about, and every message
-raised in this package is expected to say what was wrong and what to do instead.
+Three branches hang off it: :class:`CarrierError` for anything about getting
+Plannotation data into or out of a document, :class:`RenderError` for anything about
+rasterising one, and :class:`ValidatorError` for a validation run that could not be
+made at all. Each leaf names a failure a caller can actually do something about, and
+every message raised in this package is expected to say what was wrong and what to do
+instead.
 
 :class:`ValidatorError` is the branch that is *not* about the document being wrong.
-A validator has three outcomes and only two of them are about the label: it found
-nothing, it found something, or it could not look. The third is what this branch
-carries, and it is why ``plannotation validate`` has an exit code 2 distinct from its
-exit code 1 -- a pipeline must be able to tell a broken drawing from a broken
+A validator has three outcomes and only two of them are about the plannotation: it
+found nothing, it found something, or it could not look. The third is what this
+branch carries, and it is why ``plannotation validate`` has an exit code 2 distinct
+from its exit code 1 -- a pipeline must be able to tell a broken drawing from a broken
 toolchain, and a validator that reported "no errors" because it never ran a check has
 said something false.
 
@@ -52,7 +53,7 @@ class PlannotationError(Exception):
 
 
 class CarrierError(PlannotationError):
-    """Reading or writing label data in a carrier failed."""
+    """Reading or writing Plannotation data in a carrier failed."""
 
 
 class SignedPdfError(CarrierError):
@@ -83,22 +84,22 @@ class PlannotationNotFoundError(CarrierError):
 
 
 class InvalidPlannotationError(CarrierError):
-    """A label or index was found but does not validate against its schema.
+    """A plannotation or index was found but does not validate against its schema.
 
-    Section 4.3 of the specification requires a reader to treat such a label as
-    absent. The reading functions in this package raise by default -- a person
+    Section 4.3 of the specification requires a reader to treat such a plannotation
+    as absent. The reading functions in this package raise by default -- a person
     running a tool wants to be told -- and behave as 4.3 requires when asked to be
     lenient.
     """
 
 
 class PlannotationMismatchError(CarrierError):
-    """A label contradicts the document it is being attached to, or its index.
+    """A plannotation contradicts the document it is being attached to, or its index.
 
     A page size that disagrees with the page, a rotation that disagrees with
-    ``/Rotate``, two labels claiming one page, or an index entry naming a page that
-    is not being labelled. Each would produce a document whose label is wrong about
-    the page it is stapled to, which is worse than no label at all.
+    ``/Rotate``, two plannotations claiming one page, or an index entry naming a page
+    that is not being plannotated. Each would produce a document whose plannotation is
+    wrong about the page it is stapled to, which is worse than no plannotation at all.
     """
 
 
@@ -113,8 +114,8 @@ class RenderError(PlannotationError):
 class AppearanceChangedError(RenderError):
     """Two renderings of the same page differ.
 
-    The governing principle of the specification is that writing a label never
-    changes how a page looks. This is the error that fires when it did.
+    The governing principle of the specification is that writing a plannotation
+    never changes how a page looks. This is the error that fires when it did.
     """
 
 
@@ -161,9 +162,9 @@ class ExternalToolError(ValidatorError):
 class ExportError(PlannotationError):
     """The authored exporter could not produce a drawing it would stand behind.
 
-    Raised where continuing would write a document whose label describes something
-    other than the page it is attached to -- a converted page that is not the size the
-    sheet declared, or a view the serializer drew nothing into.
+    Raised where continuing would write a document whose plannotation describes
+    something other than the page it is attached to -- a converted page that is not
+    the size the sheet declared, or a view the serializer drew nothing into.
     """
 
 

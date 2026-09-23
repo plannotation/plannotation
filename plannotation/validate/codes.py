@@ -122,7 +122,7 @@ _CATALOGUE: Final = (
         _ERROR,
         "the document validates against its JSON Schema",
         "SPEC 4.3 (1), 4.4 (2)",
-        "Schema validity is the floor. A reader must treat an invalid label as absent, "
+        "Schema validity is the floor. A reader must treat an invalid plannotation as absent, "
         "so nothing below this rule can be relied on at all.",
     ),
     _rule(
@@ -153,7 +153,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-REF-002",
         _ERROR,
-        "an element's or annotation's viewport names a viewport in this label",
+        "an element's or annotation's viewport names a viewport in this plannotation",
         "SPEC 4.5",
         "MUST. Without the viewport there is no transform, no plane and no scale, so "
         "the item's paper geometry means nothing beyond the page.",
@@ -161,15 +161,15 @@ _CATALOGUE: Final = (
     _rule(
         "PL-REF-003",
         _ERROR,
-        "shows.element names an element in this label",
+        "shows.element names an element in this plannotation",
         "SPEC 4.5",
         "MUST. An unresolvable link is the cheapest way to look linked, and the level "
-        "an annotation lifts a label to is graded on its links.",
+        "an annotation lifts a plannotation to is graded on its links.",
     ),
     _rule(
         "PL-REF-004",
         _ERROR,
-        "every measures entry names something in this label",
+        "every measures entry names something in this plannotation",
         "SPEC 4.5",
         "MUST, for the same reason as PL-REF-003.",
     ),
@@ -200,7 +200,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-REF-008",
         _ERROR,
-        "page.index is the page the label is attached to",
+        "page.index is the page the plannotation is attached to",
         "SPEC 4.5",
         "MUST. A reader is told to trust the attachment over the claim, which is a rule "
         "for surviving the defect and not permission to ship it.",
@@ -216,7 +216,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-REF-010",
         _WARNING,
-        "two labelled pages do not print the same sheet.id",
+        "two plannotated pages do not print the same sheet.id",
         "SPEC 4.5",
         "Warning: 4.5 makes uniqueness a SHOULD and tells a reader how to resolve a "
         "target when it does not hold.",
@@ -244,10 +244,10 @@ _CATALOGUE: Final = (
     _rule(
         "PL-GEO-001",
         _ERROR,
-        "the label's page block matches the page it is attached to",
+        "the plannotation's page block matches the page it is attached to",
         "SPEC 3.1, 3.7, 6.5.5 (2)",
-        "MUST. A label that misstates its page reads every coordinate in it against the "
-        "wrong sheet, which is worse than carrying no label.",
+        "MUST. A plannotation that misstates its page reads every coordinate in it "
+        "against the wrong sheet, which is worse than carrying no plannotation.",
     ),
     _rule(
         "PL-GEO-002",
@@ -342,7 +342,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-GEO-013",
         _ERROR,
-        "a viewport carrying paperToPlane belongs to a label that declares model.lengthUnit",
+        "a viewport carrying paperToPlane belongs to a plannotation that declares model.lengthUnit",
         "SPEC 3.5",
         "MUST. The transform's output is in the model's length unit, and a reader that "
         "does not know the unit may not report any distance derived from it as a length.",
@@ -363,15 +363,15 @@ _CATALOGUE: Final = (
         "the top-level provenance is the aggregate of the page's items",
         "SPEC 4.6.4",
         "MUST. The aggregate is what a reader consults before deciding how much of a "
-        "label it may present as fact.",
+        "plannotation it may present as fact.",
     ),
     _rule(
         "PL-PRV-003",
         _ERROR,
-        "a mixed label records provenance on every element and annotation",
+        "a mixed plannotation records provenance on every element and annotation",
         "SPEC 4.6.4",
-        "MUST. Under 4.6.3 silence in a mixed label reads as inferred, so a writer that "
-        "leaves it out has made a claim it did not mean.",
+        "MUST. Under 4.6.3 silence in a mixed plannotation reads as inferred, so a writer "
+        "that leaves it out has made a claim it did not mean.",
     ),
     _rule(
         "PL-PRV-004",
@@ -379,7 +379,7 @@ _CATALOGUE: Final = (
         "an authored item does not carry a confidence",
         "SPEC 4.6.5",
         "Warning, and 4.6.5 asks for exactly that: the member has no meaning on an "
-        "authored value, but rejecting a label over untidiness would serve nobody.",
+        "authored value, but rejecting a plannotation over untidiness would serve nobody.",
     ),
     _rule(
         "PL-PRV-005",
@@ -401,7 +401,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-CAR-001",
         _ERROR,
-        "the index records the conformance level the page label reaches",
+        "the index records the conformance level the page's plannotation reaches",
         "SPEC 2.8, 4.1",
         "MUST. The index exists so that a reader need not open every attachment; an "
         "index that may misreport the one thing it carries has no purpose left.",
@@ -409,7 +409,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-CAR-002",
         _ERROR,
-        "the index records the sheet id the page label prints",
+        "the index records the sheet id the page's plannotation prints",
         "SPEC 2.8, 4.5",
         "MUST, for the same reason as PL-CAR-001: the sheet number is how a person "
         "finds the page, and an index that names the wrong one sends them to it.",
@@ -425,7 +425,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-CAR-004",
         _ERROR,
-        "a sidecar's plannotation matches its index's and every page label's",
+        "a sidecar's plannotation member matches its index's and every page's",
         "SPEC 6.5.1",
         "MUST, and 6.5.1 says a validator MUST report it as an error.",
     ),
@@ -446,7 +446,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-CAR-007",
         _ERROR,
-        "at least one page label pairs with a page of the document",
+        "at least one plannotation pairs with a page of the document",
         "SPEC 6.5.5 (3)",
         "MUST. A payload that pairs with nothing is a payload for another document, and "
         "6.5.5 requires a validator to report each of its three pairing rules as errors.",
@@ -454,7 +454,7 @@ _CATALOGUE: Final = (
     _rule(
         "PL-CAR-008",
         _WARNING,
-        "a labelled PDF carries the XMP PDF Declaration",
+        "a plannotated PDF carries the XMP PDF Declaration",
         "SPEC 6.2, 6.3",
         "Warning: the declaration is a claim and never evidence -- 9.2 forbids a reader "
         "from treating it as validity -- so its absence costs discoverability, not "
@@ -474,8 +474,8 @@ _CATALOGUE: Final = (
         _ERROR,
         "an entity's class is the ifcClass claimed, or a subtype of it",
         "Design brief 8 (4)",
-        "Error, and a plain fact for the same reason. The label may name a supertype -- "
-        "IfcWall for an IfcWallStandardCase -- and nothing narrower.",
+        "Error, and a plain fact for the same reason. The plannotation may name a "
+        "supertype -- IfcWall for an IfcWallStandardCase -- and nothing narrower.",
     ),
     _rule(
         "PL-IFC-003",
@@ -493,7 +493,7 @@ _CATALOGUE: Final = (
         "veraPDF finds the document conforming to the flavour it declares",
         "Design brief 8 (7)",
         "Error, but only when the caller asked for the pass: a document that declares a "
-        "PDF/A flavour and does not meet it is broken as a PDF, before any label.",
+        "PDF/A flavour and does not meet it is broken as a PDF, before any plannotation.",
     ),
 )
 

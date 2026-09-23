@@ -179,7 +179,7 @@ class TestPageSchemaShape:
 
 
 class TestIndexSchemaShape:
-    """The document-level index records what is labelled and to what level."""
+    """The document-level index records what is plannotated and to what level."""
 
     def test_requires_pages(self) -> None:
         """An index without a page list says nothing."""

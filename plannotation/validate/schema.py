@@ -2,9 +2,9 @@
 """Rule 1: schema validity, with a location a person can follow.
 
 Schema validity is the floor of everything else. Section 4.3 (1) requires a reader to
-validate a label before trusting any value in it, and 4.3 (2) requires it to treat an
-invalid label as absent -- no partial parse, no repair. So every other rule in this
-package runs only on a document that got past this module.
+validate a plannotation before trusting any value in it, and 4.3 (2) requires it to
+treat an invalid plannotation as absent -- no partial parse, no repair. So every other
+rule in this package runs only on a document that got past this module.
 
 Readable paths
 --------------
@@ -61,9 +61,10 @@ __all__ = [
 
 #: The most a JSON file read straight off disk may hold, in bytes.
 #:
-#: The same figure the PDF reader allows one embedded payload to decode to. A label for
-#: one drawing page is a few kilobytes; this is three orders of magnitude of headroom,
-#: and a bound that generous still refuses the file whose only purpose is to be large.
+#: The same figure the PDF reader allows one embedded payload to decode to. A
+#: plannotation for one drawing page is a few kilobytes; this is three orders of
+#: magnitude of headroom, and a bound that generous still refuses the file whose only
+#: purpose is to be large.
 MAX_DOCUMENT_BYTES: Final = 16 * 1024 * 1024
 
 #: The most schema violations reported for one document -- section 9.3 (6).
@@ -76,9 +77,9 @@ MAX_QUOTED_CHARS: Final = 200
 class DocumentKind(StrEnum):
     """Which of the three Plannotation schemas a document is held to.
 
-    ``PLANNOTATIONS`` is not a schema of its own: it is an array of page labels, which is a
-    shape a person reasonably has on disk and which the ``attach`` verb already
-    accepts. Each member is held to the page-label schema.
+    ``PLANNOTATIONS`` is not a schema of its own: it is an array of plannotations, which
+    is a shape a person reasonably has on disk and which the ``attach`` verb already
+    accepts. Each member is held to the plannotation schema.
     """
 
     PAGE = "page"
@@ -98,8 +99,8 @@ def _validator(kind: DocumentKind) -> Draft202012Validator:
     """Build a validator for one of the three schemas.
 
     Args:
-        kind: Which schema. ``PLANNOTATIONS`` is held to the page-label schema, member by
-            member.
+        kind: Which schema. ``PLANNOTATIONS`` is held to the plannotation schema,
+            member by member.
 
     Returns:
         A draft 2020-12 validator.
@@ -146,10 +147,10 @@ def detect_kind(document: object) -> DocumentKind | None:
     The four shapes are distinguished by members the schemas make required, so the
     decision never depends on a member a valid document may omit:
 
-    * an array is an array of page labels;
+    * an array is an array of plannotations;
     * an object with ``pages`` **and** ``index`` is a sidecar (6.5.1 requires both);
     * an object with ``pages`` alone is an index;
-    * an object with ``page`` is a page label.
+    * an object with ``page`` is a plannotation.
 
     Args:
         document: The parsed JSON.
@@ -286,7 +287,7 @@ def parse_json(raw: bytes, *, source: str) -> object:
 
 
 def read_json_file(path: Path, *, limit: int = MAX_DOCUMENT_BYTES) -> bytes:
-    """Read a JSON file from disk, refusing one that is too large to be a label.
+    """Read a JSON file from disk, refusing one that is too large to be a plannotation.
 
     Args:
         path: The file.
@@ -305,7 +306,7 @@ def read_json_file(path: Path, *, limit: int = MAX_DOCUMENT_BYTES) -> bytes:
     if size > limit:
         msg = (
             f"{path} is {size} bytes, past the {limit}-byte bound this validator puts "
-            f"on a document read from disk. A label for one drawing page is kilobytes; "
+            f"on a document read from disk. A plannotation for one drawing page is kilobytes; "
             f"raise the bound deliberately rather than going without one"
         )
         raise InputNotValidatableError(msg)
@@ -313,7 +314,7 @@ def read_json_file(path: Path, *, limit: int = MAX_DOCUMENT_BYTES) -> bytes:
 
 
 def plannotations_of(document: object) -> Sequence[object]:
-    """Return the page-label members of a parsed array of labels.
+    """Return the members of a parsed array of plannotations.
 
     Args:
         document: The parsed JSON, which the caller has decided is

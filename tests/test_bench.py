@@ -2,9 +2,10 @@
 """The benchmark harness, exercised end to end without ever reaching the API.
 
 The design brief's rules for Phase 8 are what is tested: both conditions share one
-prompt and differ only by the label supplied as a tool result; numbers are scored
-within 1 % and everything else exactly; responses are cached on condition, model and
-question so a re-run asks nothing; and no API key is needed to run what is cached.
+prompt and differ only by the plannotation supplied as a tool result; numbers are
+scored within 1 % and everything else exactly; responses are cached on condition,
+model and question so a re-run asks nothing; and no API key is needed to run what is
+cached.
 
 A fake transport stands in for the API everywhere. Where the real SDK is exercised,
 it talks to an in-process mock HTTP transport, so the request shapes are checked by
@@ -83,24 +84,30 @@ MOD_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 # ---------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def drawings(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Write a labelled and an unlabelled copy of the two-page drawing set.
+    """Write a plannotated and an unplannotated copy of the two-page drawing set.
 
     Args:
         tmp_path_factory: pytest's temporary directory factory.
 
     Returns:
-        The directory holding ``plain.pdf`` and ``labelled.pdf``.
+        The directory holding ``plain.pdf`` and ``plannotated.pdf``.
     """
     root = tmp_path_factory.mktemp("bench")
     plain = root / "plain.pdf"
     plain.write_bytes(fx.build_drawing_set())
-    labels = fx.drawing_set_plannotations()
-    embed.attach(plain, labels, embed.build_index(labels), root / "labelled.pdf", mod_date=MOD_DATE)
+    plannotations = fx.drawing_set_plannotations()
+    embed.attach(
+        plain,
+        plannotations,
+        embed.build_index(plannotations),
+        root / "plannotated.pdf",
+        mod_date=MOD_DATE,
+    )
     return root
 
 
 def question(**overrides: Any) -> Question:  # noqa: ANN401
-    """Build a question about page 1 of the labelled drawing set.
+    """Build a question about page 1 of the plannotated drawing set.
 
     Args:
         **overrides: Fields to change.
@@ -114,7 +121,7 @@ def question(**overrides: Any) -> Question:  # noqa: ANN401
         "category": "dimension",
         "question": "What is the distance between grid A and grid B?",
         "answer": 8000.0,
-        "document": "labelled.pdf",
+        "document": "plannotated.pdf",
         "unit": "mm",
     }
     return Question(**{**fields, **overrides})
@@ -203,7 +210,7 @@ def config(tmp: Path, root: Path, **overrides: Any) -> RunConfig:  # noqa: ANN40
         The configuration.
     """
     fields: dict[str, Any] = {
-        "condition": "labelled",
+        "condition": "plannotated",
         "model": "claude-opus-5",
         "cache_dir": tmp / "cache",
         "base_dir": root,
@@ -463,7 +470,7 @@ class TestPricing:
 # ---------------------------------------------------------------------------
 # The request
 # ---------------------------------------------------------------------------
-PAGE = PageInput(png=b"\x89PNG", text="A B 1 2", label='{"page": {}}')
+PAGE = PageInput(png=b"\x89PNG", text="A B 1 2", plannotation='{"page": {}}')
 
 
 def sent(condition: Condition, effort: str | None = None) -> Any:  # noqa: ANN401
@@ -481,7 +488,7 @@ def sent(condition: Condition, effort: str | None = None) -> Any:  # noqa: ANN40
 
 
 class TestPrompt:
-    """One template for both conditions; the label only as a tool result."""
+    """One template for both conditions; the plannotation only as a tool result."""
 
     def test_plain_is_one_message_ending_in_the_question(self) -> None:
         """The cache breakpoint is on the page material, before the question."""
@@ -493,26 +500,26 @@ class TestPrompt:
         assert content[2]["text"] == question_block(question())
         assert "tools" not in request
 
-    def test_labelled_adds_a_tool_call_and_its_result_and_nothing_else(self) -> None:
-        """Same picture, same text, same question; the label in between."""
-        plain, labelled = sent("plain"), sent("labelled")
-        user, call, result = labelled["messages"]
+    def test_plannotated_adds_a_tool_call_and_its_result_and_nothing_else(self) -> None:
+        """Same picture, same text, same question; the plannotation in between."""
+        plain, plannotated = sent("plain"), sent("plannotated")
+        user, call, result = plannotated["messages"]
         assert user["content"][0] == plain["messages"][0]["content"][0]
         assert user["content"][1]["text"] == plain["messages"][0]["content"][1]["text"]
         tool_use = call["content"][0]
         assert call["role"] == "assistant"
         assert tool_use["type"] == "tool_use"
         assert result["content"][0]["tool_use_id"] == tool_use["id"] == PLANNOTATION_TOOL_USE_ID
-        assert result["content"][0]["content"] == PAGE.label
+        assert result["content"][0]["content"] == PAGE.plannotation
         assert result["content"][1]["text"] == question_block(question())
-        assert labelled["system"] == plain["system"]
-        assert labelled["output_config"] == plain["output_config"]
-        assert labelled["tools"][0]["name"] == tool_use["name"]
+        assert plannotated["system"] == plain["system"]
+        assert plannotated["output_config"] == plain["output_config"]
+        assert plannotated["tools"][0]["name"] == tool_use["name"]
 
-    def test_there_is_no_labelled_condition_without_a_label(self) -> None:
+    def test_there_is_no_plannotated_condition_without_a_plannotation(self) -> None:
         """A tool result of nothing would measure nothing."""
-        with pytest.raises(ValueError, match="no label"):
-            build_request(question(), PageInput(b"", "", None), condition="labelled", model="m")
+        with pytest.raises(ValueError, match="no plannotation"):
+            build_request(question(), PageInput(b"", "", None), condition="plannotated", model="m")
 
     def test_effort_is_sent_only_when_asked_for(self) -> None:
         """Otherwise the model's own default applies."""
@@ -524,7 +531,7 @@ class TestPrompt:
 # The page
 # ---------------------------------------------------------------------------
 class TestPage:
-    """The picture, the text and the label of one page."""
+    """The picture, the text and the plannotation of one page."""
 
     def test_the_png_decodes_to_the_pixels_it_was_given(self) -> None:
         """Checked with an independent decoder."""
@@ -542,17 +549,17 @@ class TestPage:
         with pytest.raises(ValueError, match="RGB"):
             encode_png(np.zeros((2, 2, 4), dtype=np.uint8))
 
-    def test_a_labelled_page_brings_its_label(self, drawings: Path) -> None:
-        """As canonical JSON, the form the label is attached in."""
-        page = load_page(drawings / "labelled.pdf", 1, dpi=20)
+    def test_a_plannotated_page_brings_its_plannotation(self, drawings: Path) -> None:
+        """As canonical JSON, the form the plannotation is attached in."""
+        page = load_page(drawings / "plannotated.pdf", 1, dpi=20)
         assert page.png.startswith(b"\x89PNG\r\n\x1a\n")
-        assert page.label is not None
-        assert json.loads(page.label)["sheet"]["id"] == "A-101"
-        assert page.text == page_text(drawings / "labelled.pdf", 0)
+        assert page.plannotation is not None
+        assert json.loads(page.plannotation)["sheet"]["id"] == "A-101"
+        assert page.text == page_text(drawings / "plannotated.pdf", 0)
 
-    def test_an_unlabelled_page_has_none(self, drawings: Path) -> None:
-        """So the labelled condition can refuse it."""
-        assert load_page(drawings / "plain.pdf", 1, dpi=20).label is None
+    def test_an_unplannotated_page_has_none(self, drawings: Path) -> None:
+        """So the plannotated condition can refuse it."""
+        assert load_page(drawings / "plain.pdf", 1, dpi=20).plannotation is None
 
     def test_a_missing_document_says_how_to_make_it(self, tmp_path: Path) -> None:
         """The samples are generated, not committed."""
@@ -759,7 +766,7 @@ class TestAnthropicTransport:
         }
         seen = self._mock(monkeypatch, 200, message)
         send = anthropic_transport(api_key="sk-test")
-        for condition in ("plain", "labelled"):
+        for condition in ("plain", "plannotated"):
             reply = send(
                 build_request(question(), PAGE, condition=condition, model="claude-opus-5")
             )
@@ -869,7 +876,7 @@ PLANNOTATED = [
         r.id,
         r.category,
         correct=True,
-        condition="labelled",
+        condition="plannotated",
         requires_plannotation=r.requires_plannotation,
     )
     for r in PLAIN
@@ -894,7 +901,7 @@ class TestReport:
         """Every number in it can be checked against what the model said."""
         text = render_report("claude-opus-5", "2026-09-22", PLAIN, PLANNOTATED)
         assert text.startswith("# Plannotation benchmark — `claude-opus-5`, 2026-09-22\n")
-        assert "| model (label only) | 1 | 0/1 (0%) | 1/1 (100%) | +100 pp |" in text
+        assert "| model (plannotation only) | 1 | 0/1 (0%) | 1/1 (100%) | +100 pp |" in text
         assert "| **Answerable from the drawing** | **3** | **2/3 (67%)** | **3/3 (100%)**" in text
         assert "| **All questions** | **4** | **2/4 (50%)** | **4/4 (100%)** | **+50 pp** |" in text
         assert "| `plain` | 4 | 400 | 0 | 4,000 | 40 | 0.04 | 1.5 |" in text
@@ -907,7 +914,7 @@ class TestReport:
         """With dashes where the other would be."""
         unpriced = [record("A-101-01", "dimension", correct=True, cost_usd=None, expected=8000.5)]
         text = render_report("m", "2026-09-22", unpriced, [])
-        assert "| `labelled` | 0 | — | — | — | — | — | — |" in text
+        assert "| `plannotated` | 0 | — | — | — | — | — | — |" in text
         assert "| `plain` | 1 | 100 | 0 | 1,000 | 10 | — | 1.5 |" in text
         assert "| A-101-01 | dimension | 8000.5 | ✓ 8000 | — |" in text
 
@@ -921,7 +928,7 @@ class TestReport:
         assert "old" not in text
         assert text.endswith(f"{README_END}\n\ntail\n")
         assert "| Answerable from the drawing | 2/3 (67%) | 3/3 (100%) | +33 pp |" in text
-        assert "| Label only (IFC GlobalId) | 0/1 (0%) | 1/1 (100%) | +100 pp |" in text
+        assert "| Plannotation only (IFC GlobalId) | 0/1 (0%) | 1/1 (100%) | +100 pp |" in text
         assert "[bench/results/r.md](bench/results/r.md)" in text
         assert update_readme(readme, section) is False
 
@@ -956,7 +963,7 @@ class TestCli:
     ) -> None:
         """Questions, both runs, the report and the README, with a fake API."""
         monkeypatch.chdir(tmp_path)
-        (tmp_path / "labelled.pdf").write_bytes((drawings / "labelled.pdf").read_bytes())
+        (tmp_path / "plannotated.pdf").write_bytes((drawings / "plannotated.pdf").read_bytes())
         write_questions(list(QUESTIONS), tmp_path / "bench" / "questions.jsonl")
         monkeypatch.setattr(runner_module, "anthropic_transport", FakeTransport)
 
@@ -964,7 +971,7 @@ class TestCli:
         assert dry.exit_code == 0
         assert "2 questions, 0 cached, 2 would be sent" in dry.stdout
 
-        for condition in ("plain", "labelled"):
+        for condition in ("plain", "plannotated"):
             result = self._invoke("-v", "run", "--condition", condition)
             assert result.exit_code == 0, result.output
             assert "1/3" in result.stdout
@@ -1028,7 +1035,7 @@ class TestCli:
     ) -> None:
         """What was answered before it stays cached."""
         monkeypatch.chdir(tmp_path)
-        (tmp_path / "labelled.pdf").write_bytes((drawings / "labelled.pdf").read_bytes())
+        (tmp_path / "plannotated.pdf").write_bytes((drawings / "plannotated.pdf").read_bytes())
         write_questions(list(QUESTIONS), tmp_path / "bench" / "questions.jsonl")
 
         def failing() -> Callable[[dict[str, object]], Reply]:

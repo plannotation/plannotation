@@ -3,8 +3,8 @@
 
 A sheet is a page of paper with a frame, a title block and one or more viewports on it.
 This module writes that SVG, and it writes it as text rather than through a DOM, for
-one reason: every number it emits is also a number the label records, and keeping the
-two in one place is what stops them disagreeing. A sheet built here returns both the
+one reason: every number it emits is also a number the plannotation records, and keeping
+the two in one place is what stops them disagreeing. A sheet built here returns both the
 SVG and the paper geometry of everything it drew.
 
 The SVG is written in paper millimetres with a ``viewBox`` of one user unit per
@@ -13,8 +13,8 @@ way in. SVG is y-down and paper is y-up, so every y written here is ``height - y
 that flip happens in exactly one function.
 
 Nothing here is decorative. A frame, a title block, grid bubbles, dimensions, tags and
-a callout are the parts of a sheet that a label has something to say about, and a
-sample that omitted them would exercise nothing.
+a callout are the parts of a sheet that a plannotation has something to say about, and
+a sample that omitted them would exercise nothing.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def _n(value: float) -> str:
 
     Returns:
         Its text, without a trailing ``.0`` on a whole number, so that the SVG a reader
-        opens carries the same digits the label does.
+        opens carries the same digits the plannotation does.
     """
     rounded = round(float(value), COORD_DECIMALS)
     return str(int(rounded)) if rounded == int(rounded) else str(rounded)

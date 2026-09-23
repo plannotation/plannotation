@@ -3,8 +3,8 @@
 
 The HTML cannot be driven from pytest without a browser, so what is tested here is
 what a browser-free test can honestly establish: that the file is self-contained, that
-it reads labels the way this project writes them, and that the conventions it hard-codes
-still match the format. A manual check against the samples is recorded in
+it reads plannotations the way this project writes them, and that the conventions it
+hard-codes still match the format. A manual check against the samples is recorded in
 ``docs/inspector.md``; this catches the ways it would silently stop working.
 """
 
@@ -62,7 +62,7 @@ class TestTheInspectorIsOneFile:
 class TestItReadsWhatThisProjectWrites:
     """The conventions the inspector hard-codes must match the ones Plannotation emits."""
 
-    def test_it_looks_for_labels_in_the_name_tree(self) -> None:
+    def test_it_looks_for_plannotations_in_the_name_tree(self) -> None:
         """It reads the EmbeddedFiles name tree.
 
         pdf.js exposes that tree through getAttachments, which is why the carrier
@@ -89,7 +89,7 @@ class TestItReadsWhatThisProjectWrites:
         for level in ("L1", "L2", "L3"):
             assert f'"{level}"' in source
 
-    def test_it_draws_every_kind_of_thing_a_label_holds(self) -> None:
+    def test_it_draws_every_kind_of_thing_a_plannotation_holds(self) -> None:
         """Viewports, elements and annotations, each separately switchable."""
         source = html()
         for kind in ("viewports", "elements", "annotations"):
@@ -105,7 +105,7 @@ class TestItReadsWhatThisProjectWrites:
         """A sheet title is text somebody typed, and it goes into the DOM."""
         assert "&amp;" in html()
 
-    def test_a_label_that_will_not_parse_is_treated_as_absent(self) -> None:
+    def test_a_plannotation_that_will_not_parse_is_treated_as_absent(self) -> None:
         """SPEC 4.3 (2), which binds a reader whatever language it is written in."""
         assert "catch" in html()
 
@@ -146,7 +146,7 @@ class TestTheInspectCommand:
         payload = json.loads(result.stdout)
         assert payload["pages"]["0"]["sheet"]["id"] == "ARC-101"
 
-    def test_a_document_with_no_labels_says_so(self, tmp_path: Path) -> None:
+    def test_a_document_with_no_plannotations_says_so(self, tmp_path: Path) -> None:
         """Rather than printing an empty table, which reads like an empty drawing."""
         import tests.pdf_fixtures as fx
 
@@ -154,7 +154,7 @@ class TestTheInspectCommand:
         plain.write_bytes(fx.build_drawing_set())
         result = self._run(str(plain))
         assert result.exit_code == 0
-        assert "no Plannotation labels" in result.stdout
+        assert "no plannotations" in result.stdout
 
     def test_an_unreadable_document_exits_two(self, tmp_path: Path) -> None:
         """Two is "could not read this", which is not the same as "nothing in it"."""
@@ -162,7 +162,7 @@ class TestTheInspectCommand:
         broken.write_text("{ not json", encoding="utf-8")
         assert self._run(str(broken)).exit_code == 2
 
-    def test_asking_for_a_page_with_no_label_exits_two(self, tmp_path: Path) -> None:
+    def test_asking_for_a_page_with_no_plannotation_exits_two(self, tmp_path: Path) -> None:
         """A silent empty result would read as "this page has nothing on it"."""
         import tests.pdf_fixtures as fx
 

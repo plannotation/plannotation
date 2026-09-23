@@ -16,7 +16,7 @@ between them decide whether a drawing appears:
 ``setSectionHeight(...)``
     Where the cut is. A model whose storeys carry no elevation gives
     ``setSectionHeightsFromStoreys`` nothing to work from, so the height is passed
-    explicitly and recorded in the label as the viewport's ``cutHeight``.
+    explicitly and recorded in the plannotation as the viewport's ``cutHeight``.
 
 What comes out carries the conventions the design brief names and Plannotation must not
 disturb: a product group is ``id="product-<uuid>-body"`` with ``class="IfcWall"``,
@@ -64,7 +64,8 @@ class DrawnProduct:
         and marks neither, so the SVG does not know. The exporter decides it from the
         model instead -- a product is cut when its own vertical extent contains the
         section height -- which is where the answer actually lives. Guessing it from
-        the drawing would put a confident value in the label that nothing supports.
+        the drawing would put a confident value in the plannotation that nothing
+        supports.
     """
 
     guid: str
@@ -75,7 +76,7 @@ class DrawnProduct:
 
 @dataclass(frozen=True)
 class RenderedView:
-    """One rendered view and everything a label needs from it.
+    """One rendered view and everything a plannotation needs from it.
 
     Attributes:
         svg: The serializer's SVG text.
@@ -233,14 +234,14 @@ def read_products(svg: str) -> list[DrawnProduct]:
 
     The GlobalId is taken from ``ifc:guid`` rather than from the element id. The id is a
     fresh UUID that identifies the shape within this one file and means nothing outside
-    it; the guid is the identity the model and the label share.
+    it; the guid is the identity the model and the plannotation share.
 
     Groups nest -- every product sits inside the view group -- so the extent of a group
     is found by counting opening and closing tags rather than by matching to the next
     ``</g>``. A non-greedy match stops at the first close, which for nested groups means
     the outer group swallows the first product and it silently disappears from the
-    label. That is exactly the failure this function was written with and it cost a
-    wall.
+    plannotation. That is exactly the failure this function was written with and it
+    cost a wall.
 
     Args:
         svg: The serializer's output.

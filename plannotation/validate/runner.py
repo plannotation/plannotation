@@ -8,19 +8,19 @@ a bounded path.
 
 Three inputs, one set of rules
 ------------------------------
-``plannotation validate`` accepts a labelled PDF, a sidecar, or a bare labels JSON --
-which may be one page label or an array of them -- and an index on its own, because
-someone with a ``plannotation-index.json`` in front of them will try it and deserves an
-answer rather than exit 2.
+``plannotation validate`` accepts a plannotated PDF, a sidecar, or a bare plannotations
+JSON -- which may be one plannotation or an array of them -- and an index on its own,
+because someone with a ``plannotation-index.json`` in front of them will try it and
+deserves an answer rather than exit 2.
 
-Every page label reaches the rules as a pair: the **parsed document** and the **loaded
+Every plannotation reaches the rules as a pair: the **parsed document** and the **loaded
 model**. Two rules must see the parsed document, because :class:`plannotation.model.
 Plannotation` refuses to construct at all when they are broken -- a repeated ``localId``
 and an inferred item with no confidence -- and a rule whose violation stops the model
 loading cannot be checked afterwards. Where only a model is in hand, as it is for every
-label read out of a PDF, the parsed document is reconstructed from it by a canonical
-round trip. On that document the two rules cannot fire, which is correct: the model
-enforced them, and they are the model's to enforce there.
+plannotation read out of a PDF, the parsed document is reconstructed from it by a
+canonical round trip. On that document the two rules cannot fire, which is correct: the
+model enforced them, and they are the model's to enforce there.
 
 Bounded reading
 ---------------
@@ -34,7 +34,7 @@ through that reader -- there is no PDF to read it out of -- so
 the filesystem, before anything is allocated.
 
 The PDF is opened a second time, read-only, for one rule: PL-GEO-001, which compares
-each label's ``page`` block with the page it is attached to and is delegated to
+each plannotation's ``page`` block with the page it is attached to and is delegated to
 :func:`plannotation.pdf.embed.check_plannotations_against` so that the validator and ``attach``
 cannot disagree about it. That function takes an open document and the carrier module
 exposes no way to borrow the one the reader used, so the file is parsed twice. The
@@ -89,7 +89,7 @@ def validate(
     strict: bool = False,
     run_verapdf: bool = False,
 ) -> Report:
-    """Validate a labelled PDF, a sidecar, or a labels JSON file.
+    """Validate a plannotated PDF, a sidecar, or a plannotations JSON file.
 
     Args:
         source: The file to validate. Never modified.
@@ -139,23 +139,23 @@ def _looks_like_pdf(path: Path) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# One page label
+# One plannotation
 # ---------------------------------------------------------------------------
 def check_page_document(document: Mapping[str, object], *, source: str = "page") -> list[Finding]:
-    """Run the rules that must see the parsed page label rather than the model.
+    """Run the rules that must see the parsed plannotation rather than the model.
 
     Two of them, and they are here rather than beside their families because of when
-    they have to run. :class:`plannotation.model.Plannotation` refuses to construct a label
-    with a repeated ``localId``, and :class:`plannotation.model.Element` refuses to
-    construct an inferred item with no confidence. Run after the model had its say,
-    both violations would have become "this file would not load", which names neither
-    rule and tells a person nothing they can fix. So they run first, on the parsed
-    document, while they are still visible -- and their companions in 4.6, which the
-    model does not refuse, run with them so that everything a reader can learn from
+    they have to run. :class:`plannotation.model.Plannotation` refuses to construct a
+    plannotation with a repeated ``localId``, and :class:`plannotation.model.Element`
+    refuses to construct an inferred item with no confidence. Run after the model had
+    its say, both violations would have become "this file would not load", which names
+    neither rule and tells a person nothing they can fix. So they run first, on the
+    parsed document, while they are still visible -- and their companions in 4.6, which
+    the model does not refuse, run with them so that everything a reader can learn from
     the document alone is learnt in one pass.
 
     Args:
-        document: The parsed page label. It must already be schema-valid: these rules
+        document: The parsed plannotation. It must already be schema-valid: these rules
             read members the schema constrains and do not re-check their shapes.
         source: Which document it is, for the findings.
 
@@ -169,61 +169,62 @@ def check_page_document(document: Mapping[str, object], *, source: str = "page")
 
 
 def check_plannotation(
-    label: Plannotation,
+    plannotation: Plannotation,
     *,
     source: str = "page",
     page_count: int | None = None,
 ) -> list[Finding]:
-    """Run every rule that applies to one loaded page label.
+    """Run every rule that applies to one loaded plannotation.
 
     Rules 2, 3 and 5 -- references, geometry and provenance -- less the two that must
     see the parsed document, which are :func:`check_page_document`. This is the entry
-    point for a caller that already holds a loaded label, and it is what
+    point for a caller that already holds a loaded plannotation, and it is what
     ``tools/check_fixtures.py`` calls, so that the fixture corpus is held to exactly
     the rules the validator applies and not to a second copy of them.
 
     Args:
-        label: The loaded page label.
-        source: Which document the label is, for the findings.
-        page_count: The page count of the document the label belongs to, when one is in
-            front of the validator. None when there is not, in which case
+        plannotation: The loaded plannotation.
+        source: Which document the plannotation is, for the findings.
+        page_count: The page count of the document the plannotation belongs to, when one
+            is in front of the validator. None when there is not, in which case
             ``target.pdfPage`` is not bounded.
 
     Returns:
         Every violation, in no particular order; the caller sorts.
     """
     return [
-        *referential.check_references(label, source=source, page_count=page_count),
-        *geometric.check_geometry(label, source=source),
-        *provenance.check_provenance(label, source=source),
+        *referential.check_references(plannotation, source=source, page_count=page_count),
+        *geometric.check_geometry(plannotation, source=source),
+        *provenance.check_provenance(plannotation, source=source),
     ]
 
 
-def _round_trip(label: Plannotation) -> Mapping[str, object]:
-    """Reconstruct the parsed document of a label that arrived as a model.
+def _round_trip(plannotation: Plannotation) -> Mapping[str, object]:
+    """Reconstruct the parsed document of a plannotation that arrived as a model.
 
-    Used where the label was read out of a PDF, and there is therefore no parsed
+    Used where the plannotation was read out of a PDF, and there is therefore no parsed
     document to hand: the bounded reader returns models. On the reconstruction neither
     rule of :func:`check_page_document` can fire, which is correct -- the model refused
-    to load a label that broke either, and there it is the model's business to enforce
-    them.
+    to load a plannotation that broke either, and there it is the model's business to
+    enforce them.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
 
     Returns:
         Its canonical JSON, parsed. Numbers come back rounded to three decimals, which
-        is the form the label was written in and the form it would have been read in.
+        is the form the plannotation was written in and the form it would have been
+        read in.
     """
-    parsed = json.loads(canonical_json(label))
+    parsed = json.loads(canonical_json(plannotation))
     return parsed if isinstance(parsed, dict) else {}
 
 
 def _page_source(document: object, fallback: str) -> str:
-    """Name a page label for a finding.
+    """Name a plannotation for a finding.
 
     Args:
-        document: The parsed page label, which may not have loaded.
+        document: The parsed plannotation, which may not have loaded.
         fallback: What to call it when it does not say which page it describes.
 
     Returns:
@@ -238,11 +239,11 @@ def _page_source(document: object, fallback: str) -> str:
     return fallback
 
 
-def _summary(label: Plannotation, page_index: int) -> PageSummary:
-    """Summarise one loaded page label.
+def _summary(plannotation: Plannotation, page_index: int) -> PageSummary:
+    """Summarise one loaded plannotation.
 
     Args:
-        label: The label.
+        plannotation: The plannotation.
         page_index: The page it was found on.
 
     Returns:
@@ -250,21 +251,21 @@ def _summary(label: Plannotation, page_index: int) -> PageSummary:
     """
     return PageSummary(
         page_index=page_index,
-        sheet_id=label.sheet.sheet_id,
-        level=conformance_level(label),
-        declared_version=label.plannotation,
-        implemented=label.plannotation == SCHEMA_VERSION,
-        viewports=len(label.viewports or []),
-        elements=len(label.elements or []),
-        annotations=len(label.annotations or []),
+        sheet_id=plannotation.sheet.sheet_id,
+        level=conformance_level(plannotation),
+        declared_version=plannotation.plannotation,
+        implemented=plannotation.plannotation == SCHEMA_VERSION,
+        viewports=len(plannotation.viewports or []),
+        elements=len(plannotation.elements or []),
+        annotations=len(plannotation.annotations or []),
     )
 
 
 def _unloadable_summary(document: object, page_index: int) -> PageSummary:
-    """Summarise a page label that did not load.
+    """Summarise a plannotation that did not load.
 
     Args:
-        document: The parsed page label, or whatever was found in its place.
+        document: The parsed plannotation, or whatever was found in its place.
         page_index: The page it was found on, or claims.
 
     Returns:
@@ -301,7 +302,7 @@ def _validate_pdf(
     strict: bool,
     run_verapdf: bool,
 ) -> Report:
-    """Validate a labelled PDF.
+    """Validate a plannotated PDF.
 
     Args:
         path: The document.
@@ -325,26 +326,26 @@ def _validate_pdf(
     except (CarrierError, OSError) as exc:
         msg = f"{path} could not be read as a PDF: {exc}"
         raise InputNotValidatableError(msg) from exc
-    if read.labels.is_empty and not findings:
+    if read.plannotations.is_empty and not findings:
         msg = (
             f"{path} carries no Plannotation data. `plannotation attach` puts some there; a "
-            f"document that was never labelled is not invalid, only unlabelled"
+            f"document that was never plannotated is not invalid, only unplannotated"
         )
         raise InputNotValidatableError(msg)
 
-    pairs = sorted(read.labels.pages.items())
+    pairs = sorted(read.plannotations.pages.items())
     page_count = read.page_count
     notes: list[str] = []
     findings += _pair_with_document(path, pairs, attached=True, notes=notes)
-    for page_index, label in pairs:
+    for page_index, plannotation in pairs:
         source = f"page {page_index}"
-        findings += check_page_document(_round_trip(label), source=source)
-        findings += check_plannotation(label, source=source, page_count=page_count)
+        findings += check_page_document(_round_trip(plannotation), source=source)
+        findings += check_plannotation(plannotation, source=source, page_count=page_count)
     findings += referential.check_sheet_ids(pairs)
     findings += carrier.check_declaration(
-        present=read.declaration, labelled=not read.labels.is_empty, source=path.name
+        present=read.declaration, plannotated=not read.plannotations.is_empty, source=path.name
     )
-    findings += _check_index(read.labels.index, pairs, source="index")
+    findings += _check_index(read.plannotations.index, pairs, source="index")
     findings += _check_model(pairs, model, notes)
     if run_verapdf:
         findings += verapdf.check_verapdf(path, source=path.name)
@@ -353,7 +354,7 @@ def _validate_pdf(
     report = Report(
         source=path,
         carrier="pdf",
-        pages=tuple(_summary(label, page_index) for page_index, label in pairs),
+        pages=tuple(_summary(plannotation, page_index) for page_index, plannotation in pairs),
         notes=tuple(notes),
         strict=strict,
     )
@@ -370,16 +371,16 @@ def _pair_with_document(
     """Check a payload against the document it belongs to.
 
     Three rules live here and nowhere else, because only a document can decide them:
-    PL-REF-008, that each label names a page that exists (and, in a PDF, the page it is
-    attached to); PL-GEO-001, that the label's ``page`` block matches that page; and
-    PL-CAR-007, that at least one label pairs with something -- 6.5.5's three
-    obligations on a reader that pairs a payload with a document.
+    PL-REF-008, that each plannotation names a page that exists (and, in a PDF, the page
+    it is attached to); PL-GEO-001, that the plannotation's ``page`` block matches that
+    page; and PL-CAR-007, that at least one plannotation pairs with something -- 6.5.5's
+    three obligations on a reader that pairs a payload with a document.
 
     Args:
         document: The PDF.
-        pairs: The page labels, each with the page it was found on -- which for a PDF
+        pairs: The plannotations, each with the page it was found on -- which for a PDF
             is where it was attached, and for a sidecar is the page it claims.
-        attached: True when the labels came out of this document, so that a
+        attached: True when the plannotations came out of this document, so that a
             ``page.index`` disagreeing with the attachment is reportable; False for a
             sidecar, where there is no attachment to disagree with.
         notes: Collected notes, appended to when the pairing cannot be made at all.
@@ -391,17 +392,19 @@ def _pair_with_document(
     try:
         with pikepdf.open(document) as pdf:
             page_count = len(pdf.pages)
-            for page_index, label in pairs:
+            for page_index, plannotation in pairs:
                 source = f"page {page_index}"
                 identity = carrier.check_page_identity(
-                    label,
+                    plannotation,
                     page_count=page_count,
                     attached_to=page_index if attached else None,
                     source=source,
                 )
                 findings += identity
                 if not identity:
-                    findings += geometric.check_page_against_document(pdf, label, source=source)
+                    findings += geometric.check_page_against_document(
+                        pdf, plannotation, source=source
+                    )
             findings += carrier.check_pairing(pairs, page_count=page_count, source=document.name)
     except (pikepdf.PdfError, OSError) as exc:
         _LOGGER.warning("could not open %s to measure its pages: %s", document, exc)
@@ -422,7 +425,7 @@ def _validate_json(
     strict: bool,
     run_verapdf: bool,
 ) -> Report:
-    """Validate a sidecar, an index, a page label or an array of page labels.
+    """Validate a sidecar, an index, a plannotation or an array of plannotations.
 
     Args:
         path: The file.
@@ -442,7 +445,7 @@ def _validate_json(
 
         msg = (
             f"--verapdf validates a PDF, and {path} is not one. Run it against the "
-            f"labelled document rather than against its labels"
+            f"plannotated document rather than against its plannotations"
         )
         raise ExternalToolError(msg)
     raw = schema.read_json_file(path)
@@ -450,9 +453,9 @@ def _validate_json(
     kind = schema.detect_kind(document)
     if kind is None:
         msg = (
-            f"{path} is not a Plannotation document. Pass a labelled PDF, a sidecar "
-            f"({{plannotation, index, pages}}), an index, a page label, or an array of "
-            f"page labels"
+            f"{path} is not a Plannotation document. Pass a plannotated PDF, a sidecar "
+            f"({{plannotation, index, pages}}), an index, a plannotation, or an array of "
+            f"plannotations"
         )
         raise InputNotValidatableError(msg)
     beside = _document_beside(path) if kind is schema.DocumentKind.SIDECAR else None
@@ -468,7 +471,7 @@ def _validate_json(
     report = Report(
         source=path,
         carrier=carrier_name,
-        pages=tuple(_summary(label, page_index) for page_index, label in pages),
+        pages=tuple(_summary(plannotation, page_index) for page_index, plannotation in pages),
         notes=tuple(notes),
         strict=strict,
     )
@@ -546,14 +549,14 @@ def _dispatch(
             None when it was not paired with one.
 
     Returns:
-        The findings, the page labels that loaded paired with the page each claims, and
+        The findings, the plannotations that loaded paired with the page each claims, and
         the carrier name for the report.
     """
     if kind is schema.DocumentKind.SIDECAR:
         return (*_validate_sidecar(document, path=path, page_count=page_count), "sidecar")
     if kind is schema.DocumentKind.INDEX:
         notes.append(
-            "an index on its own names pages whose labels are not here, so the rules "
+            "an index on its own names pages whose plannotations are not here, so the rules "
             "that compare the two (PL-CAR-001 to PL-CAR-003, PL-PRV-006) were not run"
         )
         return (_validate_index_alone(document, path=path), [], "index")
@@ -577,18 +580,19 @@ def _validate_one_plannotation(
     fallback: str,
     page_count: int | None = None,
 ) -> tuple[list[Finding], Plannotation | None]:
-    """Validate one page label read from a JSON file.
+    """Validate one plannotation read from a JSON file.
 
     Args:
-        member: The parsed page label.
+        member: The parsed plannotation.
         fallback: What to call it when it does not say which page it describes.
-        page_count: The page count of the document this label belongs to, when one was
-            found; None otherwise.
+        page_count: The page count of the document this plannotation belongs to, when
+            one was found; None otherwise.
 
     Returns:
-        Its findings, and the loaded label when it loaded. A label that fails its
-        schema is not examined further: 4.3 (2) makes it absent, and every rule below
-        the schema would be reading a document the specification says is not there.
+        Its findings, and the loaded plannotation when it loaded. A plannotation that
+        fails its schema is not examined further: 4.3 (2) makes it absent, and every
+        rule below the schema would be reading a document the specification says is not
+        there.
     """
     source = _page_source(member, fallback)
     version = schema.check_version(member, source=source)
@@ -600,20 +604,20 @@ def _validate_one_plannotation(
     parsed = member if isinstance(member, dict) else {}
     findings = check_page_document(parsed, source=source)
     try:
-        label = load_plannotation(json.dumps(member))
+        plannotation = load_plannotation(json.dumps(member))
     except ValueError as exc:
         findings.append(
             finding(
                 "PL-SCH-002",
-                message=f"the schema accepts this label but the model does not: {exc}",
+                message=f"the schema accepts this plannotation but the model does not: {exc}",
                 path="",
                 source=source,
             )
         )
         return (findings, None)
     return (
-        findings + check_plannotation(label, source=source, page_count=page_count),
-        label,
+        findings + check_plannotation(plannotation, source=source, page_count=page_count),
+        plannotation,
     )
 
 
@@ -623,7 +627,7 @@ def _validate_sidecar(
     path: Path,
     page_count: int | None,
 ) -> tuple[list[Finding], list[tuple[int, Plannotation]]]:
-    """Validate a sidecar and every page label in it.
+    """Validate a sidecar and every plannotation in it.
 
     Args:
         document: The parsed sidecar.
@@ -631,7 +635,7 @@ def _validate_sidecar(
         page_count: The page count of the document beside it, when there is one.
 
     Returns:
-        The findings, and the page labels that loaded paired with the page each claims.
+        The findings, and the plannotations that loaded paired with the page each claims.
     """
     version = schema.check_version(document, source=path.name)
     if version is not None:
@@ -659,14 +663,14 @@ def _validate_sidecar(
     raw_pages = raw.get("pages")
     members = raw_pages if isinstance(raw_pages, list) else []
     pages: list[tuple[int, Plannotation]] = []
-    for position, label in enumerate(sidecar.pages):
+    for position, plannotation in enumerate(sidecar.pages):
         parsed = members[position] if position < len(members) else None
-        source = f"page {label.page.index}"
+        source = f"page {plannotation.page.index}"
         findings += check_page_document(
-            parsed if isinstance(parsed, dict) else _round_trip(label), source=source
+            parsed if isinstance(parsed, dict) else _round_trip(plannotation), source=source
         )
-        findings += check_plannotation(label, source=source, page_count=page_count)
-        pages.append((label.page.index, label))
+        findings += check_plannotation(plannotation, source=source, page_count=page_count)
+        pages.append((plannotation.page.index, plannotation))
     findings += referential.check_sheet_ids(sorted(pages, key=lambda pair: pair[0]))
     findings += _check_index(sidecar.index, pages, source="index")
     return (findings, pages)
@@ -706,7 +710,7 @@ def _document_beside(sidecar: Path) -> Path | None:
 
 
 def _validate_index_alone(document: object, *, path: Path) -> list[Finding]:
-    """Validate an index file with no labels beside it.
+    """Validate an index file with no plannotations beside it.
 
     Args:
         document: The parsed index.
@@ -715,7 +719,7 @@ def _validate_index_alone(document: object, *, path: Path) -> list[Finding]:
     Returns:
         Its findings: the version, the schema, and whether the model accepts it. There
         is nothing else an index can be held to on its own -- every other rule about an
-        index compares it with the labels it describes.
+        index compares it with the plannotations it describes.
     """
     version = schema.check_version(document, source=path.name)
     if version is not None:
@@ -750,11 +754,11 @@ def _check_index(
 
     Args:
         index: The index, or None when there is none.
-        pages: The page labels, paired with the page each was found on.
+        pages: The plannotations, paired with the page each was found on.
         source: What to call the index in a finding.
 
     Returns:
-        Every disagreement between the index and the labels beside it.
+        Every disagreement between the index and the plannotations beside it.
     """
     if index is None:
         return []
@@ -772,7 +776,7 @@ def _check_model(
     """Run the IFC cross-check, when the caller asked for one.
 
     Args:
-        pages: The page labels, paired with the page each was found on.
+        pages: The plannotations, paired with the page each was found on.
         model: The opened model, or None.
         notes: Collected notes, appended to either way.
 
@@ -787,9 +791,9 @@ def _check_model(
         return []
     findings: list[Finding] = []
     remeasurable = 0
-    for page_index, label in pages:
-        findings += ifc.check_against_model(label, model, source=f"page {page_index}")
-        remeasurable += ifc.remeasurable(label)
+    for page_index, plannotation in pages:
+        findings += ifc.check_against_model(plannotation, model, source=f"page {page_index}")
+        remeasurable += ifc.remeasurable(plannotation)
     notes.append(
         f"the model cross-check ran against {model.path.name}; {remeasurable} "
         f"dimension(s) named two elements with a GlobalId and could be re-measured"

@@ -76,7 +76,7 @@ def model_marks(model_path: Path) -> dict[str, list[tuple[str, str]]]:
     return marks
 
 
-def match_to_model(label: Plannotation, model_path: Path) -> tuple[Plannotation, int]:
+def match_to_model(plannotation: Plannotation, model_path: Path) -> tuple[Plannotation, int]:
     """Fill in GlobalIds and classes for inferred elements whose mark the model holds.
 
     An ambiguous mark -- one the model gives to two elements -- is left unmatched
@@ -84,16 +84,16 @@ def match_to_model(label: Plannotation, model_path: Path) -> tuple[Plannotation,
     about the building that no later reader could detect.
 
     Args:
-        label: An inferred page label.
+        plannotation: An inferred plannotation.
         model_path: The IFC file it was drawn from.
 
     Returns:
-        The label with matched elements filled in, and how many were matched.
+        The plannotation with matched elements filled in, and how many were matched.
     """
     marks = model_marks(model_path)
     matched = 0
     elements: list[Element] = []
-    for element in label.elements or []:
+    for element in plannotation.elements or []:
         candidates = marks.get(normalise_mark(element.tag or ""), [])
         if len(candidates) == 1:
             guid, ifc_class = candidates[0]
@@ -110,5 +110,5 @@ def match_to_model(label: Plannotation, model_path: Path) -> tuple[Plannotation,
         else:
             elements.append(element)
     if not matched:
-        return label, 0
-    return label.model_copy(update={"elements": elements}), matched
+        return plannotation, 0
+    return plannotation.model_copy(update={"elements": elements}), matched

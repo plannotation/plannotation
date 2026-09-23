@@ -34,7 +34,7 @@ uv run pre-commit install
 These come from the project's design constraints. A pull request that breaks one
 of them will be rejected regardless of how good the rest of it is.
 
-### 1. The PDF is the leading document; the label is auxiliary
+### 1. The PDF is the leading document; the plannotation is auxiliary
 
 Plannotation never alters how a drawing looks or prints. Concretely: **never** modify
 page content streams, **never** add visible marks, **never** delete third-party
@@ -42,7 +42,7 @@ attachments or metadata. The appearance-guarantee test rasterises every page bef
 and after and asserts the pixel arrays are *identical* — not merely similar.
 
 When the specification is ambiguous, choose the reading that keeps the PDF leading
-and the label auxiliary, then write that decision into `spec/SPEC.md`.
+and the plannotation auxiliary, then write that decision into `spec/SPEC.md`.
 
 ### 2. Licence policy
 
@@ -66,7 +66,7 @@ Run `make licenses` to regenerate `THIRD_PARTY_LICENSES.md` when the set changes
 
 Every element and annotation carries `provenance`. `authored` means it was written
 from the model by the authoring tool. `inferred` means it was reconstructed from
-the drawing by a reader, and it **must** carry a `confidence`. Never label
+the drawing by a reader, and it **must** carry a `confidence`. Never mark
 reconstructed data as authored.
 
 ### 4. The vocabulary is IFC's
@@ -130,6 +130,6 @@ anything normative is reflected in `spec/SPEC.md`.
 Please do not open a public issue. Use
 [private vulnerability reporting](https://github.com/plannotation/plannotation/security/advisories/new).
 
-Note the threat model in `spec/SPEC.md`: labels are **data, never executable**, and
-a conforming reader is required to validate a label against the schema before
-trusting any value in it.
+Note the threat model in `spec/SPEC.md`: plannotations are **data, never
+executable**, and a conforming reader is required to validate a plannotation against
+the schema before trusting any value in it.

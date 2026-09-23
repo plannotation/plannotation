@@ -1,7 +1,7 @@
 # plannotation-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that serves Plannotation-labelled
-drawing sets to MCP hosts such as Claude Desktop, over stdio or streamable HTTP.
+An [MCP](https://modelcontextprotocol.io) server that serves plannotated drawing sets
+to MCP hosts such as Claude Desktop, over stdio or streamable HTTP.
 
 ```bash
 uvx plannotation-mcp --root ~/Drawings

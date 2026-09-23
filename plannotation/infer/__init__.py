@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Reconstruct labels for legacy PDFs that were never authored with Plannotation.
+"""Reconstruct plannotations for legacy PDFs that were never authored with Plannotation.
 
-A drawing office has decades of PDFs and none of them has a label. This package reads
-what is printed on each page -- the title block, grid bubbles, dimensions, marks and
-callouts -- and writes a label saying what it found. It never modifies the input: the
-output is a labelled copy (design brief section 12).
+A drawing office has decades of PDFs and none of them has a plannotation. This package
+reads what is printed on each page -- the title block, grid bubbles, dimensions, marks
+and callouts -- and writes a plannotation saying what it found. It never modifies the
+input: the output is a plannotated copy (design brief section 12).
 
 Everything produced here carries ``provenance: inferred`` and a ``confidence``
 (SPEC 4.6), and SPEC 4.6.6 forbids promoting any of it to ``authored``, however good
@@ -35,26 +35,26 @@ __all__ = ["infer_document", "infer_plannotations"]
 def infer_plannotations(
     pdf: Path, *, ifc_model: Path | None = None
 ) -> tuple[list[Plannotation], int]:
-    """Reconstruct a label for every page of a document.
+    """Reconstruct a plannotation for every page of a document.
 
     Args:
         pdf: The document to read.
         ifc_model: An IFC model to match marks against, or None.
 
     Returns:
-        One label per page, and how many elements were matched to the model.
+        One plannotation per page, and how many elements were matched to the model.
     """
-    labels: list[Plannotation] = []
+    plannotations: list[Plannotation] = []
     matched = 0
     for page_index in range(page_count(pdf)):
-        label = infer_page(
+        plannotation = infer_page(
             extract_page(pdf, page_index), page_index=page_index, generator_version=__version__
         )
         if ifc_model is not None:
-            label, count = match_to_model(label, ifc_model)
+            plannotation, count = match_to_model(plannotation, ifc_model)
             matched += count
-        labels.append(label)
-    return labels, matched
+        plannotations.append(plannotation)
+    return plannotations, matched
 
 
 def infer_document(
@@ -64,14 +64,14 @@ def infer_document(
     ifc_model: Path | None = None,
     mod_date: datetime | None = None,
 ) -> dict[str, object]:
-    """Infer labels for a document and write a labelled copy.
+    """Infer plannotations for a document and write a plannotated copy.
 
     The input is never modified: the design brief is explicit, and a tool that edits the
     only copy of a legacy drawing is a tool nobody can afford to try.
 
     Args:
         pdf: The document to read.
-        out: Where to write the labelled copy, which must not be the input.
+        out: Where to write the plannotated copy, which must not be the input.
         ifc_model: An IFC model to match marks against, or None.
         mod_date: The timestamp to stamp, or None for now.
 
@@ -82,19 +82,19 @@ def infer_document(
         ValueError: If ``out`` is the input.
     """
     if out.resolve() == pdf.resolve():
-        msg = "infer writes a labelled copy and never modifies its input; choose another -o"
+        msg = "infer writes a plannotated copy and never modifies its input; choose another -o"
         raise ValueError(msg)
-    labels, matched = infer_plannotations(pdf, ifc_model=ifc_model)
+    plannotations, matched = infer_plannotations(pdf, ifc_model=ifc_model)
     embed.attach(
         pdf,
-        labels,
-        embed.build_index(labels),
+        plannotations,
+        embed.build_index(plannotations),
         out,
         mod_date=mod_date or datetime.now(tz=UTC),
     )
     return {
-        "pages": len(labels),
-        "elements": sum(len(label.elements or []) for label in labels),
-        "annotations": sum(len(label.annotations or []) for label in labels),
+        "pages": len(plannotations),
+        "elements": sum(len(page.elements or []) for page in plannotations),
+        "annotations": sum(len(page.annotations or []) for page in plannotations),
         "matchedToModel": matched,
     }

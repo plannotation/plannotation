@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """Inference, measured against the gate of design brief section 12.
 
-The gate is recall on the three sample drawings with their labels stripped: at least
-90% of tags, 80% of dimensions and every grid, with precision reported. It is measured
-here against the *unlabelled* PDFs, so that nothing can be read off an attached label;
-the authored ``plannotations.json`` beside each is only the answer key.
+The gate is recall on the three sample drawings with their plannotations stripped: at
+least 90% of tags, 80% of dimensions and every grid, with precision reported. It is
+measured here against the *unplannotated* PDFs, so that nothing can be read off an
+attached plannotation; the authored ``plannotations.json`` beside each is only the
+answer key.
 
 Recall alone is easy to game -- call every word a tag and every tag is found -- so
 precision is asserted too, and the patterns are tested on their own so that a regression
@@ -205,30 +206,30 @@ class TestWhatInferenceWrites:
     """SPEC 4.6: everything reconstructed says so."""
 
     @staticmethod
-    def _label(name: str = "positionsplan") -> Any:  # noqa: ANN401
-        """Infer one sample's label.
+    def _plannotation(name: str = "positionsplan") -> Any:  # noqa: ANN401
+        """Infer one sample's plannotation.
 
         Args:
             name: The sample.
 
         Returns:
-            The inferred label.
+            The inferred plannotation.
         """
         from plannotation.infer import infer_plannotations
 
-        [label], _ = infer_plannotations(SAMPLES / name / "sheet.pdf")
-        return label
+        [plannotation], _ = infer_plannotations(SAMPLES / name / "sheet.pdf")
+        return plannotation
 
-    def test_the_label_is_inferred(self) -> None:
+    def test_the_plannotation_is_inferred(self) -> None:
         """Top-level provenance, and it must not claim to be authored."""
         from plannotation.model import Provenance
 
-        assert self._label().provenance is Provenance.INFERRED
+        assert self._plannotation().provenance is Provenance.INFERRED
 
     def test_every_item_is_inferred_with_a_confidence(self) -> None:
         """SPEC 4.6.5: an inferred value that will not say how sure it is withholds the point."""
-        label = self._label()
-        items = [*(label.elements or []), *(label.annotations or [])]
+        plannotation = self._plannotation()
+        items = [*(plannotation.elements or []), *(plannotation.annotations or [])]
         assert items
         for item in items:
             assert item.provenance.value == "inferred"
@@ -238,8 +239,8 @@ class TestWhatInferenceWrites:
     @pytest.mark.parametrize("name", NAMES)
     def test_dimensions_link_to_the_grids_they_span(self, name: str) -> None:
         """So a dimension is a statement about the building, not a number beside a line."""
-        label = self._label(name)
-        dimensions = [a for a in label.annotations or [] if a.annotation_type == "dimension"]
+        plannotation = self._plannotation(name)
+        dimensions = [a for a in plannotation.annotations or [] if a.annotation_type == "dimension"]
         assert dimensions
         assert all(d.measures and len(d.measures) == 2 for d in dimensions)
 
@@ -249,30 +250,32 @@ class TestWhatInferenceWrites:
         Taking the nearest line to the value took grid B's, and the overall dimension
         measured nothing. Grid and level lines are now never a dimension's own.
         """
-        label = self._label("positionsplan")
-        by_id = {a.local_id: a for a in label.annotations or []}
-        overall = next(a for a in label.annotations or [] if a.text == "11400")
+        plannotation = self._plannotation("positionsplan")
+        by_id = {a.local_id: a for a in plannotation.annotations or []}
+        overall = next(a for a in plannotation.annotations or [] if a.text == "11400")
         assert sorted(by_id[end].axis for end in overall.measures or []) == ["A", "C"]
 
     def test_each_bay_of_a_chain_links_to_its_own_grids(self) -> None:
         """Not the whole chain's first and last: 1-2, 2-3 and 3-4 on the floor plan."""
-        label = self._label("floorplan")
-        by_id = {a.local_id: a for a in label.annotations or []}
+        plannotation = self._plannotation("floorplan")
+        by_id = {a.local_id: a for a in plannotation.annotations or []}
         spans = sorted(
             "".join(sorted(str(by_id[end].axis) for end in a.measures or []))
-            for a in label.annotations or []
+            for a in plannotation.annotations or []
             if a.annotation_type == "dimension" and a.text == "2000"
         )
         assert spans == ["12", "23", "34"]
 
     def test_levels_are_read_and_storey_heights_link_to_them(self) -> None:
         """A section's storey heights run between level lines, and say so."""
-        label = self._label("section")
-        levels = {a.local_id: a for a in label.annotations or [] if a.annotation_type == "level"}
+        plannotation = self._plannotation("section")
+        levels = {
+            a.local_id: a for a in plannotation.annotations or [] if a.annotation_type == "level"
+        }
         assert sorted(level.elevation for level in levels.values()) == [0.0, 3.0, 6.0]
         heights = [
             a
-            for a in label.annotations or []
+            for a in plannotation.annotations or []
             if a.annotation_type == "dimension" and set(a.measures or []) <= set(levels)
         ]
         assert sorted(a.value for a in heights) == [3000.0, 3000.0, 6000.0]
@@ -282,7 +285,7 @@ class TestWhatInferenceWrites:
 
     @pytest.mark.parametrize("name", NAMES)
     def test_what_it_writes_validates_clean(self, name: str, tmp_path: Path) -> None:
-        """An inferred label must still satisfy every rule the validator checks."""
+        """An inferred plannotation must still satisfy every rule the validator checks."""
         from plannotation.infer import infer_document
         from plannotation.validate import validate
 
@@ -316,7 +319,7 @@ class TestMatchingToTheModel:
 
     @pytest.mark.parametrize("name", NAMES)
     def test_every_mark_recovers_its_global_id(self, name: str) -> None:
-        """Checked against the authored label, which the exporter wrote from the model."""
+        """Checked against the authored plannotation, which the exporter wrote from the model."""
         from plannotation.infer import infer_plannotations
         from plannotation.model import load_plannotation
 

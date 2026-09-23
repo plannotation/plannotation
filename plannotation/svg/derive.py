@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Build a page label from a sheet SVG, and attach it to the PDF drawn from that SVG.
+"""Build a plannotation from a sheet SVG, and attach it to the PDF drawn from that SVG.
 
 This is the path for authoring tools that draw through IfcOpenShell's serializer --
 Bonsai among them. The tool already wrote the SVG; its PDF is a rendering of it. The
 SVG carries every product's GlobalId and class and every view's paper-to-model
-transform (:mod:`plannotation.svg.carrier`), so a label written from it is ``authored``:
-it states what the authoring tool drew, not what someone read off the page.
+transform (:mod:`plannotation.svg.carrier`), so a plannotation written from it is
+``authored``: it states what the authoring tool drew, not what someone read off the page.
 
-The label reaches conformance level L2 -- sheet, viewports and elements. Annotations
-(dimensions, tags, grids) are not derived: the serializer does not mark them, and
-guessing them from line work is inference's job, not a carrier's.
+The plannotation reaches conformance level L2 -- sheet, viewports and elements.
+Annotations (dimensions, tags, grids) are not derived: the serializer does not mark
+them, and guessing them from line work is inference's job, not a carrier's.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE_TOLERANCE_MM: Final = 0.5
 
 #: Products an SVG may name that are not building elements drawn on a sheet: the
-#: spatial structure, and the annotation and grid entities a label describes as
+#: spatial structure, and the annotation and grid entities a plannotation describes as
 #: annotations rather than elements.
 NOT_ELEMENTS: Final = frozenset(
     {
@@ -105,16 +105,16 @@ class SheetSource:
 def derive_plannotation(
     sheet: SvgSheet, source: SheetSource, *, page_index: int = 0
 ) -> Plannotation:
-    """Describe a sheet SVG as a page label.
+    """Describe a sheet SVG as a plannotation.
 
     Args:
         sheet: What :func:`plannotation.svg.carrier.read_svg` read.
         source: What the authoring tool knows that the SVG does not.
-        page_index: The page of the PDF the label is for.
+        page_index: The page of the PDF the plannotation is for.
 
     Returns:
-        An ``authored`` label at conformance level L2, or L1 when the sheet draws no
-        IFC product.
+        An ``authored`` plannotation at conformance level L2, or L1 when the sheet
+        draws no IFC product.
     """
     tags = source.tags or {}
     elements: list[Element] = []
@@ -228,21 +228,21 @@ def attach_from_svg(
     *,
     mod_date: datetime,
 ) -> Plannotation:
-    """Label a one-sheet PDF from the SVG it was drawn from.
+    """Plannotate a one-sheet PDF from the SVG it was drawn from.
 
     Args:
         svg: The sheet SVG.
         pdf_in: The PDF rendered from it. Its first page is the sheet.
-        pdf_out: Where to write the labelled copy; ``pdf_in`` is not modified.
+        pdf_out: Where to write the plannotated copy; ``pdf_in`` is not modified.
         source: What the authoring tool knows that the SVG does not.
         mod_date: The modification date to stamp, so the output is reproducible.
 
     Returns:
-        The label that was attached.
+        The plannotation that was attached.
 
     Raises:
         PlannotationMismatchError: If the PDF's first page is not the SVG's page size, which
-            means it is not a rendering of this SVG and the label would misplace
+            means it is not a rendering of this SVG and the plannotation would misplace
             everything on it.
     """
     sheet = read_svg(svg)
@@ -258,9 +258,11 @@ def attach_from_svg(
             "not a rendering of this SVG"
         )
         raise PlannotationMismatchError(msg)
-    label = derive_plannotation(sheet, source)
-    embed.attach(pdf_in, [label], embed.build_index([label]), pdf_out, mod_date=mod_date)
-    return label
+    plannotation = derive_plannotation(sheet, source)
+    embed.attach(
+        pdf_in, [plannotation], embed.build_index([plannotation]), pdf_out, mod_date=mod_date
+    )
+    return plannotation
 
 
 def paper_to_plane(view: SvgView, height_mm: float, unit_scale_to_m: float) -> Affine:

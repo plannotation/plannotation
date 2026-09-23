@@ -34,8 +34,8 @@ PAGE = {"index": 0, "widthMm": 420, "heightMm": 297}
 SHEET = {"id": "A-101"}
 
 
-def label(**extra: JsonValue) -> dict[str, Any]:
-    """Build a minimal valid page-label document.
+def plannotation(**extra: JsonValue) -> dict[str, Any]:
+    """Build a minimal valid plannotation document.
 
     Args:
         **extra: Members merged into the document, overriding defaults.
@@ -81,23 +81,23 @@ class TestCanonicalSerialisation:
 
     def test_round_trip_is_byte_for_byte(self) -> None:
         """Loading a canonical document and re-emitting it reproduces the bytes."""
-        text = canonical_json(load(label()))
+        text = canonical_json(load(plannotation()))
         assert canonical_json(load_plannotation(text)) == text
 
     def test_round_trip_is_a_fixed_point(self) -> None:
         """Serialising twice changes nothing the second time."""
-        once = canonical_json(load(label()))
+        once = canonical_json(load(plannotation()))
         twice = canonical_json(load_plannotation(once))
         assert once == twice
 
     def test_keys_are_sorted(self) -> None:
         """Sorted keys are what makes two writers produce the same bytes."""
-        emitted = json.loads(canonical_json(load(label())))
+        emitted = json.loads(canonical_json(load(plannotation())))
         assert list(emitted) == sorted(emitted)
 
     def test_two_space_indent_lf_and_one_trailing_newline(self) -> None:
         """The serialised form is stable across platforms."""
-        text = canonical_json(load(label()))
+        text = canonical_json(load(plannotation()))
         assert "\r" not in text
         assert text.endswith("\n")
         assert not text.endswith("\n\n")
@@ -105,7 +105,7 @@ class TestCanonicalSerialisation:
 
     def test_canonical_bytes_is_the_utf8_of_canonical_json(self) -> None:
         """Phase 2 embeds these exact bytes, so the two must not drift."""
-        parsed = load(label())
+        parsed = load(plannotation())
         assert canonical_bytes(parsed) == canonical_json(parsed).encode("utf-8")
 
     @pytest.mark.parametrize(
@@ -125,7 +125,7 @@ class TestCanonicalSerialisation:
         Fixing the precision is what makes byte-for-byte golden comparison possible,
         and fixing the tie-break is what makes two implementations agree on 0.8125.
         """
-        doc = label(elements=[element(paperBBox=[written, 0, 100, 100])])
+        doc = plannotation(elements=[element(paperBBox=[written, 0, 100, 100])])
         emitted = canonical_json(load(doc))
         first = re.search(r'"paperBBox": \[\s*([^,\s]+),', emitted)
         assert first is not None, emitted
@@ -133,13 +133,13 @@ class TestCanonicalSerialisation:
 
     def test_non_ascii_is_written_literally(self) -> None:
         """German terms appear in this format; escaping them helps nobody."""
-        doc = label(sheet={"id": "A-101", "title": "Maßstab 1:50 Übersicht"})
+        doc = plannotation(sheet={"id": "A-101", "title": "Maßstab 1:50 Übersicht"})
         assert "Maßstab" in canonical_json(load(doc))
         assert "\\u00df" not in canonical_json(load(doc))
 
     def test_absent_optionals_stay_absent(self) -> None:
         """A default is an annotation, not a value; materialising one breaks the trip."""
-        emitted = json.loads(canonical_json(load(label())))
+        emitted = json.loads(canonical_json(load(plannotation())))
         assert "rotation" not in emitted["page"]
         assert "generator" not in emitted
 
@@ -150,30 +150,30 @@ class TestSchemaFidelity:
     def test_unknown_member_is_rejected(self) -> None:
         """``additionalProperties: false`` means extras are an error, not a warning."""
         with pytest.raises(ValidationError):
-            load(label(unexpected="x"))
+            load(plannotation(unexpected="x"))
 
     @pytest.mark.parametrize("bbox", [[1, 2, 3], [1, 2, 3, 4, 5]])
     def test_bbox_arity_is_exact(self, bbox: list[int]) -> None:
         """A bbox is exactly ``[x0, y0, x1, y1]``."""
         with pytest.raises(ValidationError):
-            load(label(elements=[element(paperBBox=bbox)]))
+            load(plannotation(elements=[element(paperBBox=bbox)]))
 
     @pytest.mark.parametrize("value", [True, "420"])
     def test_a_number_is_not_a_bool_or_a_string(self, value: object) -> None:
         """``True`` is an int in Python; a JSON number is neither it nor a string."""
         with pytest.raises(ValidationError):
-            load(label(page={"index": 0, "widthMm": value, "heightMm": 297}))
+            load(plannotation(page={"index": 0, "widthMm": value, "heightMm": 297}))
 
     @pytest.mark.parametrize("bad", ["not-a-guid", "0123456789012345678901234567890"])
     def test_ifc_guid_pattern(self, bad: str) -> None:
         """A GlobalId is 22 characters of the IFC base64 alphabet."""
         with pytest.raises(ValidationError):
-            load(label(elements=[element(ifcGuid=bad)]))
+            load(plannotation(elements=[element(ifcGuid=bad)]))
 
     def test_extension_keys_must_be_namespaced(self) -> None:
         """Un-namespaced extension keys could collide with a future member."""
         with pytest.raises(ValidationError):
-            load(label(extensions={"vendor": 1}))
+            load(plannotation(extensions={"vendor": 1}))
 
     @pytest.mark.parametrize(
         "bag",
@@ -186,10 +186,10 @@ class TestSchemaFidelity:
     def test_properties_is_as_permissive_as_the_schema(self, bag: dict[str, Any]) -> None:
         """The schema says only ``"type": "object"``.
 
-        A reader stricter than the format would reject conforming third-party labels,
-        which for an interoperability format is the worse failure.
+        A reader stricter than the format would reject conforming third-party
+        plannotations, which for an interoperability format is the worse failure.
         """
-        assert load(label(elements=[element(properties=bag)])) is not None
+        assert load(plannotation(elements=[element(properties=bag)])) is not None
 
     def test_pset_gives_typed_access_to_the_described_shape(self) -> None:
         """Ergonomics live in an accessor rather than in the field's type."""
@@ -219,7 +219,7 @@ class TestProvenanceRules:
     def test_explicit_inferred_requires_a_confidence(self) -> None:
         """An inferred value that will not say how sure it is withholds the point."""
         with pytest.raises(ValidationError):
-            load(label(provenance="inferred", elements=[element(provenance="inferred")]))
+            load(plannotation(provenance="inferred", elements=[element(provenance="inferred")]))
 
     @pytest.mark.parametrize(
         ("declared", "expected"),
@@ -238,17 +238,17 @@ class TestProvenanceRules:
         could say which half an unmarked item came from, and reading silence as
         ``authored`` would overstate what the writer knew.
         """
-        parsed = load(label(provenance=declared, elements=[element()]))
+        parsed = load(plannotation(provenance=declared, elements=[element()]))
         assert parsed.aggregate_provenance is expected
 
-    def test_a_wholly_inferred_label_need_not_repeat_itself(self) -> None:
+    def test_a_wholly_inferred_plannotation_need_not_repeat_itself(self) -> None:
         """This is the case the inheritance rule exists for."""
-        parsed = load(label(provenance="inferred", elements=[element(), element(id="e2")]))
+        parsed = load(plannotation(provenance="inferred", elements=[element(), element(id="e2")]))
         assert parsed.provenance_is_consistent
 
     def test_authored_and_inferred_together_is_mixed(self) -> None:
         """Both kinds are items and are counted together."""
-        doc = label(
+        doc = plannotation(
             provenance="mixed",
             elements=[
                 element(provenance="authored"),
@@ -258,7 +258,7 @@ class TestProvenanceRules:
         assert load(doc).aggregate_provenance is Provenance.MIXED
         assert load(doc).provenance_is_consistent
 
-    def test_an_item_less_label_determines_nothing(self) -> None:
+    def test_an_item_less_plannotation_determines_nothing(self) -> None:
         """With no items there is no evidence either way, so the declaration stands.
 
         Reading it as ``inferred`` would force a title-block sheet written straight
@@ -266,29 +266,29 @@ class TestProvenanceRules:
         let one recovered from a legacy PDF claim it came from a model.
         """
         assert aggregate_provenance([]) is None
-        assert load(label(provenance="inferred")).provenance_is_consistent
-        assert load(label(provenance="authored")).provenance_is_consistent
+        assert load(plannotation(provenance="inferred")).provenance_is_consistent
+        assert load(plannotation(provenance="authored")).provenance_is_consistent
 
 
 class TestConformanceLevels:
     """Design brief §6: L1 page+sheet, L2 adds elements, L3 adds a linked annotation."""
 
-    def test_minimal_label_is_l1(self) -> None:
-        """``page`` and ``sheet`` are schema-required, so every valid label reaches L1."""
-        assert conformance_level(load(label())) is ConformanceLevel.L1
+    def test_minimal_plannotation_is_l1(self) -> None:
+        """``page`` and ``sheet`` are schema-required, so every valid plannotation reaches L1."""
+        assert conformance_level(load(plannotation())) is ConformanceLevel.L1
 
     def test_viewports_alone_do_not_reach_l2(self) -> None:
         """L1 admits viewports; elements are what L2 is about."""
-        doc = label(viewports=[{"id": "vp1", "kind": "plan", "paperBBox": [0, 0, 100, 100]}])
+        doc = plannotation(viewports=[{"id": "vp1", "kind": "plan", "paperBBox": [0, 0, 100, 100]}])
         assert conformance_level(load(doc)) is ConformanceLevel.L1
 
     def test_one_element_reaches_l2(self) -> None:
         """``ifcClass`` and ``paperBBox`` are required, so presence is the whole test."""
-        assert conformance_level(load(label(elements=[element()]))) is ConformanceLevel.L2
+        assert conformance_level(load(plannotation(elements=[element()]))) is ConformanceLevel.L2
 
     def test_unlinked_annotations_stay_at_l2(self) -> None:
         """A north arrow links to nothing and cannot lift a sheet to L3."""
-        doc = label(
+        doc = plannotation(
             elements=[element()],
             annotations=[{"id": "a1", "type": "northArrow", "paperBBox": [0, 0, 10, 10]}],
         )
@@ -306,7 +306,7 @@ class TestConformanceLevels:
     )
     def test_any_one_link_reaches_l3(self, link: dict[str, Any]) -> None:
         """The design brief lists five link kinds and any one of them counts."""
-        doc = label(
+        doc = plannotation(
             elements=[element()],
             annotations=[{"id": "a1", "type": "dimension", "paperBBox": [0, 0, 10, 10], **link}],
         )
@@ -315,7 +315,7 @@ class TestConformanceLevels:
     @pytest.mark.parametrize("empty", [{"shows": {}}, {"target": {}}])
     def test_an_empty_link_is_not_a_link(self, empty: dict[str, Any]) -> None:
         """``shows: {}`` is schema-valid and refers to nothing."""
-        doc = label(
+        doc = plannotation(
             elements=[element()],
             annotations=[{"id": "a1", "type": "tag", "paperBBox": [0, 0, 10, 10], **empty}],
         )
@@ -327,7 +327,7 @@ class TestIdentity:
 
     def test_duplicate_id_across_collections_is_rejected(self) -> None:
         """``measures`` may name an element or a grid, so one namespace is required."""
-        doc = label(
+        doc = plannotation(
             elements=[element(id="x1")],
             annotations=[{"id": "x1", "type": "grid", "paperBBox": [0, 0, 5, 5], "axis": "A"}],
         )
@@ -336,7 +336,7 @@ class TestIdentity:
 
     def test_distinct_ids_are_accepted(self) -> None:
         """The control case for the rule above."""
-        doc = label(
+        doc = plannotation(
             elements=[element(id="x1")],
             annotations=[{"id": "x2", "type": "grid", "paperBBox": [0, 0, 5, 5], "axis": "A"}],
         )

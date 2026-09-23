@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""What a model is shown of one page: its picture, its text, and its label.
+"""What a model is shown of one page: its picture, its text, and its plannotation.
 
 The picture is rendered with the same pinned pdfium options the appearance tests use,
 at 150 dpi, and encoded as PNG here rather than through an imaging library: a PNG of
@@ -42,12 +42,12 @@ class PageInput:
     Attributes:
         png: The page rendered at :data:`BENCH_DPI`, as PNG bytes.
         text: The page's extracted text.
-        label: The page's label as canonical JSON, or None when it has none.
+        plannotation: The page's plannotation as canonical JSON, or None when it has none.
     """
 
     png: bytes
     text: str
-    label: str | None
+    plannotation: str | None
 
 
 def load_page(document: Path, page: int, *, dpi: float = BENCH_DPI) -> PageInput:
@@ -59,7 +59,7 @@ def load_page(document: Path, page: int, *, dpi: float = BENCH_DPI) -> PageInput
         dpi: The resolution to render at.
 
     Returns:
-        The page's picture, text and label.
+        The page's picture, text and plannotation.
 
     Raises:
         FileNotFoundError: If the PDF is not there.
@@ -68,12 +68,12 @@ def load_page(document: Path, page: int, *, dpi: float = BENCH_DPI) -> PageInput
         msg = f"{document} does not exist; run `plannotation samples build` first"
         raise FileNotFoundError(msg)
     index = page - 1
-    labels = embed.read(document).pages
-    label = labels.get(index)
+    plannotations = embed.read(document).pages
+    plannotation = plannotations.get(index)
     return PageInput(
         png=encode_png(render_page(document, index, dpi=dpi)),
         text=page_text(document, index),
-        label=None if label is None else canonical_json(label),
+        plannotation=None if plannotation is None else canonical_json(plannotation),
     )
 
 

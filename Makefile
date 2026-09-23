@@ -105,16 +105,16 @@ samples-check: samples ## Build the samples and validate every one of them
 # The only target that calls a paid API. It needs ANTHROPIC_API_KEY in the
 # environment or in .env (git-ignored), and only for questions whose response is not
 # already in bench/cache/; a repeated run is free. CI never runs it.
-bench: samples ## Run the labelled-vs-plain benchmark and update the README table
+bench: samples ## Run the plannotated-vs-plain benchmark and update the README table
 	$(RUN) plannotation-bench questions
-	$(RUN) plannotation-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N)
-	$(RUN) plannotation-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N)
+	$(RUN) plannotation-bench run --condition plain       --model $(BENCH_MODEL) --n $(BENCH_N)
+	$(RUN) plannotation-bench run --condition plannotated --model $(BENCH_MODEL) --n $(BENCH_N)
 	$(RUN) plannotation-bench report --model $(BENCH_MODEL)
 	$(RUN) plannotation-bench readme --model $(BENCH_MODEL)
 
 bench-dry: samples ## Say how many benchmark questions would reach the API; ask none
-	$(RUN) plannotation-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
-	$(RUN) plannotation-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
+	$(RUN) plannotation-bench run --condition plain       --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
+	$(RUN) plannotation-bench run --condition plannotated --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 
 # The schema version is read from plannotation.SCHEMA_VERSION rather than repeated
 # here, so the published URL layout cannot drift from the one constant that
@@ -128,7 +128,7 @@ docs: ## Stage spec/, schema/ and README into site/ for GitHub Pages
 	 printf 'docs staged in site/ (schema %s) -- publish with GitHub Pages\n' "$$V"
 
 # The inspector is one static file with no build step; this only makes sure there is
-# a labelled drawing to open in it. `open` is macOS, `xdg-open` elsewhere.
+# a plannotated drawing to open in it. `open` is macOS, `xdg-open` elsewhere.
 inspector: samples ## Build the samples and open the single-file inspector
 	@printf 'open %s/floorplan/sheet.plannotated.pdf in the page that opens\n' '$(SAMPLES_DIR)'
 	@if command -v open >/dev/null 2>&1; then open inspector/index.html; \

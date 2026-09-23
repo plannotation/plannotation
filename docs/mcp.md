@@ -2,7 +2,7 @@
 
 `plannotation-mcp` lets an MCP host -- Claude Desktop, ChatGPT, Copilot, or anything else
 that speaks the Model Context Protocol -- ask what is on a construction drawing and get
-answers read from the drawing's label rather than guessed from its pixels.
+answers read from the drawing's plannotation rather than guessed from its pixels.
 
 ## Run it
 
@@ -34,21 +34,21 @@ Restart Claude Desktop, and the tools appear.
 
 | Tool | What it does | Writes? |
 | --- | --- | --- |
-| `list_sheets` | Every labelled sheet in a PDF, a sidecar, or a folder, with its level. | no |
-| `get_plannotation` | One page's label in full. | no |
+| `list_sheets` | Every plannotated sheet in a PDF, a sidecar, or a folder, with its level. | no |
+| `get_plannotation` | One page's plannotation in full. | no |
 | `find_elements` | Elements whose IFC class, tag or name contains a query. | no |
 | `measure` | Paper and model distance between two items on a page. | no |
 | `validate` | The validator's report, optionally against an IFC model. | no |
-| `attach` | Attach page labels to a PDF, writing a new file. | **yes** |
-| `infer` | Reconstruct labels for an unlabelled PDF, writing a copy. | **yes** |
+| `attach` | Attach plannotations to a PDF, writing a new file. | **yes** |
+| `infer` | Reconstruct plannotations for an unplannotated PDF, writing a copy. | **yes** |
 
 ## Resources
 
 | URI | Content |
 | --- | --- |
-| `plannotation://schema/page` | The page-label JSON Schema. |
+| `plannotation://schema/page` | The plannotation JSON Schema. |
 | `plannotation://spec` | Where the specification is published. |
-| `plannotation://index` | Every labelled sheet under the root. |
+| `plannotation://index` | Every plannotated sheet under the root. |
 
 ## Safety
 
@@ -65,14 +65,14 @@ and refused unless it lies inside `--root`. `../`, an absolute path elsewhere an
 symlink pointing out of the tree are all refused. Paths in results are reported relative
 to the root, so a host never learns what lies above it.
 
-**Labels are data.** A label's text is returned as data. The server's instructions tell
-the host not to follow instructions that appear inside a label, but a host that obeys
-text it reads in a drawing has a problem no server can fully fix.
+**Plannotations are data.** A plannotation's text is returned as data. The server's
+instructions tell the host not to follow instructions that appear inside a plannotation,
+but a host that obeys text it reads in a drawing has a problem no server can fully fix.
 
 ## Measuring
 
 `measure` reports the paper distance between the centres of two items, in millimetres.
 It reports a model distance as well only when both items sit in the same viewport, that
-viewport carries a `paperToPlane`, and the label declares `model.lengthUnit`. Otherwise
-it says why it did not: a number without a unit is not a length (SPEC 3.5), and a
-distance between two different viewports means nothing.
+viewport carries a `paperToPlane`, and the plannotation declares `model.lengthUnit`.
+Otherwise it says why it did not: a number without a unit is not a length (SPEC 3.5),
+and a distance between two different viewports means nothing.

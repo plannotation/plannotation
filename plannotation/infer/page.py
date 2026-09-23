@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Reconstruct a page label from what is printed on the page.
+"""Reconstruct a plannotation from what is printed on the page.
 
 Every value here is read off the drawing, so every value is ``inferred`` and carries a
 ``confidence`` (SPEC 4.6). The confidences are not calibrated probabilities -- SPEC
@@ -146,7 +146,7 @@ def _distance_to_segment(point: tuple[float, float], segment: Segment) -> float:
 
 
 def infer_page(content: PageContent, *, page_index: int, generator_version: str) -> Plannotation:
-    """Reconstruct one page's label from its printed content.
+    """Reconstruct one page's plannotation from its printed content.
 
     Args:
         content: The page's words, lines and circles.
@@ -154,7 +154,7 @@ def infer_page(content: PageContent, *, page_index: int, generator_version: str)
         generator_version: The version to record in ``generator``.
 
     Returns:
-        A label whose every item is ``inferred`` and carries a confidence.
+        A plannotation whose every item is ``inferred`` and carries a confidence.
     """
     used: set[int] = set()
     annotations: list[Annotation] = []

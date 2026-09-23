@@ -28,22 +28,22 @@ I1. Nothing escapes ``read``, ``carrier_report``, ``attach`` or ``strip`` that i
     two say the bound was not applied, and the third says a caller has to catch a C++
     library's exception hierarchy to use this package.
 II. No one document raises peak resident memory by more than
-    :data:`PEAK_MEMORY_BUDGET`, eight times the cap a label is read under, and no whole
-    sweep raises it past its own budget. Measured with ``getrusage``, not assumed: a
-    refusal issued after the allocation reads exactly like one issued before it, which is
-    how the last three defects survived review.
+    :data:`PEAK_MEMORY_BUDGET`, eight times the cap a plannotation is read under, and no
+    whole sweep raises it past its own budget. Measured with ``getrusage``, not assumed:
+    a refusal issued after the allocation reads exactly like one issued before it, which
+    is how the last three defects survived review.
 III. No single operation takes longer than :data:`OPERATION_TIME_BUDGET`, because a
     bound on bytes is not a bound on time.
 IV. ``read(strict=False)`` never raises :class:`~plannotation.errors.InvalidPlannotationError`.
-    Section 4.3 (2) says a label a reader will not accept is a label that is absent, and
-    absence is a return value.
+    Section 4.3 (2) says a plannotation a reader will not accept is a plannotation that
+    is absent, and absence is a return value.
 V.  ``attach`` and ``strip`` either complete or refuse. A refusal leaves no output file
     at all; a completion leaves one the PDF library can open, no larger than the input
     plus what was written into it.
 VI. ``strip`` never destroys or alters foreign material: every attachment Plannotation does
     not own survives with its bytes, its associations are not dropped, and a packet with
     no Plannotation declaration in it comes back byte for byte.
-VII. A document ``attach`` labelled really declares what it reports declaring -- the
+VII. A document ``attach`` plannotated really declares what it reports declaring -- the
     claim is in the packet, outside every comment and CDATA section, and inside the RDF
     -- and stripping it again restores the packet exactly. This one is here because the
     other six did not reach it: reverting the defect that spliced Plannotation's claim into
@@ -107,11 +107,12 @@ SEED: Final = 20_260_922
 
 #: How much any one document may raise this process's peak resident memory.
 #:
-#: Stated as a multiple of the cap a label is read under, because that is what bounds it:
-#: a reader decoding a label at the cap holds the inflated bytes, the unpredicted copy and
-#: the string it then tries to parse, and pays the allocator on top. Measured across both
-#: corpora, the worst single document costs 69 MB -- a Flate bomb that is inflated up to
-#: the cap and refused there -- and the worst in the malformed corpus costs 4 MB.
+#: Stated as a multiple of the cap a plannotation is read under, because that is what
+#: bounds it: a reader decoding a plannotation at the cap holds the inflated bytes, the
+#: unpredicted copy and the string it then tries to parse, and pays the allocator on top.
+#: Measured across both corpora, the worst single document costs 69 MB -- a Flate bomb
+#: that is inflated up to the cap and refused there -- and the worst in the malformed
+#: corpus costs 4 MB.
 #:
 #: What it catches is an allocation the document chose rather than the reader: 1,963 MB
 #: for a ``/Columns`` of two thousand million, 743 MB for the same parameter handed to the
@@ -125,7 +126,7 @@ PEAK_MEMORY_BUDGET: Final = 8 * embed._MAX_PLANNOTATION_BYTES
 
 #: How much more resident memory the malformed corpus may reach than it started with.
 #:
-#: Every document in it is a few kilobytes on disk and holds a label of about one
+#: Every document in it is a few kilobytes on disk and holds a plannotation of about one
 #: kilobyte, so nothing in it has any business allocating anything. What this budget
 #: covers is the first call's warm-up -- compiling the JSON Schema validators, importing
 #: numpy's inner loops -- measured at 43 MB for the whole corpus.
@@ -133,7 +134,7 @@ SWEEP_MEMORY_BUDGET: Final = 96 * 1024 * 1024
 
 #: The same, for the handful of documents that are legitimately large once decoded.
 #:
-#: A label at the cap really is fifteen mebibytes, and decoding one costs several
+#: A plannotation at the cap really is fifteen mebibytes, and decoding one costs several
 #: multiples of that at once: the inflated bytes, the unpredicted copy, and the string a
 #: reader then tries to parse as JSON. CPython does not hand freed arenas back to the
 #: operating system either, so a few such documents in one process accumulate -- measured
@@ -145,10 +146,10 @@ HEAVY_MEMORY_BUDGET: Final = 448 * 1024 * 1024
 
 #: How long any one operation on any one of these documents may take.
 #:
-#: The slowest legitimate thing here is inflating and unpredicting a label at the cap,
-#: measured at a quarter of a second. One second is four times that, and below what a
-#: single Paeth-predicted label cost before the predictors were vectorised and the two
-#: sequential ones capped: 2.8 s.
+#: The slowest legitimate thing here is inflating and unpredicting a plannotation at the
+#: cap, measured at a quarter of a second. One second is four times that, and below what
+#: a single Paeth-predicted plannotation cost before the predictors were vectorised and
+#: the two sequential ones capped: 2.8 s.
 OPERATION_TIME_BUDGET: Final = 1.0
 
 #: How long the whole sweep may take, so that it stays in every run of ``make check``.
@@ -175,15 +176,15 @@ MOD_DATE: Final = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 #: The page content stream every generated document carries.
 _CONTENT: Final = b"0.5 w 56.7 56.7 481.9 728.5 re S\n"
 
-#: A4 portrait in points, which is what the labels below claim.
+#: A4 portrait in points, which is what the plannotations below claim.
 _MEDIA_BOX: Final = "[0 0 595.2756 841.8898]"
 
 #: The name Plannotation owns, and a name it does not.
 _OWNED_NAME: Final = plannotation_filename(0)
 _FOREIGN_NAME: Final = "site-notes.txt"
 
-#: A page label that agrees with the page above, so that a well-formed document really is
-#: one and :func:`plannotation.pdf.embed.attach` has something it can write.
+#: A plannotation that agrees with the page above, so that a well-formed document really
+#: is one and :func:`plannotation.pdf.embed.attach` has something it can write.
 PLANNOTATION: Final = fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)
 PLANNOTATION_BYTES: Final = canonical_bytes(PLANNOTATION)
 
@@ -206,7 +207,7 @@ def owns(name: str) -> bool:
         name: A name-tree key, or a specification's ``/UF`` or ``/F``.
 
     Returns:
-        True for the index and for a page label's zero-padded name, and for nothing else.
+        True for the index and for a plannotation's zero-padded name, and for nothing else.
     """
     return name == INDEX_FILENAME or bool(_PLANNOTATION_NAME.fullmatch(name))
 
@@ -310,7 +311,7 @@ def filespec(name: str, *, entries: str | None = None) -> str:
     if entries is not None:
         return entries
     return (
-        f"<< /Type /Filespec /F ({name}) /UF ({name}) /Desc (a label) "
+        f"<< /Type /Filespec /F ({name}) /UF ({name}) /Desc (a plannotation) "
         "/EF << /F 6 0 R /UF 6 0 R >> /AFRelationship /Data >>"
     )
 
@@ -487,9 +488,9 @@ def _filter_cases() -> Iterator[Case]:
     """Build one document per filter name and per chain.
 
     Yields:
-        The cases. Each stores the same Flate-compressed label, so the only thing that
-        varies is what the document says it is stored under -- which is the whole point:
-        the reader must answer for the declaration, not for the bytes.
+        The cases. Each stores the same Flate-compressed plannotation, so the only thing
+        that varies is what the document says it is stored under -- which is the whole
+        point: the reader must answer for the declaration, not for the bytes.
     """
     stored = zlib.compress(PLANNOTATION_BYTES, 9)
     for index, written in enumerate((*FILTER_NAMES, *FILTER_CHAINS)):
@@ -721,8 +722,8 @@ def _metadata_cases() -> Iterator[Case]:
     Yields:
         The cases. The packet is read on every operation -- to find a declaration, to
         decide whether one can be added, to read ``pdfaid:part`` -- so it is as much
-        attacker-supplied input as a label, and is the one stream a save is guaranteed to
-        write out in full.
+        attacker-supplied input as a plannotation, and is the one stream a save is
+        guaranteed to write out in full.
     """
     packet = rdf(b'<rdf:Description rdf:about=""/>')
     shapes: dict[str, bytes] = {
@@ -942,9 +943,9 @@ def _associated_file_cases() -> Iterator[Case]:
     """Build a document per ``/AF`` shape, on the page and on the catalog.
 
     Yields:
-        The cases. ``/AF`` is where a reader learns which page a label belongs to, and it
-        is an array of references a document wrote: it may hold a deleted object, the
-        same file twice, or something that is not a file specification at all.
+        The cases. ``/AF`` is where a reader learns which page a plannotation belongs to,
+        and it is an array of references a document wrote: it may hold a deleted object,
+        the same file twice, or something that is not a file specification at all.
     """
     for index, shape in enumerate(AF_SHAPES):
         yield Case(f"af-page-{index:02d}", hostile(page_af=shape))
@@ -1031,15 +1032,15 @@ def _page_tree_cases() -> Iterator[Case]:
     """Build a document per page-tree shape.
 
     Yields:
-        The cases. The page count decides how many labels a reader looks for and which
-        page each one is attached to, and it is two numbers the document wrote that need
-        not agree with each other or with anything else.
+        The cases. The page count decides how many plannotations a reader looks for and
+        which page each one is attached to, and it is two numbers the document wrote that
+        need not agree with each other or with anything else.
     """
     for name, kids, count in PAGE_TREES:
         yield Case(f"pages-{name}", hostile(pages=(kids, count)))
 
 
-#: What a case built at the label cap decodes to, in bytes.
+#: What a case built at the plannotation cap decodes to, in bytes.
 #:
 #: Only the two Average and Paeth cases are built this large, and they are refused: the
 #: tag bytes are counted before anything is allocated, so a document this reader will not
@@ -1080,9 +1081,10 @@ def _heavy_cases() -> Iterator[Case]:
         )
     for tag in (3, 4):
         # Two of each: one just under the cap those two filters carry, so the work is
-        # really done, and one at the label cap, which is refused now -- and which costs
-        # nothing to refuse, so it is the cheapest probe in this corpus and the sharpest.
-        # A reader that undid it a byte at a time spent 1.4 s and 2.6 s on these two.
+        # really done, and one at the plannotation cap, which is refused now -- and which
+        # costs nothing to refuse, so it is the cheapest probe in this corpus and the
+        # sharpest. A reader that undid it a byte at a time spent 1.4 s and 2.6 s on these
+        # two.
         for size, suffix in ((_SEQUENTIAL_BYTES // 512 * 512, ""), (_HEAVY_BYTES, "-large")):
             yield Case(
                 f"heavy-png-{tag}{suffix}",
@@ -1241,8 +1243,8 @@ def heavy_cases() -> list[Case]:
     Returns:
         The heavy corpus. It is kept apart from the malformed one so that each can be
         measured against a budget that means something: a document of a few kilobytes
-        that allocates a hundred megabytes is a defect, and a label at the cap that
-        allocates a hundred megabytes is a label at the cap.
+        that allocates a hundred megabytes is a defect, and a plannotation at the cap
+        that allocates a hundred megabytes is a plannotation at the cap.
     """
     return list(_heavy_cases())
 
@@ -1337,7 +1339,7 @@ class Sweep:
         memory_budget: How much more resident memory this corpus may reach than it
             started with. It differs between the two because what the two may cost
             differs: nothing in the malformed corpus has any business allocating, and a
-            label at the cap legitimately does.
+            plannotation at the cap legitimately does.
         probes: One per document.
         peak_before: Peak resident memory when the sweep started, in bytes.
         peak_after: Peak resident memory when it finished.
@@ -1876,14 +1878,14 @@ class TestTheInvariants:
             + "\n".join(slow[:20])
         )
 
-    def test_i4_lenient_reading_never_raises_about_a_label(self, corpus: Sweep) -> None:
-        """Section 4.3 (2): an invalid label is absent, and absence is a return value.
+    def test_i4_lenient_reading_never_raises_about_a_plannotation(self, corpus: Sweep) -> None:
+        """Section 4.3 (2): an invalid plannotation is absent, and absence is a return value.
 
-        A document can still be damaged in ways that are not about a label at all -- a
-        catalog that is not a dictionary, an ``/AF`` that is not an array -- and those are
-        a :class:`~plannotation.errors.CarrierError` either way. What must never happen is an
-        :class:`~plannotation.errors.InvalidPlannotationError` from a reader that was asked to be
-        lenient.
+        A document can still be damaged in ways that are not about a plannotation at
+        all -- a catalog that is not a dictionary, an ``/AF`` that is not an array -- and
+        those are a :class:`~plannotation.errors.CarrierError` either way. What must
+        never happen is an :class:`~plannotation.errors.InvalidPlannotationError` from a
+        reader that was asked to be lenient.
         """
         offenders = [
             describe(found, found.attempt("read(strict=False)"))
@@ -1897,7 +1899,7 @@ class TestTheInvariants:
 
     @pytest.mark.parametrize("operation", ["attach()", "strip()"])
     def test_i5_a_refusal_leaves_no_output_at_all(self, corpus: Sweep, operation: str) -> None:
-        """Half a labelled document is worse than none, and harder to notice."""
+        """Half a plannotated document is worse than none, and harder to notice."""
         offenders = [
             f"{describe(found, found.attempt(operation))} and left {found.attempt(operation).size}"
             f" bytes behind"
@@ -2033,7 +2035,7 @@ class TestTheInvariants:
         assert "strip(attach())" in completed
 
 
-class TestALabelledDocumentSaysSo:
+class TestAPlannotatedDocumentSaysSo:
     """Invariant VII, which the six above do not reach.
 
     Reverting the defect that spliced Plannotation's claim into another producer's XML
@@ -2044,7 +2046,7 @@ class TestALabelledDocumentSaysSo:
     """
 
     def test_a_completed_attach_leaves_a_declaration_a_reader_can_find(self, sweep: Sweep) -> None:
-        """Section 6.2.1 (4) makes the declaration part of labelling, not a nicety.
+        """Section 6.2.1 (4) makes the declaration part of plannotating, not a nicety.
 
         Found in the packet with comments and CDATA masked out, and before the last
         ``</rdf:RDF>``, because those are the two ways a claim can be in the bytes and in
@@ -2064,11 +2066,11 @@ class TestALabelledDocumentSaysSo:
             elif closed >= 0 and at > closed:
                 offenders.append(f"{found.case.name}: the claim is after the end of the RDF")
         assert offenders == [], (
-            f"{len(offenders)} labelled document(s) declare nothing a reader will find:\n"
+            f"{len(offenders)} plannotated document(s) declare nothing a reader will find:\n"
             + "\n".join(offenders[:20])
         )
 
-    def test_stripping_a_document_this_module_labelled_restores_its_packet(
+    def test_stripping_a_document_this_module_plannotated_restores_its_packet(
         self, sweep: Sweep
     ) -> None:
         """What was spliced in must come out again, whatever it was spliced into.
@@ -2092,6 +2094,6 @@ class TestALabelledDocumentSaysSo:
 
     def test_the_corpus_reaches_this_at_all(self, sweep: Sweep) -> None:
         """An invariant nothing satisfies is an invariant nothing tests."""
-        labelled = [found for found in sweep.probes if found.plannotated_packet is not None]
-        assert len(labelled) >= 10
-        assert sum(1 for found in labelled if found.round_tripped_packet is not None) >= 10
+        plannotated = [found for found in sweep.probes if found.plannotated_packet is not None]
+        assert len(plannotated) >= 10
+        assert sum(1 for found in plannotated if found.round_tripped_packet is not None) >= 10

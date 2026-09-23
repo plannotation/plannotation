@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Plannotation MCP server.
 
-Exposes labelled drawing projects to MCP hosts such as Claude Desktop, ChatGPT and
+Exposes plannotated drawing projects to MCP hosts such as Claude Desktop, ChatGPT and
 Copilot, over stdio or streamable HTTP.
 
 The server is **read-only by default**. Tools that write require ``--allow-write``,

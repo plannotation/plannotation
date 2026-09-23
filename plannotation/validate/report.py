@@ -57,7 +57,7 @@ recognise::
         "notes": ["target.pdfPage was not checked: no document to count pages in"],
     }
 
-``path`` is a JSON Pointer (RFC 6901) into the page label the finding belongs to, or
+``path`` is a JSON Pointer (RFC 6901) into the plannotation the finding belongs to, or
 into the index or the sidecar where the finding belongs to one of those; the empty
 string points at the document itself. ``source`` says which document that is.
 ``findings`` is ordered: errors before warnings, then by page, then by code, then by
@@ -113,8 +113,8 @@ class Severity(StrEnum):
 
     A third level was considered and refused. Informational output -- the level
     reached, the counts, what was skipped for want of a document -- is not a finding
-    about the label, and putting it in the same list would make ``counts.finding`` mean
-    less rather than more. It goes in the report body instead.
+    about the plannotation, and putting it in the same list would make
+    ``counts.finding`` mean less rather than more. It goes in the report body instead.
     """
 
     ERROR = "error"
@@ -176,15 +176,16 @@ class PageSummary:
     and annotations. This is those four, per page.
 
     Attributes:
-        page_index: The page the label was found on, which for a PDF is the page it is
-            attached to and not the ``page.index`` inside it -- section 4.5 makes the
-            attachment the fact and ``page.index`` a claim.
-        sheet_id: The sheet number as printed, or None when the label did not load.
-        level: The level reached, or None when the label is invalid and therefore
-            reaches no level at all.
+        page_index: The page the plannotation was found on, which for a PDF is the page
+            it is attached to and not the ``page.index`` inside it -- section 4.5 makes
+            the attachment the fact and ``page.index`` a claim.
+        sheet_id: The sheet number as printed, or None when the plannotation did not
+            load.
+        level: The level reached, or None when the plannotation is invalid and
+            therefore reaches no level at all.
         declared_version: The value of ``plannotation``, or None when there was none.
         implemented: Whether this validator implements that version.
-        viewports: How many viewports the label declares.
+        viewports: How many viewports the plannotation declares.
         elements: How many elements.
         annotations: How many annotations.
     """
@@ -205,9 +206,10 @@ class Report:
 
     Attributes:
         source: The file validated.
-        carrier: ``"pdf"``, ``"sidecar"`` or ``"plannotations"`` -- the last being a bare page
-            label or array of page labels, which is a payload with no carrier at all.
-        pages: One summary per page label examined, ascending by page.
+        carrier: ``"pdf"``, ``"sidecar"`` or ``"plannotations"`` -- the last being a
+            bare plannotation or array of plannotations, which is a payload with no
+            carrier at all.
+        pages: One summary per plannotation examined, ascending by page.
         findings: Every violation found, in :attr:`Finding.sort_key` order.
         notes: What the run did and did not do, in a person's words: every check that
             was skipped and why, and every optional check that ran and over what. A
@@ -432,7 +434,7 @@ def _markdown_summary(report: Report) -> list[str]:
         "",
         f"- Source: `{report.source}`",
         f"- Carrier: {report.carrier}",
-        f"- Page labels examined: {len(report.pages)}",
+        f"- Plannotations examined: {len(report.pages)}",
     ]
 
 
@@ -446,7 +448,7 @@ def _markdown_pages(pages: Sequence[PageSummary]) -> list[str]:
         The table lines, or a single line when there is nothing to tabulate.
     """
     if not pages:
-        return ["## Pages", "", "No page label was read."]
+        return ["## Pages", "", "No plannotation was read."]
     lines = [
         "## Pages",
         "",

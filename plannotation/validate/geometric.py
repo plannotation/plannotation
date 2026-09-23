@@ -15,16 +15,16 @@ Section 8 of the design brief says a bbox must be inside the page **media box**;
 3.1 of the specification says the page is the **CropBox**, falling back to the MediaBox
 where there is none. They disagree, and the specification wins -- it is normative and
 the design brief is not, and 1.2's governing principle decides it on the merits anyway:
-the CropBox is the page as displayed and printed, so a label measures the page a person
-measures. Taking the media box instead would let a label place a bounding box in the
-margin a viewer crops away, where nothing is drawn and nobody can find it.
+the CropBox is the page as displayed and printed, so a plannotation measures the page a
+person measures. Taking the media box instead would let a plannotation place a bounding
+box in the margin a viewer crops away, where nothing is drawn and nobody can find it.
 
 In practice the rule is checked in two halves, which is what makes the disagreement
 moot for most documents:
 
-* **PL-GEO-003** holds every bounding box to the page the *label declares*, the
-  rectangle from ``(0, 0)`` to ``(page.widthMm, page.heightMm)``. This is the half that
-  works with no document in front of the validator.
+* **PL-GEO-003** holds every bounding box to the page the *plannotation declares*,
+  the rectangle from ``(0, 0)`` to ``(page.widthMm, page.heightMm)``. This is the half
+  that works with no document in front of the validator.
 * **PL-GEO-001** holds that declared page to the document, through
   :func:`plannotation.pdf.embed.page_geometry`, which already implements 3.1 exactly:
   CropBox clipped to MediaBox, falling back to MediaBox, honouring ``/UserUnit``.
@@ -129,54 +129,58 @@ METRES_PER_MODEL_UNIT: Final = {"m": 1.0, "cm": 0.01, "mm": 0.001}
 _METRES_PER_MEASURE: Final = {"mm": 0.001, "cm": 0.01, "m": 1.0}
 
 
-def check_geometry(label: Plannotation, *, source: str) -> list[Finding]:
-    """Run every geometric rule that needs only the label itself.
+def check_geometry(plannotation: Plannotation, *, source: str) -> list[Finding]:
+    """Run every geometric rule that needs only the plannotation itself.
 
     The page dimensions are not checked here: that rule needs the document, and lives
     in :func:`check_page_against_document`.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         source: Which document it is, for the findings.
 
     Returns:
         Every violation, in document order.
     """
     return [
-        *_check_bboxes(label, source=source),
-        *_check_drawn_geometry(label, source=source),
-        *_check_viewport_containment(label, source=source),
-        *_check_transforms(label, source=source),
-        *_check_plane_axes(label, source=source),
-        *_check_cut_heights(label, source=source),
-        *_check_dimensions(label, source=source),
+        *_check_bboxes(plannotation, source=source),
+        *_check_drawn_geometry(plannotation, source=source),
+        *_check_viewport_containment(plannotation, source=source),
+        *_check_transforms(plannotation, source=source),
+        *_check_plane_axes(plannotation, source=source),
+        *_check_cut_heights(plannotation, source=source),
+        *_check_dimensions(plannotation, source=source),
     ]
 
 
-def check_page_against_document(pdf: Pdf, label: Plannotation, *, source: str) -> list[Finding]:
-    """Check a label's ``page`` block against the page it describes.
+def check_page_against_document(
+    pdf: Pdf, plannotation: Plannotation, *, source: str
+) -> list[Finding]:
+    """Check a plannotation's ``page`` block against the page it describes.
 
     The comparison is delegated to :func:`plannotation.pdf.embed.check_plannotations_against`,
     which is the same check ``attach`` makes before it writes anything. That is
-    deliberate: a validator that disagreed with the writer about whether a label fits a
-    page would be worse than either being wrong on its own. One code covers dimensions
-    and rotation together because one call decides both; the message says which fired.
+    deliberate: a validator that disagreed with the writer about whether a plannotation
+    fits a page would be worse than either being wrong on its own. One code covers
+    dimensions and rotation together because one call decides both; the message says
+    which fired.
 
-    The caller must have established that ``label.page.index`` is a page of ``pdf``,
-    which is :func:`plannotation.validate.carrier.check_page_identity`; this function
-    would otherwise report that as a page mismatch, under the wrong code.
+    The caller must have established that ``plannotation.page.index`` is a page of
+    ``pdf``, which is :func:`plannotation.validate.carrier.check_page_identity`; this
+    function would otherwise report that as a page mismatch, under the wrong code.
 
     Args:
         pdf: The open document.
-        label: The label, which describes the page its ``page.index`` names.
+        plannotation: The plannotation, which describes the page its ``page.index``
+            names.
         source: Which document it is, for the findings.
 
     Returns:
-        A single finding when the label contradicts the page, and nothing when it does
-        not.
+        A single finding when the plannotation contradicts the page, and nothing when it
+        does not.
     """
     try:
-        check_plannotations_against(pdf, [label])
+        check_plannotations_against(pdf, [plannotation])
     except PlannotationMismatchError as exc:
         return [finding("PL-GEO-001", message=str(exc), path="/page", source=source)]
     return []
@@ -185,33 +189,33 @@ def check_page_against_document(pdf: Pdf, label: Plannotation, *, source: str) -
 # ---------------------------------------------------------------------------
 # Bounding boxes
 # ---------------------------------------------------------------------------
-def _named_bboxes(label: Plannotation) -> Iterator[tuple[str, str, Sequence[float]]]:
-    """Yield every bbox in a label with a name and a JSON Pointer for it.
+def _named_bboxes(plannotation: Plannotation) -> Iterator[tuple[str, str, Sequence[float]]]:
+    """Yield every bbox in a plannotation with a name and a JSON Pointer for it.
 
     Args:
-        label: The page label to walk.
+        plannotation: The plannotation to walk.
 
     Yields:
         Triples of a human-readable name, a JSON Pointer and the bbox.
     """
-    if label.sheet.title_block_bbox is not None:
-        yield ("sheet.titleBlockBBox", "/sheet/titleBlockBBox", label.sheet.title_block_bbox)
-    for position, viewport in enumerate(label.viewports or []):
+    if plannotation.sheet.title_block_bbox is not None:
+        yield ("sheet.titleBlockBBox", "/sheet/titleBlockBBox", plannotation.sheet.title_block_bbox)
+    for position, viewport in enumerate(plannotation.viewports or []):
         name = f"viewport {viewport.local_id!r}"
         yield (name, json_pointer(["viewports", position, "paperBBox"]), viewport.paper_bbox)
-    for position, element in enumerate(label.elements or []):
+    for position, element in enumerate(plannotation.elements or []):
         name = f"element {element.local_id!r}"
         yield (name, json_pointer(["elements", position, "paperBBox"]), element.paper_bbox)
-    for position, annotation in enumerate(label.annotations or []):
+    for position, annotation in enumerate(plannotation.annotations or []):
         name = f"annotation {annotation.local_id!r}"
         yield (name, json_pointer(["annotations", position, "paperBBox"]), annotation.paper_bbox)
 
 
-def _check_bboxes(label: Plannotation, *, source: str) -> list[Finding]:
-    """Check that every bbox is ordered and lies on the page the label declares.
+def _check_bboxes(plannotation: Plannotation, *, source: str) -> list[Finding]:
+    """Check that every bbox is ordered and lies on the page the plannotation declares.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
@@ -219,9 +223,9 @@ def _check_bboxes(label: Plannotation, *, source: str) -> list[Finding]:
         page. A box that is out of order is not also tested for containment: the test
         would be meaningless on a rectangle whose corners are the wrong way round.
     """
-    page = (0.0, 0.0, label.page.width_mm, label.page.height_mm)
+    page = (0.0, 0.0, plannotation.page.width_mm, plannotation.page.height_mm)
     found: list[Finding] = []
-    for name, path, box in _named_bboxes(label):
+    for name, path, box in _named_bboxes(plannotation):
         if box[0] > box[2] or box[1] > box[3]:
             found.append(
                 finding(
@@ -241,7 +245,7 @@ def _check_bboxes(label: Plannotation, *, source: str) -> list[Finding]:
                     "PL-GEO-003",
                     message=(
                         f"{name}: bbox {list(box)} leaves the "
-                        f"{label.page.width_mm:g} x {label.page.height_mm:g} mm page "
+                        f"{plannotation.page.width_mm:g} x {plannotation.page.height_mm:g} mm page "
                         f"by more than the {GEOMETRIC_TOLERANCE_MM:g} mm tolerance"
                     ),
                     path=path,
@@ -251,11 +255,11 @@ def _check_bboxes(label: Plannotation, *, source: str) -> list[Finding]:
     return found
 
 
-def _check_drawn_geometry(label: Plannotation, *, source: str) -> list[Finding]:
+def _check_drawn_geometry(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check that drawn geometry stays inside the bbox of the item carrying it.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
@@ -263,7 +267,7 @@ def _check_drawn_geometry(label: Plannotation, *, source: str) -> list[Finding]:
         own bounding box by more than the geometric tolerance.
     """
     found: list[Finding] = []
-    for position, annotation in enumerate(label.annotations or []):
+    for position, annotation in enumerate(plannotation.annotations or []):
         if annotation.geometry is None:
             continue
         span = polyline_bbox(annotation.geometry)
@@ -280,7 +284,7 @@ def _check_drawn_geometry(label: Plannotation, *, source: str) -> list[Finding]:
                 source=source,
             )
         )
-    for position, element in enumerate(label.elements or []):
+    for position, element in enumerate(plannotation.elements or []):
         for outline_index, outline in enumerate(element.paper_outlines or []):
             span = polyline_bbox(outline)
             if contains(element.paper_bbox, span, tolerance=GEOMETRIC_TOLERANCE_MM):
@@ -299,22 +303,22 @@ def _check_drawn_geometry(label: Plannotation, *, source: str) -> list[Finding]:
     return found
 
 
-def _check_viewport_containment(label: Plannotation, *, source: str) -> list[Finding]:
+def _check_viewport_containment(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check that items sit inside the viewport they name.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
         One warning per item whose bbox leaves its viewport's. An item naming a
         viewport that does not exist is left to PL-REF-002, which is the rule for that.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
     found: list[Finding] = []
     collections: tuple[tuple[str, Sequence[Element | Annotation]], ...] = (
-        ("elements", label.elements or []),
-        ("annotations", label.annotations or []),
+        ("elements", plannotation.elements or []),
+        ("annotations", plannotation.annotations or []),
     )
     for collection, items in collections:
         for position, item in enumerate(items):
@@ -342,11 +346,11 @@ def _check_viewport_containment(label: Plannotation, *, source: str) -> list[Fin
 # ---------------------------------------------------------------------------
 # Transforms and planes
 # ---------------------------------------------------------------------------
-def _check_transforms(label: Plannotation, *, source: str) -> list[Finding]:
+def _check_transforms(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check every ``paperToPlane`` for invertibility, handedness and scale.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
@@ -354,10 +358,10 @@ def _check_transforms(label: Plannotation, *, source: str) -> list[Finding]:
         with ``scale``: the comparison would report a second failure caused by the
         first.
     """
-    unit = label.source_model.length_unit if label.source_model else None
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
     found: list[Finding] = []
     without_unit: list[tuple[str, str]] = []
-    for position, viewport in enumerate(label.viewports or []):
+    for position, viewport in enumerate(plannotation.viewports or []):
         matrix = viewport.paper_to_plane
         if matrix is None:
             continue
@@ -401,8 +405,8 @@ def _check_transforms(label: Plannotation, *, source: str) -> list[Finding]:
             finding(
                 "PL-GEO-013",
                 message=(
-                    f"viewport(s) {named} carry paperToPlane, but the label declares no "
-                    f"model.lengthUnit; the transform's output is in the model's length "
+                    f"viewport(s) {named} carry paperToPlane, but the plannotation declares "
+                    f"no model.lengthUnit; the transform's output is in the model's length "
                     f"unit, and a reader that does not know it may not report any "
                     f"distance derived from the transform as a length"
                 ),
@@ -459,11 +463,11 @@ def _check_scale(
     ]
 
 
-def _check_plane_axes(label: Plannotation, *, source: str) -> list[Finding]:
+def _check_plane_axes(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check that every plane's axes are unit vectors and mutually orthogonal.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
@@ -471,7 +475,7 @@ def _check_plane_axes(label: Plannotation, *, source: str) -> list[Finding]:
         orthogonal.
     """
     found: list[Finding] = []
-    for position, viewport in enumerate(label.viewports or []):
+    for position, viewport in enumerate(plannotation.viewports or []):
         plane = viewport.plane
         if plane is None:
             continue
@@ -509,7 +513,7 @@ def _check_plane_axes(label: Plannotation, *, source: str) -> list[Finding]:
     return found
 
 
-def _check_cut_heights(label: Plannotation, *, source: str) -> list[Finding]:
+def _check_cut_heights(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check the cut-height convention on every viewport that states one.
 
     For a cut view the drawing plane is the cutting plane, and ``cutHeight`` is the
@@ -518,14 +522,14 @@ def _check_cut_heights(label: Plannotation, *, source: str) -> list[Finding]:
     normal must be their sum.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
         One finding per viewport whose plane sits at the wrong height.
     """
     found: list[Finding] = []
-    for position, viewport in enumerate(label.viewports or []):
+    for position, viewport in enumerate(plannotation.viewports or []):
         elevation = viewport.storey.elevation if viewport.storey else None
         plane = viewport.plane
         if viewport.cut_height is None or elevation is None or plane is None:
@@ -565,9 +569,9 @@ def millimetres(value: float) -> str:
 
     Returns:
         The number with no exponent and no trailing zeros, so that a ten-metre run
-        reads 10000 and not 1e+04. Rounded to the three decimals a label is serialised
-        at, because a message quoting more precision than the format carries invites an
-        argument about a digit that is not in the file.
+        reads 10000 and not 1e+04. Rounded to the three decimals a plannotation is
+        serialised at, because a message quoting more precision than the format carries
+        invites an argument about a digit that is not in the file.
     """
     return f"{round(value, 3):g}"
 
@@ -607,7 +611,7 @@ def measured_length_mm(annotation: Annotation) -> float | None:
     return annotation.value * _METRES_PER_MEASURE[annotation.unit] * 1000.0
 
 
-def _check_dimensions(label: Plannotation, *, source: str) -> list[Finding]:
+def _check_dimensions(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check that a dimension's value matches the length it is drawn at.
 
     The drawn model length is the **path length** of the annotation's geometry in paper
@@ -616,15 +620,15 @@ def _check_dimensions(label: Plannotation, *, source: str) -> list[Finding]:
     two agree only for a straight run.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
         source: Which document it is, for the findings.
 
     Returns:
         One warning per dimension whose printed value disagrees with its geometry.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
     found: list[Finding] = []
-    for position, annotation in enumerate(label.annotations or []):
+    for position, annotation in enumerate(plannotation.annotations or []):
         expected = measured_length_mm(annotation)
         viewport = viewports.get(annotation.viewport or "")
         if expected is None or viewport is None or viewport.scale is None:

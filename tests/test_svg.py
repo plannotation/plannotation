@@ -7,8 +7,8 @@ once. The identity: GlobalIds are read from ``ifc:guid`` or decoded from the
 serializer's ``product-<uuid>`` ids, and never rewritten. And the safety: a DTD is
 refused, sizes are bounded, and ``<image>`` references go nowhere but a local SVG.
 
-The strongest check needs the samples: a label derived from each sample's sheet SVG
-must agree with the label the exporter wrote from the model itself.
+The strongest check needs the samples: a plannotation derived from each sample's sheet
+SVG must agree with the plannotation the exporter wrote from the model itself.
 """
 
 from __future__ import annotations
@@ -154,7 +154,7 @@ class TestIdentity:
         assert parse_svg(svg(product(ifc_class="cut"))).products == ()
 
     def test_a_product_that_draws_nothing_is_left_out(self) -> None:
-        """A label element needs a bounding box."""
+        """A plannotation element needs a bounding box."""
         assert parse_svg(svg(product(shape="<text>Pos. 1</text>"))).products == ()
 
 
@@ -467,10 +467,10 @@ class TestImages:
 
 
 # ---------------------------------------------------------------------------
-# The label
+# The plannotation
 # ---------------------------------------------------------------------------
-class TestLabel:
-    """From SVG to an authored L2 label."""
+class TestPlannotation:
+    """From SVG to an authored L2 plannotation."""
 
     def test_a_placed_view_gets_the_transform_the_exporter_computes(self) -> None:
         """The same numbers as the sample floor plan, from the SVG alone."""
@@ -498,7 +498,7 @@ class TestLabel:
         with pytest.raises(ValueError, match="degenerate"):
             paper_to_plane(sheet.views[0], sheet.height_mm, 1.0)
 
-    def test_the_label_is_authored_l2_with_tags_from_the_model(self) -> None:
+    def test_the_plannotation_is_authored_l2_with_tags_from_the_model(self) -> None:
         """Tags come from the source, since the SVG does not carry them."""
         body = view(product() + product(guid="1" * 22))
         sheet = parse_svg(svg(body))
@@ -511,11 +511,11 @@ class TestLabel:
             model_file="model.ifc",
             ifc_schema="IFC4",
         )
-        label = derive_plannotation(sheet, source, page_index=2)
-        data = json.loads(canonical_json(label))
+        plannotation = derive_plannotation(sheet, source, page_index=2)
+        data = json.loads(canonical_json(plannotation))
         assert data["provenance"] == "authored"
-        assert label.level is not None
-        assert label.level.value == "L2"
+        assert plannotation.level is not None
+        assert plannotation.level.value == "L2"
         assert data["page"] == {"index": 2, "widthMm": 420, "heightMm": 297}
         assert data["sheet"] == {"id": "A-101", "title": "Plan", "scale": 50, "drawingType": "plan"}
         assert data["model"] == {"file": "model.ifc", "lengthUnit": "m", "schema": "IFC4"}
@@ -529,27 +529,27 @@ class TestLabel:
         """A view whose axes leave the horizontal is not a plan."""
         vertical = "[[1,0,0,0],[0,0,1,0],[0,-1,0,5],[0,0,0,1]]"
         body = f"<g class='section' ifc:plane='{vertical}' ifc:matrix3='{MATRIX3}'>{product()}</g>"
-        label = derive_plannotation(parse_svg(svg(body)), SOURCE)
-        assert label.viewports is not None
-        assert label.viewports[0].kind == "section"
-        assert label.sheet.drawing_type == "section"
+        plannotation = derive_plannotation(parse_svg(svg(body)), SOURCE)
+        assert plannotation.viewports is not None
+        assert plannotation.viewports[0].kind == "section"
+        assert plannotation.sheet.drawing_type == "section"
 
     def test_annotations_and_spatial_structure_are_not_elements(self) -> None:
-        """They are drawn, but a label describes them otherwise or not at all."""
+        """They are drawn, but a plannotation describes them otherwise or not at all."""
         body = view(
             product(ifc_class="IfcAnnotation")
             + product(guid="1" * 22, ifc_class="IfcGridAxis")
             + product(guid="2" * 22)
         )
-        label = derive_plannotation(parse_svg(svg(body)), SOURCE)
-        assert [e.ifc_guid for e in label.elements or []] == ["2" * 22]
+        plannotation = derive_plannotation(parse_svg(svg(body)), SOURCE)
+        assert [e.ifc_guid for e in plannotation.elements or []] == ["2" * 22]
 
     def test_a_sheet_with_no_products_is_l1(self) -> None:
-        """Still a valid label: the sheet is described, nothing on it is."""
-        label = derive_plannotation(parse_svg(svg("<rect width='1' height='1'/>")), SOURCE)
-        assert label.viewports is None
-        assert label.elements is None
-        assert label.sheet.scale is None
+        """Still a valid plannotation: the sheet is described, nothing on it is."""
+        plannotation = derive_plannotation(parse_svg(svg("<rect width='1' height='1'/>")), SOURCE)
+        assert plannotation.viewports is None
+        assert plannotation.elements is None
+        assert plannotation.sheet.scale is None
 
     def test_a_product_outside_any_view_has_no_viewport(self) -> None:
         """And sheets with views at two scales have no single scale."""
@@ -558,19 +558,19 @@ class TestLabel:
             + view(product())
             + view(product(), transform="translate(200,12) scale(0.5)")
         )
-        label = derive_plannotation(parse_svg(svg(body)), SOURCE)
-        assert label.elements is not None
-        assert label.elements[0].viewport is None
-        assert label.viewports is not None
-        assert [v.scale for v in label.viewports] == [50, 100]
-        assert label.sheet.scale is None
+        plannotation = derive_plannotation(parse_svg(svg(body)), SOURCE)
+        assert plannotation.elements is not None
+        assert plannotation.elements[0].viewport is None
+        assert plannotation.viewports is not None
+        assert [v.scale for v in plannotation.viewports] == [50, 100]
+        assert plannotation.sheet.scale is None
 
 
 # ---------------------------------------------------------------------------
 # Attaching, and the samples
 # ---------------------------------------------------------------------------
 class TestAttach:
-    """The label goes onto the PDF drawn from the SVG, and only that PDF."""
+    """The plannotation goes onto the PDF drawn from the SVG, and only that PDF."""
 
     def test_a_pdf_of_another_size_is_refused(self, tmp_path: Path) -> None:
         """An A4 PDF is not a rendering of an A3 SVG."""
@@ -581,15 +581,15 @@ class TestAttach:
         with pytest.raises(PlannotationMismatchError, match="not a rendering"):
             attach_from_svg(page, pdf, tmp_path / "out.pdf", SOURCE, mod_date=MOD_DATE)
 
-    def test_a_matching_pdf_is_labelled_and_validates(self, tmp_path: Path) -> None:
+    def test_a_matching_pdf_is_plannotated_and_validates(self, tmp_path: Path) -> None:
         """The two-page drawing set's first page is A3."""
         page = tmp_path / "sheet.svg"
         page.write_bytes(svg(view(product())))
         pdf = tmp_path / "sheet.pdf"
         pdf.write_bytes(fx.build_drawing_set())
         out = tmp_path / "out.pdf"
-        label = attach_from_svg(page, pdf, out, SOURCE, mod_date=MOD_DATE)
-        assert label.elements is not None
+        plannotation = attach_from_svg(page, pdf, out, SOURCE, mod_date=MOD_DATE)
+        assert plannotation.elements is not None
         assert validate(out).error_count == 0
 
     @pytest.mark.skipif(
@@ -604,14 +604,14 @@ class TestAttach:
         authored = json.loads((SAMPLES / name / "plannotations.json").read_text("utf-8"))
         source = SheetSource(sheet_id=authored["sheet"]["id"], unit_scale_to_m=1.0, length_unit="m")
         out = tmp_path / "out.pdf"
-        label = attach_from_svg(
+        plannotation = attach_from_svg(
             SAMPLES / name / "sheet.svg",
             SAMPLES / name / "sheet.pdf",
             out,
             source,
             mod_date=MOD_DATE,
         )
-        derived = json.loads(canonical_json(label))
+        derived = json.loads(canonical_json(plannotation))
         by_guid = {e["ifcGuid"]: e for e in derived["elements"]}
         for element in authored["elements"]:
             mine = by_guid[element["ifcGuid"]]
@@ -679,9 +679,9 @@ class TestFromSvgCommand:
             ],
         )
         assert result.exit_code == 0, result.output
-        label = json.loads(result.stdout)
-        assert label["viewports"][0]["paperToPlane"][0] == scale
-        assert label["model"]["lengthUnit"] == unit
+        plannotation = json.loads(result.stdout)
+        assert plannotation["viewports"][0]["paperToPlane"][0] == scale
+        assert plannotation["model"]["lengthUnit"] == unit
         assert out.is_file()
 
     def test_a_mismatch_is_an_error(self, tmp_path: Path) -> None:
@@ -726,21 +726,21 @@ class TestFromSvgCommand:
         )
         assert result.exit_code == 0, result.output
         assert "level L2" in result.stdout
-        label = next(iter(read_pdf_plannotations(out).values()))
-        assert label.source_model is not None
-        assert label.source_model.ifc_schema == "IFC4"
-        marks = {e.tag for e in label.elements or []}
+        plannotation = next(iter(read_pdf_plannotations(out).values()))
+        assert plannotation.source_model is not None
+        assert plannotation.source_model.ifc_schema == "IFC4"
+        marks = {e.tag for e in plannotation.elements or []}
         assert marks == {f"Pos. {n}" for n in range(1, 6)} | {"T1", "T2", "W1", "W2"}
 
 
 def read_pdf_plannotations(path: Path) -> dict[int, Plannotation]:
-    """Read the labels a PDF carries.
+    """Read the plannotations a PDF carries.
 
     Args:
         path: The PDF.
 
     Returns:
-        Its labels by page.
+        Its plannotations by page.
     """
     from plannotation.pdf import embed
 
@@ -752,7 +752,7 @@ class TestModelSource:
 
     @pytest.mark.parametrize(("scale", "name"), [(1.0, "m"), (0.01, "cm"), (0.001, "mm")])
     def test_metric_units_are_named(self, scale: float, name: str) -> None:
-        """The three a label can state."""
+        """The three a plannotation can state."""
         from plannotation.units import length_unit_for
 
         assert length_unit_for(scale) == name

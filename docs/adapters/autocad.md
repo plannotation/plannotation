@@ -1,8 +1,8 @@
 # AutoCAD adapter — design note
 
 **Status: design only.** This project ships no AutoCAD plug-in. This note says where
-each part of a label lives in a DWG, how paper space maps to the model, and what a
-first prototype would look like. API names are from the AutoCAD .NET API
+each part of a plannotation lives in a DWG, how paper space maps to the model, and
+what a first prototype would look like. API names are from the AutoCAD .NET API
 (`Autodesk.AutoCAD.DatabaseServices`); the DXF group-code equivalents are given where a
 prototype would read a DXF instead.
 
@@ -10,7 +10,7 @@ prototype would read a DXF instead.
 
 A Revit or Tekla model knows that a line is a wall. A plain DWG does not: it has
 entities on layers, and IFC identity exists only if something put it there. So the
-adapter has two jobs, and the second decides the label's provenance:
+adapter has two jobs, and the second decides the plannotation's provenance:
 
 1. **Geometry** — sheets, viewports and the paper transform. This is always available
    and always exact.
@@ -24,9 +24,9 @@ adapter has two jobs, and the second decides the label's provenance:
      mapped to IFC classes. This is a reading of the drawing, so elements identified
      this way must be `inferred`, with a confidence, and carry no `ifcGuid`.
 
-## Where each part of a label comes from
+## Where each part of a plannotation comes from
 
-| Label | DWG |
+| Plannotation | DWG |
 | --- | --- |
 | `sheet` | A paper-space `Layout` (`Layout.LayoutName`), and the title block's attributes (`AttributeReference.Tag` / `TextString`) for number, title and revision |
 | `page.widthMm`, `heightMm` | The layout's paper size (`Layout.PlotPaperSize`) in the orientation `Layout.PlotRotation` gives |
@@ -73,7 +73,8 @@ asking.
    `view_center_point`, `view_height`, `view_direction_vector`, `view_target_point`
    and `view_twist_angle`. The scale is `vp.dxf.height / vp.dxf.view_height`.
 2. Model-space entities carry `entity.dxf.handle` and `entity.get_xdata("PLANNOTATION")`.
-3. Write one label per layout, then `plannotation attach` it to the PDF AutoCAD plotted.
+3. Write one plannotation per layout, then `plannotation attach` it to the PDF AutoCAD
+   plotted.
 
 What it cannot do: identity when nothing put it into the DWG (then everything is
 `inferred`, and `plannotation infer` on the PDF may do as well); external references,

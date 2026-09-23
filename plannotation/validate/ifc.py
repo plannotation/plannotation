@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Rule 4: cross-check a label against the IFC model it says it came from.
+"""Rule 4: cross-check a plannotation against the IFC model it says it came from.
 
-Everything above this module is a statement about one file. This is the only rule
-family that puts two files side by side and asks whether they agree, which is also why
-it runs only when the caller passes ``--ifc``: the model is not part of the payload, it
-is not named by anything the validator may dereference (9.1 forbids resolving a
-filename found in a label), and a validator that went looking for one would be doing
-something the specification tells readers not to do.
+Everything above this module is a statement about one file. This is the only rule family
+that puts two files side by side and asks whether they agree, which is also why it runs
+only when the caller passes ``--ifc``: the model is not part of the payload, it is not
+named by anything the validator may dereference (9.1 forbids resolving a filename found
+in a plannotation), and a validator that went looking for one would be doing something
+the specification tells readers not to do.
 
 Three checks, and the reason two are errors and one is not
 ----------------------------------------------------------
@@ -23,7 +23,7 @@ Three checks, and the reason two are errors and one is not
 
 Class matching is directional
 -----------------------------
-A label may name a **supertype** of the entity's class and nothing narrower:
+A plannotation may name a **supertype** of the entity's class and nothing narrower:
 ``IfcWall`` for an ``IfcWallStandardCase`` is a true, if less precise, statement, while
 ``IfcWallStandardCase`` for a plain ``IfcWall`` is false. ``ifcopenshell``'s
 ``entity.is_a(name)`` answers exactly that question in that direction, so the check is
@@ -245,28 +245,30 @@ def _module(name: str) -> Any:  # noqa: ANN401 - the whole point is that it is u
         raise MissingExtraError(msg) from exc
 
 
-def check_against_model(label: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
-    """Cross-check one page label against an IFC model.
+def check_against_model(
+    plannotation: Plannotation, model: IfcModel, *, source: str
+) -> list[Finding]:
+    """Cross-check one plannotation against an IFC model.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         model: The opened model.
-        source: Which document the label is, for the findings.
+        source: Which document the plannotation is, for the findings.
 
     Returns:
         Every violation: unresolved GlobalIds, class mismatches, and dimensions whose
         printed value disagrees with the distance re-measured in the model.
     """
-    found = _check_guids(label, model, source=source)
-    found += _check_dimensions(label, model, source=source)
+    found = _check_guids(plannotation, model, source=source)
+    found += _check_dimensions(plannotation, model, source=source)
     return found
 
 
-def _check_guids(label: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
-    """Check every GlobalId a label carries against the model.
+def _check_guids(plannotation: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
+    """Check every GlobalId a plannotation carries against the model.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         model: The opened model.
         source: Which document it is, for the findings.
 
@@ -275,7 +277,7 @@ def _check_guids(label: Plannotation, model: IfcModel, *, source: str) -> list[F
         class the entity is not.
     """
     found: list[Finding] = []
-    for name, path, guid, claimed in _guids(label):
+    for name, path, guid, claimed in _guids(plannotation):
         entity = model.entity(guid)
         if entity is None:
             found.append(
@@ -294,7 +296,7 @@ def _check_guids(label: Plannotation, model: IfcModel, *, source: str) -> list[F
                 "PL-IFC-002",
                 message=(
                     f"{name}: declares ifcClass {claimed!r}, but {guid} is an "
-                    f"{entity.is_a()} in {model.path.name}; a label may name a "
+                    f"{entity.is_a()} in {model.path.name}; a plannotation may name a "
                     f"supertype of the entity's class and nothing narrower"
                 ),
                 path=path,
@@ -304,11 +306,11 @@ def _check_guids(label: Plannotation, model: IfcModel, *, source: str) -> list[F
     return found
 
 
-def _guids(label: Plannotation) -> list[tuple[str, str, str, str | None]]:
-    """Collect every GlobalId in a label with a name, a pointer and a claimed class.
+def _guids(plannotation: Plannotation) -> list[tuple[str, str, str, str | None]]:
+    """Collect every GlobalId in a plannotation with a name, a pointer and a claimed class.
 
     Args:
-        label: The page label to walk.
+        plannotation: The plannotation to walk.
 
     Returns:
         One entry per ``ifcGuid``: a human-readable name, a JSON Pointer, the GlobalId,
@@ -317,7 +319,7 @@ def _guids(label: Plannotation) -> list[tuple[str, str, str, str | None]]:
         only PL-IFC-001 applies to them.
     """
     collected: list[tuple[str, str, str, str | None]] = []
-    for position, viewport in enumerate(label.viewports or []):
+    for position, viewport in enumerate(plannotation.viewports or []):
         storey = viewport.storey
         if storey is not None and storey.ifc_guid is not None:
             collected.append(
@@ -328,7 +330,7 @@ def _guids(label: Plannotation) -> list[tuple[str, str, str, str | None]]:
                     None,
                 )
             )
-    for position, element in enumerate(label.elements or []):
+    for position, element in enumerate(plannotation.elements or []):
         if element.ifc_guid is None:
             continue
         collected.append(
@@ -339,7 +341,7 @@ def _guids(label: Plannotation) -> list[tuple[str, str, str, str | None]]:
                 element.ifc_class,
             )
         )
-    for position, annotation in enumerate(label.annotations or []):
+    for position, annotation in enumerate(plannotation.annotations or []):
         if annotation.ifc_guid is None:
             continue
         collected.append(
@@ -353,11 +355,11 @@ def _guids(label: Plannotation) -> list[tuple[str, str, str, str | None]]:
     return collected
 
 
-def _check_dimensions(label: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
+def _check_dimensions(plannotation: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
     """Re-measure every dimension that runs between two elements with geometry.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         model: The opened model.
         source: Which document it is, for the findings.
 
@@ -367,12 +369,12 @@ def _check_dimensions(label: Plannotation, model: IfcModel, *, source: str) -> l
         fewer than two elements, names one without a GlobalId, or names one whose
         geometry cannot be built is not reported at all: there is nothing to compare.
     """
-    unit = label.source_model.length_unit if label.source_model else None
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
     if unit is None:
         return []
-    elements = {element.local_id: element for element in label.elements or []}
+    elements = {element.local_id: element for element in plannotation.elements or []}
     found: list[Finding] = []
-    for position, annotation in enumerate(label.annotations or []):
+    for position, annotation in enumerate(plannotation.annotations or []):
         expected = measured_length_mm(annotation)
         if expected is None:
             continue
@@ -438,20 +440,20 @@ def _remeasure(
     return distance * MM_PER_MODEL_UNIT[unit]
 
 
-def remeasurable(label: Plannotation) -> int:
+def remeasurable(plannotation: Plannotation) -> int:
     """Count the dimensions a model cross-check could re-measure.
 
     Args:
-        label: The page label.
+        plannotation: The plannotation.
 
     Returns:
         How many dimensions name exactly two elements that carry a GlobalId. Reported
         alongside the findings so that "no mismatches" can be told from "nothing was
         compared".
     """
-    elements = {element.local_id: element for element in label.elements or []}
+    elements = {element.local_id: element for element in plannotation.elements or []}
     count = 0
-    for annotation in label.annotations or []:
+    for annotation in plannotation.annotations or []:
         if measured_length_mm(annotation) is None:
             continue
         named = [elements[ref] for ref in (annotation.measures or []) if ref in elements]

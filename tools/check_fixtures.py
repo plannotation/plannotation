@@ -41,7 +41,7 @@ e. :func:`plannotation.model.conformance_level` returns the level the manifest, 
 The corpus is a drawing, not only a document
 --------------------------------------------
 These rules need a drawing to be plausible as well as well-formed. None is in the
-specification, none could be -- a conforming label may describe an unbuildable
+specification, none could be -- a conforming plannotation may describe an unbuildable
 building -- and a real project's drawings would trip several of them for good reasons.
 
 * **a level agrees with its own transform.** A level annotation's paper position, taken
@@ -61,18 +61,18 @@ building -- and a real project's drawings would trip several of them for good re
 * **model identity.** Two documents that declare the same ``model.sha256`` must agree on
   ``lengthUnit`` and on ``schema``, and ``file`` and ``sha256`` must determine each
   other. One file cannot be two models. Also cross-document;
-* **the index against the labels.** Matched here by printed sheet id, because the
-  corpus's indexes and labels are separate fixture files describing no one document;
-  the validator matches them by page inside a carrier, which is a different rule about
-  a different thing;
+* **the index against the plannotations.** Matched here by printed sheet id, because
+  the corpus's indexes and plannotations are separate fixture files describing no one
+  document; the validator matches them by page inside a carrier, which is a different
+  rule about a different thing;
 * **GlobalIds and sheet sizes are real.** A GlobalId's first character encodes two bits,
   so it can only be ``0`` to ``3``; the schema's pattern is deliberately looser, and a
   page that is not an A-series size is a fixture nobody meant to write.
 
-Warnings count as failures here. On the command line a label with warnings and no
-errors is conforming and exits 0, as section 4.4 requires. In this corpus a warning is
-a defect: these are the twelve labels a reader copies, and one that trips a SHOULD
-teaches the SHOULD wrongly.
+Warnings count as failures here. On the command line a plannotation with warnings and
+no errors is conforming and exits 0, as section 4.4 requires. In this corpus a warning
+is a defect: these are the twelve plannotations a reader copies, and one that trips a
+SHOULD teaches the SHOULD wrongly.
 
 Dimensions read off a name
 --------------------------
@@ -102,9 +102,9 @@ Usage::
 
     uv run --frozen python tools/check_fixtures.py [FIXTURES_ROOT]
 
-``FIXTURES_ROOT`` is the directory holding ``labels/`` and ``index/``; it defaults to
-``tests/fixtures`` in this repository. Exits 0 when everything passes and 1 on the
-first run that finds anything, printing the offending fixtures grouped by file.
+``FIXTURES_ROOT`` is the directory holding ``plannotations/`` and ``index/``; it
+defaults to ``tests/fixtures`` in this repository. Exits 0 when everything passes and 1
+on the first run that finds anything, printing the offending fixtures grouped by file.
 """
 
 from __future__ import annotations
@@ -238,8 +238,9 @@ class Drawn(NamedTuple):
         sheet_id: The printed number of the sheet the element appears on.
         element: The element itself.
         viewport: The viewport it is drawn in.
-        length_unit: ``model.lengthUnit``, or None when the label declares no model.
-        sha256: ``model.sha256``, or None when the label declares no model.
+        length_unit: ``model.lengthUnit``, or None when the plannotation declares no
+            model.
+        sha256: ``model.sha256``, or None when the plannotation declares no model.
     """
 
     fixture: str
@@ -286,11 +287,11 @@ class Stated(NamedTuple):
 # ---------------------------------------------------------------------------
 # Corpus rules: is this a real drawing?
 # ---------------------------------------------------------------------------
-def check_identifiers_and_page_size(label: Plannotation) -> list[str]:
+def check_identifiers_and_page_size(plannotation: Plannotation) -> list[str]:
     """Check that GlobalIds and page sizes are real ones.
 
     Args:
-        label: The page label to check.
+        plannotation: The plannotation to check.
 
     Returns:
         One message per malformed GlobalId, plus one if the page is not A-series.
@@ -298,14 +299,16 @@ def check_identifiers_and_page_size(label: Plannotation) -> list[str]:
     found: list[str] = []
     guids: list[tuple[str, str | None]] = [
         (f"viewport {vp.local_id}", vp.storey.ifc_guid if vp.storey else None)
-        for vp in label.viewports or []
+        for vp in plannotation.viewports or []
     ]
-    guids += [(f"element {item.local_id}", item.ifc_guid) for item in label.elements or []]
-    guids += [(f"annotation {item.local_id}", item.ifc_guid) for item in label.annotations or []]
+    guids += [(f"element {item.local_id}", item.ifc_guid) for item in plannotation.elements or []]
+    guids += [
+        (f"annotation {item.local_id}", item.ifc_guid) for item in plannotation.annotations or []
+    ]
     for name, guid in guids:
         if guid is not None and not IFC_GUID_RE.match(guid):
             found.append(f"{name}: {guid!r} is not a 22-character IFC GlobalId")
-    size = (label.page.width_mm, label.page.height_mm)
+    size = (plannotation.page.width_mm, plannotation.page.height_mm)
     if size not in A_SERIES and (size[1], size[0]) not in A_SERIES:
         found.append(f"page: {size[0]}x{size[1]} mm is not an A-series sheet size")
     return found
@@ -314,7 +317,7 @@ def check_identifiers_and_page_size(label: Plannotation) -> list[str]:
 # ---------------------------------------------------------------------------
 # Corpus rules: drafting conventions the specification does not require
 # ---------------------------------------------------------------------------
-def check_levels(label: Plannotation) -> list[str]:
+def check_levels(plannotation: Plannotation) -> list[str]:
     """Check that a level's elevation matches its viewport's transform.
 
     A level annotation sits at a height in the model. Its viewport says what a paper
@@ -323,16 +326,16 @@ def check_levels(label: Plannotation) -> list[str]:
     paper position must therefore be the elevation it prints.
 
     Args:
-        label: The page label to check.
+        plannotation: The plannotation to check.
 
     Returns:
         One message per level that contradicts its viewport.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
-    unit = label.source_model.length_unit if label.source_model else None
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
     metres = METRES_PER_UNIT.get(unit or "m", 1.0)
     found: list[str] = []
-    for annotation in label.annotations or []:
+    for annotation in plannotation.annotations or []:
         if annotation.annotation_type != "level" or annotation.elevation is None:
             continue
         viewport = viewports.get(annotation.viewport or "")
@@ -352,7 +355,7 @@ def check_levels(label: Plannotation) -> list[str]:
     return found
 
 
-def check_section_marks(label: Plannotation) -> list[str]:
+def check_section_marks(plannotation: Plannotation) -> list[str]:
     """Check that a section mark lies on the plane of the section it opens.
 
     A section mark drawn on a plan is the cutting line, so the model points it runs
@@ -360,15 +363,15 @@ def check_section_marks(label: Plannotation) -> list[str]:
     plane it names is the same defect as a level that contradicts its own transform.
 
     Args:
-        label: The page label to check.
+        plannotation: The plannotation to check.
 
     Returns:
         One message per section mark that misses its target plane.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
     found: list[str] = []
-    for annotation in label.annotations or []:
-        placed = section_mark_placement(annotation, viewports, label.sheet.sheet_id)
+    for annotation in plannotation.annotations or []:
+        placed = section_mark_placement(annotation, viewports, plannotation.sheet.sheet_id)
         if placed is None:
             continue
         drawn_in, matrix, opened = placed
@@ -427,13 +430,13 @@ def section_mark_placement(
     Args:
         annotation: The annotation to inspect.
         viewports: Every viewport on the page, by local id.
-        sheet_id: The id of the sheet the label describes.
+        sheet_id: The id of the sheet the plannotation describes.
 
     Returns:
         The plane and transform of the viewport the mark is drawn in, and the plane of
         the viewport it opens. None when the annotation is not a section mark carrying
         geometry, is not placed in a viewport that maps paper to the model, or points at
-        a viewport on another sheet, whose plane this label does not hold.
+        a viewport on another sheet, whose plane this plannotation does not hold.
     """
     if annotation.annotation_type != "sectionMark" or annotation.geometry is None:
         return None
@@ -456,7 +459,7 @@ def section_mark_placement(
 PRINTED_NUMBER_RE = re.compile(r"(?<![\d,.])(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?(?![A-Za-z0-9])")
 
 
-def check_shown_properties(label: Plannotation) -> list[str]:
+def check_shown_properties(plannotation: Plannotation) -> list[str]:
     """Check that a tag prints what it says it shows.
 
     Whether ``shows.element`` resolves at all is PL-REF-003, which the validator owns.
@@ -467,16 +470,16 @@ def check_shown_properties(label: Plannotation) -> list[str]:
     examples -- so this is a statement about this corpus and not about Plannotation.
 
     Args:
-        label: The page label to check.
+        plannotation: The plannotation to check.
 
     Returns:
         One message per ``shows.property`` the element does not carry, and per printed
         text that contradicts the property it says it displays.
     """
-    elements = {element.local_id: element for element in label.elements or []}
-    unit = label.source_model.length_unit if label.source_model else None
+    elements = {element.local_id: element for element in plannotation.elements or []}
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
     found: list[str] = []
-    for annotation in label.annotations or []:
+    for annotation in plannotation.annotations or []:
         shows = annotation.shows
         if shows is None or shows.element is None:
             continue
@@ -499,8 +502,8 @@ def check_shown_property(
     set: where the element carries it and the annotation's text contains a number, the
     two must agree. Whether the element carries it at all is PL-REF-012, which the
     validator owns; this is only about what the sheet prints. Any other spelling -- a
-    bare IFC attribute name, say -- is left alone, because nothing in the label says
-    where to look it up.
+    bare IFC attribute name, say -- is left alone, because nothing in the plannotation
+    says where to look it up.
 
     Args:
         annotation: The annotation doing the showing.
@@ -719,7 +722,7 @@ def drawn_height_mm(item: Drawn) -> float | None:
 
     Returns:
         The model height its bbox spans, or None when the view does not resolve height
-        or the label declares no length unit to read the model's coordinates in.
+        or the plannotation declares no length unit to read the model's coordinates in.
     """
     if item.length_unit is None:
         return None
@@ -1010,20 +1013,20 @@ def disagreements(
     return found
 
 
-def check_foundations(fixture: str, label: Plannotation) -> list[Problem]:
+def check_foundations(fixture: str, plannotation: Plannotation) -> list[Problem]:
     """Check that nothing called a foundation is drawn above the model datum.
 
     Args:
-        fixture: The fixture the label was read from.
-        label: The page label to check.
+        fixture: The fixture the plannotation was read from.
+        plannotation: The plannotation to check.
 
     Returns:
         One problem per footing whose lowest drawn point is above z = 0.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
-    unit = label.source_model.length_unit if label.source_model else None
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
     found: list[Problem] = []
-    for element in label.elements or []:
+    for element in plannotation.elements or []:
         named = FOUNDATION_NAME_RE.search(element.name or "") is not None
         if not named and element.ifc_class != FOOTING_CLASS:
             continue
@@ -1045,18 +1048,18 @@ def check_foundations(fixture: str, label: Plannotation) -> list[Problem]:
     return found
 
 
-def check_slab_thickness(fixture: str, label: Plannotation) -> list[Problem]:
+def check_slab_thickness(fixture: str, plannotation: Plannotation) -> list[Problem]:
     """Check that every slab a section cuts has a buildable thickness.
 
     Args:
-        fixture: The fixture the label was read from.
-        label: The page label to check.
+        fixture: The fixture the plannotation was read from.
+        plannotation: The plannotation to check.
 
     Returns:
         One problem per cut slab thinner than 100 mm or thicker than 500 mm.
     """
     found: list[Problem] = []
-    for item in drawn_elements(fixture, label):
+    for item in drawn_elements(fixture, plannotation):
         element = item.element
         if element.ifc_class != SLAB_CLASS or element.representation != "cut":
             continue
@@ -1076,24 +1079,24 @@ def check_slab_thickness(fixture: str, label: Plannotation) -> list[Problem]:
     return found
 
 
-def check_storey_heights(fixture: str, label: Plannotation) -> list[Problem]:
+def check_storey_heights(fixture: str, plannotation: Plannotation) -> list[Problem]:
     """Check the storey heights a section states between the slabs it cuts.
 
     Args:
-        fixture: The fixture the label was read from.
-        label: The page label to check.
+        fixture: The fixture the plannotation was read from.
+        plannotation: The plannotation to check.
 
     Returns:
         One problem per pair of consecutive slabs whose tops are less than 2.2 m or
         more than 6 m apart, which is a storey nobody can stand up in or a slab drawn
         at the wrong height.
     """
-    unit = label.source_model.length_unit if label.source_model else None
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
     if unit is None:
         return []
     metres = METRES_PER_UNIT[unit]
     stacks: dict[str, list[tuple[float, str]]] = {}
-    for item in drawn_elements(fixture, label):
+    for item in drawn_elements(fixture, plannotation):
         if item.element.ifc_class != SLAB_CLASS or item.element.representation != "cut":
             continue
         span = world_z_range(item.viewport, item.element.paper_bbox)
@@ -1128,7 +1131,7 @@ def check_cross_sheet_sizes(items: list[Drawn]) -> list[Problem]:
     crop, and two sections may legitimately crop one stair differently.
 
     Args:
-        items: Every element of every valid label, as its fixture draws it.
+        items: Every element of every valid plannotation, as its fixture draws it.
 
     Returns:
         One problem per pair that disagrees by more than 2 per cent in either extent.
@@ -1178,29 +1181,29 @@ def extents_agree(left: tuple[float, float], right: tuple[float, float]) -> bool
     )
 
 
-def drawn_elements(fixture: str, label: Plannotation) -> list[Drawn]:
-    """Pair every element of a label with the viewport that places it.
+def drawn_elements(fixture: str, plannotation: Plannotation) -> list[Drawn]:
+    """Pair every element of a plannotation with the viewport that places it.
 
     Args:
-        fixture: The fixture the label was read from.
-        label: The page label to walk.
+        fixture: The fixture the plannotation was read from.
+        plannotation: The plannotation to walk.
 
     Returns:
-        One :class:`Drawn` per element that names a viewport the label declares.
+        One :class:`Drawn` per element that names a viewport the plannotation declares.
         Elements placed in no viewport are left out: without one there is no scale, no
         plane and nothing to measure against.
     """
-    viewports = {viewport.local_id: viewport for viewport in label.viewports or []}
-    model = label.source_model
+    viewports = {viewport.local_id: viewport for viewport in plannotation.viewports or []}
+    model = plannotation.source_model
     items: list[Drawn] = []
-    for element in label.elements or []:
+    for element in plannotation.elements or []:
         viewport = viewports.get(element.viewport or "")
         if viewport is None:
             continue
         items.append(
             Drawn(
                 fixture=fixture,
-                sheet_id=label.sheet.sheet_id,
+                sheet_id=plannotation.sheet.sheet_id,
                 element=element,
                 viewport=viewport,
                 length_unit=model.length_unit if model else None,
@@ -1308,7 +1311,7 @@ def declared_level(filename: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Per-file drivers: page labels
+# Per-file drivers: plannotations
 # ---------------------------------------------------------------------------
 def schema_findings(document: Any, kind: DocumentKind) -> list[str]:  # noqa: ANN401
     """Validate one fixture against its schema, through the validator.
@@ -1336,12 +1339,12 @@ def schema_findings(document: Any, kind: DocumentKind) -> list[str]:  # noqa: AN
 def validator_findings(findings: list[Finding]) -> list[str]:
     """Render what the validator found, for this script's report.
 
-    Warnings count as problems here, unlike on the command line, where a label with
-    warnings and no errors is conforming and exits 0. The difference is deliberate and
-    is about what this corpus is for: these twelve labels are what a reader copies when
-    learning the format, so a fixture that trips a SHOULD teaches the SHOULD wrongly. A
-    warning fired by a real drawing is a question; a warning fired by the reference
-    corpus is a defect in the reference corpus.
+    Warnings count as problems here, unlike on the command line, where a plannotation
+    with warnings and no errors is conforming and exits 0. The difference is deliberate
+    and is about what this corpus is for: these twelve plannotations are what a reader
+    copies when learning the format, so a fixture that trips a SHOULD teaches the SHOULD
+    wrongly. A warning fired by a real drawing is a question; a warning fired by the
+    reference corpus is a defect in the reference corpus.
 
     Args:
         findings: What :func:`plannotation.validate.check_page_document` or
@@ -1360,18 +1363,18 @@ def check_valid_plannotation(
     root: Path,
     entry: dict[str, Any],
 ) -> tuple[list[Problem], Plannotation | None]:
-    """Run every check over one page label that is expected to be valid.
+    """Run every check over one plannotation that is expected to be valid.
 
     Args:
-        root: The ``labels`` fixture directory.
+        root: The ``plannotations`` fixture directory.
         entry: The manifest entry describing the file.
 
     Returns:
-        One problem per failed expectation, and the loaded label when it loaded, for
-        the corpus-wide checks to use.
+        One problem per failed expectation, and the loaded plannotation when it
+        loaded, for the corpus-wide checks to use.
     """
     name = str(entry["file"])
-    where = f"labels/{name}"
+    where = f"plannotations/{name}"
     raw, found = read_fixture(root / name)
     if raw is None:
         return ([Problem(where, message) for message in found], None)
@@ -1381,25 +1384,25 @@ def check_valid_plannotation(
     schema_errors = schema_findings(document, DocumentKind.PAGE)
     if schema_errors:
         return ([Problem(where, message) for message in found + schema_errors], None)
-    # Before the model is built: two rules the model refuses to let a label exist with,
-    # which would otherwise reach this script only as "it would not load".
+    # Before the model is built: two rules the model refuses to let a plannotation
+    # exist with, which would otherwise reach this script only as "it would not load".
     found += validator_findings(check_page_document(document, source="fixture"))
     try:
-        label = load_plannotation(raw)
+        plannotation = load_plannotation(raw)
     except (ValidationError, ValueError) as error:
         found.append(f"the schema accepts it but plannotation.model does not: {error}")
         return ([Problem(where, message) for message in found], None)
-    if canonical_bytes(label) != raw:
+    if canonical_bytes(plannotation) != raw:
         found.append("does not round-trip byte for byte through the models")
-    level = conformance_level(label).value
+    level = conformance_level(plannotation).value
     if level != entry.get("level"):
         found.append(f"reaches {level}, but the manifest says {entry.get('level')}")
     if declared_level(name) not in (None, level):
         found.append(f"reaches {level}, but the filename says {declared_level(name)}")
-    found.extend(validator_findings(check_plannotation(label, source="fixture")))
+    found.extend(validator_findings(check_plannotation(plannotation, source="fixture")))
     for check in PLANNOTATION_CHECKS:
-        found.extend(check(label))
-    return ([Problem(where, message) for message in found], label)
+        found.extend(check(plannotation))
+    return ([Problem(where, message) for message in found], plannotation)
 
 
 def check_invalid_plannotation(
@@ -1407,10 +1410,10 @@ def check_invalid_plannotation(
     entry: dict[str, Any],
     validator: Draft202012Validator,
 ) -> list[Problem]:
-    """Run every check over one page label that is expected to fail, in exactly one way.
+    """Run every check over one plannotation that is expected to fail, in exactly one way.
 
     Args:
-        root: The ``labels`` fixture directory.
+        root: The ``plannotations`` fixture directory.
         entry: The manifest entry describing the file.
         validator: A validator built from the page schema.
 
@@ -1418,7 +1421,7 @@ def check_invalid_plannotation(
         One problem per failed expectation.
     """
     return check_invalid_document(
-        f"labels/{entry['file']}", root, entry, validator, load_plannotation
+        f"plannotations/{entry['file']}", root, entry, validator, load_plannotation
     )
 
 
@@ -1528,56 +1531,60 @@ def check_valid_index(
 def check_index_against_plannotations(
     where: str,
     index: PlannotationIndex,
-    labels: dict[str, Plannotation],
+    plannotations: dict[str, Plannotation],
 ) -> list[Problem]:
-    """Check that an index says about a sheet what that sheet's label says about itself.
+    """Check that an index says about a sheet what the sheet's plannotation says of itself.
 
-    An index exists so that a reader can see what is labelled, and at which level,
+    An index exists so that a reader can see what is plannotated, and at which level,
     without opening every page attachment. That is only worth anything while the two
-    agree: a level recorded here that the label does not reach is a promise the
+    agree: a level recorded here that the plannotation does not reach is a promise the
     attachment does not keep, and SPEC 4.5 makes the page index a MUST.
 
     Args:
         where: How to name the index fixture in a message.
         index: The loaded index.
-        labels: Every valid page label of this corpus, by the sheet id it prints.
+        plannotations: Every valid plannotation of this corpus, by the sheet id it prints.
 
     Returns:
-        One problem per entry that contradicts the label it describes.
+        One problem per entry that contradicts the plannotation it describes.
     """
     found: list[Problem] = []
     for page in index.pages:
-        label = labels.get(page.sheet_id)
-        if label is None:
+        plannotation = plannotations.get(page.sheet_id)
+        if plannotation is None:
             continue
-        level = conformance_level(label).value
+        level = conformance_level(plannotation).value
         if page.level.value != level:
             found.append(
                 Problem(
                     where,
                     f"page {page.page_index} ({page.sheet_id}) is recorded as "
-                    f"{page.level.value}, but its label reaches {level}",
+                    f"{page.level.value}, but its plannotation reaches {level}",
                 )
             )
-        if page.page_index != label.page.index:
+        if page.page_index != plannotation.page.index:
             found.append(
                 Problem(
                     where,
                     f"sheet {page.sheet_id} is indexed at page {page.page_index}, but its "
-                    f"label declares page.index {label.page.index}",
+                    f"plannotation declares page.index {plannotation.page.index}",
                 )
             )
-        found += index_entry_text(where, page, label)
+        found += index_entry_text(where, page, plannotation)
     return found
 
 
-def index_entry_text(where: str, page: Any, label: Plannotation) -> list[Problem]:  # noqa: ANN401
+def index_entry_text(
+    where: str,
+    page: Any,  # noqa: ANN401
+    plannotation: Plannotation,
+) -> list[Problem]:
     """Check the title and revision an index entry copies from a sheet.
 
     Args:
         where: How to name the index fixture in a message.
         page: The index entry.
-        label: The page label it describes.
+        plannotation: The plannotation it describes.
 
     Returns:
         One problem per member that is present and disagrees. A member the index omits
@@ -1585,15 +1592,15 @@ def index_entry_text(where: str, page: Any, label: Plannotation) -> list[Problem
     """
     found: list[Problem] = []
     for member, indexed, printed in (
-        ("title", page.title, label.sheet.title),
-        ("revision", page.revision, label.sheet.revision),
+        ("title", page.title, plannotation.sheet.title),
+        ("revision", page.revision, plannotation.sheet.revision),
     ):
         if indexed is not None and indexed != printed:
             found.append(
                 Problem(
                     where,
                     f"sheet {page.sheet_id} is indexed with {member} {indexed!r}, but its "
-                    f"label prints {printed!r}",
+                    f"plannotation prints {printed!r}",
                 )
             )
     return found
@@ -1610,7 +1617,7 @@ def check_schema_pointers(
     """Check that every manifest ``schemaPointer`` dereferences inside the schema.
 
     Args:
-        corpus: ``labels`` or ``index``, for the message.
+        corpus: ``plannotations`` or ``index``, for the message.
         schema: The parsed schema of this corpus.
         entries: The manifest's ``invalid`` entries.
 
@@ -1638,7 +1645,7 @@ def check_manifest_matches_disk(corpus: str, root: Path, manifest: dict[str, Any
     """Check that a manifest lists exactly the files on disk, as many of each as agreed.
 
     Args:
-        corpus: ``labels`` or ``index``.
+        corpus: ``plannotations`` or ``index``.
         root: That corpus's fixture directory.
         manifest: Its parsed manifest.
 
@@ -1670,7 +1677,7 @@ def check_manifest_matches_disk(corpus: str, root: Path, manifest: dict[str, Any
 # ---------------------------------------------------------------------------
 # Drivers
 # ---------------------------------------------------------------------------
-#: The corpus checks that run over one loaded page label on its own.
+#: The corpus checks that run over one loaded plannotation on its own.
 #:
 #: Every rule the validator owns is applied by :func:`validator_findings` instead, and
 #: none of them appears here. What is left is what is about this corpus rather than
@@ -1687,13 +1694,14 @@ PLANNOTATION_CHECKS = (
 
 
 def run_plannotations(root: Path) -> tuple[list[Problem], list[tuple[str, Plannotation]]]:
-    """Check the page-label corpus.
+    """Check the plannotation corpus.
 
     Args:
-        root: The ``labels`` fixture directory.
+        root: The ``plannotations`` fixture directory.
 
     Returns:
-        Every problem found, and every label that loaded, paired with its fixture name.
+        Every problem found, and every plannotation that loaded, paired with its
+        fixture name.
     """
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     schema = page_schema()
@@ -1702,10 +1710,10 @@ def run_plannotations(root: Path) -> tuple[list[Problem], list[tuple[str, Planno
     problems += check_schema_pointers("plannotations", schema, manifest["invalid"])
     loaded: list[tuple[str, Plannotation]] = []
     for entry in manifest["valid"]:
-        found, label = check_valid_plannotation(root, entry)
+        found, plannotation = check_valid_plannotation(root, entry)
         problems += found
-        if label is not None:
-            loaded.append((f"labels/{entry['file']}", label))
+        if plannotation is not None:
+            loaded.append((f"plannotations/{entry['file']}", plannotation))
     for entry in manifest["invalid"]:
         problems += check_invalid_plannotation(root, entry, validator)
     return (problems, loaded)
@@ -1713,13 +1721,13 @@ def run_plannotations(root: Path) -> tuple[list[Problem], list[tuple[str, Planno
 
 def run_index(
     root: Path,
-    labels: list[tuple[str, Plannotation]],
+    plannotations: list[tuple[str, Plannotation]],
 ) -> tuple[list[Problem], list[tuple[str, PlannotationIndex]]]:
-    """Check the document-index corpus, including against the labels it describes.
+    """Check the document-index corpus, including against the plannotations it describes.
 
     Args:
         root: The ``index`` fixture directory.
-        labels: Every valid page label, paired with its fixture name.
+        plannotations: Every valid plannotation, paired with its fixture name.
 
     Returns:
         Every problem found, and every index that loaded, paired with its fixture name.
@@ -1729,7 +1737,7 @@ def run_index(
     validator = Draft202012Validator(schema)
     problems = check_manifest_matches_disk("index", root, manifest)
     problems += check_schema_pointers("index", schema, manifest["invalid"])
-    by_sheet = {label.sheet.sheet_id: label for _, label in labels}
+    by_sheet = {plannotation.sheet.sheet_id: plannotation for _, plannotation in plannotations}
     loaded: list[tuple[str, PlannotationIndex]] = []
     for entry in manifest["valid"]:
         found, index = check_valid_index(root, entry)
@@ -1746,21 +1754,21 @@ def run_index(
 
 
 def run_corpus_rules(
-    labels: list[tuple[str, Plannotation]],
+    plannotations: list[tuple[str, Plannotation]],
     indexes: list[tuple[str, PlannotationIndex]],
 ) -> list[Problem]:
     """Run every rule that needs more than one document, or more than the schema.
 
     Args:
-        labels: Every valid page label, paired with its fixture name.
+        plannotations: Every valid plannotation, paired with its fixture name.
         indexes: Every valid index, paired with its fixture name.
 
     Returns:
         Every problem found: model identity and cross-sheet size across the corpus,
-        stated sizes and physical plausibility within each label.
+        stated sizes and physical plausibility within each plannotation.
     """
     declared: list[tuple[str, Model | None]] = [
-        (fixture, label.source_model) for fixture, label in labels
+        (fixture, plannotation.source_model) for fixture, plannotation in plannotations
     ]
     declared += [(fixture, index.source_model) for fixture, index in indexes]
     declarations = [
@@ -1770,14 +1778,14 @@ def run_corpus_rules(
     ]
     problems: list[Problem] = []
     drawn: list[Drawn] = []
-    for fixture, label in labels:
-        items = drawn_elements(fixture, label)
+    for fixture, plannotation in plannotations:
+        items = drawn_elements(fixture, plannotation)
         drawn += items
         for item in items:
             problems += [Problem(fixture, message) for message in check_stated_sizes(item)]
-        problems += check_foundations(fixture, label)
-        problems += check_slab_thickness(fixture, label)
-        problems += check_storey_heights(fixture, label)
+        problems += check_foundations(fixture, plannotation)
+        problems += check_slab_thickness(fixture, plannotation)
+        problems += check_storey_heights(fixture, plannotation)
     return problems + check_model_identity(declarations) + check_cross_sheet_sizes(drawn)
 
 
@@ -1785,15 +1793,15 @@ def run(root: Path) -> list[Problem]:
     """Run every check over a fixture tree.
 
     Args:
-        root: The directory holding ``labels/`` and ``index/``.
+        root: The directory holding ``plannotations/`` and ``index/``.
 
     Returns:
         Every problem found: per-file ones in file order, then the ones that belong to
         no single file.
     """
-    problems, labels = run_plannotations(root / "plannotations")
-    index_problems, indexes = run_index(root / "index", labels)
-    return problems + index_problems + run_corpus_rules(labels, indexes)
+    problems, plannotations = run_plannotations(root / "plannotations")
+    index_problems, indexes = run_index(root / "index", plannotations)
+    return problems + index_problems + run_corpus_rules(plannotations, indexes)
 
 
 def count_fixtures(root: Path) -> int:
@@ -1803,7 +1811,8 @@ def count_fixtures(root: Path) -> int:
         root: The fixture tree's root.
 
     Returns:
-        How many JSON fixtures lie under ``labels/`` and ``index/``, manifests aside.
+        How many JSON fixtures lie under ``plannotations/`` and ``index/``, manifests
+        aside.
     """
     return sum(
         len(list((root / corpus / kind).glob("*.json")))

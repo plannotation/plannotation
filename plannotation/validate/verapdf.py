@@ -25,8 +25,8 @@ The flavour is left to the file
 -------------------------------
 ``--flavour 0`` is veraPDF's auto-detection, so the document's own XMP decides what it
 is held to. A document that declares no PDF/A flavour is not held to one, which is
-correct: Plannotation does not require a labelled PDF to be a PDF/A, and nothing here
-should invent a conformance target the document never claimed.
+correct: Plannotation does not require a plannotated PDF to be a PDF/A, and nothing
+here should invent a conformance target the document never claimed.
 """
 
 from __future__ import annotations

@@ -6,9 +6,9 @@ so the drawings cannot drift from the code that makes them.
 
 Each directory holds `model.ifc`, `sheet.svg`, `sheet.pdf`, `sheet.plannotated.pdf`,
 `plannotations.json` and `groundtruth.jsonl`; `groundtruth.jsonl` beside them merges all
-three. Every labelled sheet validates at conformance level **L3** with no errors and
-no warnings, cross-checked against its model, and rasterises identically to its
-unlabelled PDF. The callouts form a cycle, so the three are one set of drawings.
+three. Every plannotated sheet validates at conformance level **L3** with no errors
+and no warnings, cross-checked against its model, and rasterises identically to its
+unplannotated PDF. The callouts form a cycle, so the three are one set of drawings.
 
 ## `floorplan` — ARC-101, Grundriss Erdgeschoss, 1:50
 
@@ -30,7 +30,7 @@ A foundation position plan on the grid A–C / 1–3, cut at 0.50 m.
   (`Pos. 10`–`Pos. 15`), cut; a 25 cm base slab (`Pos. 16`) below the cut, drawn as
   a projection.
 - Every member's cross-section printed under its mark, from the model's
-  `Pset_*Common.Reference`, and linked to that property in the label.
+  `Pset_*Common.Reference`, and linked to that property in the plannotation.
 - Six dimensions, bays and overall, and a callout to ARC-301.
 
 ## `section` — ARC-301, Schnitt A-A, 1:50

@@ -70,19 +70,19 @@ def tally(records: Sequence[Record]) -> Tally:
     return Tally(sum(1 for record in records if record.correct), len(records))
 
 
-def delta(plain: Tally, labelled: Tally) -> str:
+def delta(plain: Tally, plannotated: Tally) -> str:
     """Return the difference in accuracy, in percentage points.
 
     Args:
         plain: The plain condition's tally.
-        labelled: The labelled condition's tally.
+        plannotated: The plannotated condition's tally.
 
     Returns:
         A signed figure such as ``+40 pp``, or a dash if either is missing.
     """
-    if plain.rate is None or labelled.rate is None:
+    if plain.rate is None or plannotated.rate is None:
         return "—"
-    points = (labelled.rate - plain.rate) * _PERCENT
+    points = (plannotated.rate - plain.rate) * _PERCENT
     return f"{points:+.0f} pp"
 
 
@@ -101,7 +101,7 @@ def categories(records: Sequence[Record]) -> list[str]:
 
 
 def render_report(
-    model: str, date: str, plain: Sequence[Record], labelled: Sequence[Record]
+    model: str, date: str, plain: Sequence[Record], plannotated: Sequence[Record]
 ) -> str:
     """Write the full report.
 
@@ -109,24 +109,24 @@ def render_report(
         model: The model the runs asked.
         date: The report's date, ``YYYY-MM-DD``.
         plain: The plain run's records; may be empty.
-        labelled: The labelled run's records; may be empty.
+        plannotated: The plannotated run's records; may be empty.
 
     Returns:
         The report as Markdown.
     """
-    everything = [*plain, *labelled]
+    everything = [*plain, *plannotated]
     sheets = sorted({record.sheet for record in everything})
     lines = [
         f"# Plannotation benchmark — `{model}`, {date}",
         "",
         (
-            f"Questions about {len(sheets)} sample sheet(s) ({', '.join(sheets)}), asked "
-            "under two conditions that differ only in whether the page label is supplied."
+            f"Questions about {len(sheets)} sample sheet(s) ({', '.join(sheets)}), asked under "
+            "two conditions that differ only in whether the page's plannotation is supplied."
         ),
         "",
         f"- `plain`: the page rendered at {BENCH_DPI:.0f} dpi, and its extracted text.",
         (
-            "- `labelled`: the same, then the Plannotation page label as the result of a "
+            "- `plannotated`: the same, then the page's plannotation as the result of a "
             "`get_plannotation` tool call."
         ),
         (
@@ -136,14 +136,14 @@ def render_report(
         "",
         "## Accuracy",
         "",
-        "| Category | Questions | `plain` | `labelled` | Difference |",
+        "| Category | Questions | `plain` | `plannotated` | Difference |",
         "| --- | ---: | ---: | ---: | ---: |",
     ]
     for category in categories(everything):
         in_plain = [record for record in plain if record.category == category]
-        in_plannotated = [record for record in labelled if record.category == category]
+        in_plannotated = [record for record in plannotated if record.category == category]
         only = (
-            " (label only)"
+            " (plannotation only)"
             if any(r.requires_plannotation for r in [*in_plain, *in_plannotated])
             else ""
         )
@@ -153,14 +153,14 @@ def render_report(
             f"| {delta(tally(in_plain), tally(in_plannotated))} |"
         )
     drawing_plain = [record for record in plain if not record.requires_plannotation]
-    drawing_plannotated = [record for record in labelled if not record.requires_plannotation]
+    drawing_plannotated = [record for record in plannotated if not record.requires_plannotation]
     lines += [
         _total_row("Answerable from the drawing", drawing_plain, drawing_plannotated),
-        _total_row("All questions", plain, labelled),
+        _total_row("All questions", plain, plannotated),
         "",
         (
-            "Label-only questions ask for something the page does not print, such as an "
-            "element's IFC GlobalId. They are counted in the last row and not in the one "
+            "Plannotation-only questions ask for something the page does not print, such as "
+            "an element's IFC GlobalId. They are counted in the last row and not in the one "
             "above it."
         ),
         "",
@@ -173,7 +173,8 @@ def render_report(
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     lines += [
-        _cost_row(name, records) for name, records in (("plain", plain), ("labelled", labelled))
+        _cost_row(name, records)
+        for name, records in (("plain", plain), ("plannotated", plannotated))
     ]
     lines += [
         "",
@@ -184,11 +185,11 @@ def render_report(
         "",
         "## Answers",
         "",
-        "| Question | Category | Expected | `plain` | `labelled` |",
+        "| Question | Category | Expected | `plain` | `plannotated` |",
         "| --- | --- | --- | --- | --- |",
     ]
     by_id = {record.id: record for record in plain}
-    plannotated_by_id = {record.id: record for record in labelled}
+    plannotated_by_id = {record.id: record for record in plannotated}
     for question_id in sorted({*by_id, *plannotated_by_id}):
         first = by_id.get(question_id) or plannotated_by_id[question_id]
         lines.append(
@@ -199,21 +200,21 @@ def render_report(
     return "\n".join(lines) + "\n"
 
 
-def _total_row(name: str, plain: Sequence[Record], labelled: Sequence[Record]) -> str:
+def _total_row(name: str, plain: Sequence[Record], plannotated: Sequence[Record]) -> str:
     """Return one bold total row of the accuracy table.
 
     Args:
         name: The row's label.
         plain: The plain records it counts.
-        labelled: The labelled records it counts.
+        plannotated: The plannotated records it counts.
 
     Returns:
         The row.
     """
-    questions = max(len(plain), len(labelled))
+    questions = max(len(plain), len(plannotated))
     return (
-        f"| **{name}** | **{questions}** | **{tally(plain)}** | **{tally(labelled)}** "
-        f"| **{delta(tally(plain), tally(labelled))}** |"
+        f"| **{name}** | **{questions}** | **{tally(plain)}** | **{tally(plannotated)}** "
+        f"| **{delta(tally(plain), tally(plannotated))}** |"
     )
 
 
@@ -287,7 +288,7 @@ def _cell(text: str) -> str:
 
 
 def render_readme_section(
-    model: str, report_path: str, plain: Sequence[Record], labelled: Sequence[Record]
+    model: str, report_path: str, plain: Sequence[Record], plannotated: Sequence[Record]
 ) -> str:
     """Write what goes between the README's benchmark markers.
 
@@ -295,30 +296,33 @@ def render_readme_section(
         model: The model the runs asked.
         report_path: The full report, relative to the README.
         plain: The plain run's records.
-        labelled: The labelled run's records.
+        plannotated: The plannotated run's records.
 
     Returns:
         The section, markers excluded.
     """
     drawing = [
         [record for record in records if not record.requires_plannotation]
-        for records in (plain, labelled)
+        for records in (plain, plannotated)
     ]
     only = [
         [record for record in records if record.requires_plannotation]
-        for records in (plain, labelled)
+        for records in (plain, plannotated)
     ]
-    total = max(len(plain), len(labelled))
+    total = max(len(plain), len(plannotated))
     lines = [
         (
             f"Measured with `{model}` on the three sample sheets, {total} questions whose "
             "answers come from the IFC model each sheet was drawn from. Same model, same "
-            "prompt, same page image and extracted text; `labelled` also gets the page "
-            "label as a tool result. Full report, every answer included: "
+            "prompt, same page image and extracted text; `plannotated` also gets the page's "
+            "plannotation as a tool result. Full report, every answer included: "
             f"[{report_path}]({report_path})."
         ),
         "",
-        "| Questions | `plain` (page render + text) | `labelled` (+ Plannotation) | Difference |",
+        (
+            "| Questions | `plain` (page render + text) | `plannotated` (+ Plannotation) "
+            "| Difference |"
+        ),
         "| --- | ---: | ---: | ---: |",
     ]
     lines.append(
@@ -327,7 +331,7 @@ def render_readme_section(
     )
     if only[0] or only[1]:
         lines.append(
-            f"| Label only (IFC GlobalId) | {tally(only[0])} | {tally(only[1])} "
+            f"| Plannotation only (IFC GlobalId) | {tally(only[0])} | {tally(only[1])} "
             f"| {delta(tally(only[0]), tally(only[1]))} |"
         )
     return "\n".join(lines)

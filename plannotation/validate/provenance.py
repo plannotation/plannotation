@@ -8,10 +8,10 @@ the checkable part of that.
 
 None of the arithmetic is written twice. :func:`plannotation.model.aggregate_provenance`
 already implements 4.6.3's inheritance and 4.6.4's aggregation, and
-:attr:`plannotation.model.Plannotation.provenance_is_consistent` already applies them to a
-label; this module reports what they decide and adds the three rules they do not cover
--- a missing confidence, a confidence where there should be none, and a ``mixed`` label
-whose items are silent.
+:attr:`plannotation.model.Plannotation.provenance_is_consistent` already applies them
+to a plannotation; this module reports what they decide and adds the three rules they
+do not cover -- a missing confidence, a confidence where there should be none, and a
+``mixed`` plannotation whose items are silent.
 
 One rule runs on the parsed JSON rather than on the model, for the reason given in
 :mod:`plannotation.validate.referential`: :class:`plannotation.model.Element` refuses to
@@ -47,12 +47,12 @@ def effective_provenance(declared: str | None, top_level: str | None) -> str:
 
     Args:
         declared: The item's own ``provenance``, or None when it omits it.
-        top_level: The label's top-level ``provenance``.
+        top_level: The plannotation's top-level ``provenance``.
 
     Returns:
-        The item's own value where it has one; otherwise the label's, except that where
-        the label's is ``mixed`` the effective value is ``inferred`` -- silence is read
-        conservatively, never as ``authored``.
+        The item's own value where it has one; otherwise the plannotation's, except that
+        where the plannotation's is ``mixed`` the effective value is ``inferred`` --
+        silence is read conservatively, never as ``authored``.
     """
     if declared is not None:
         return declared
@@ -69,12 +69,12 @@ def check_inferred_confidence(document: Mapping[str, object], *, source: str) ->
     * **PL-PRV-001**, an item whose effective provenance is ``inferred`` and which
       carries no ``confidence``. 4.6.5 names the validator as the place this is
       enforced, because the schema cannot express it.
-    * **PL-PRV-003**, a label whose top level is ``mixed`` and whose items do not all
-      say which half they came from. Under 4.6.3 that silence reads as ``inferred``,
+    * **PL-PRV-003**, a plannotation whose top level is ``mixed`` and whose items do not
+      all say which half they came from. Under 4.6.3 that silence reads as ``inferred``,
       which is a smaller claim than the writer meant to make.
 
     Args:
-        document: The parsed page label, already schema-valid.
+        document: The parsed plannotation, already schema-valid.
         source: Which document it is, for the findings.
 
     Returns:
@@ -108,8 +108,8 @@ def _check_one_item(
         member: The parsed item.
         collection: ``"elements"`` or ``"annotations"``.
         position: Its index in that collection.
-        top: The label's top-level provenance, or None when it is absent or not a
-            string.
+        top: The plannotation's top-level provenance, or None when it is absent or not
+            a string.
         source: Which document it is, for the findings.
 
     Returns:
@@ -122,7 +122,7 @@ def _check_one_item(
     base = json_pointer([collection, position])
     found: list[Finding] = []
     if effective == Provenance.INFERRED.value and member.get("confidence") is None:
-        inherited = "" if own is not None else f" (inherited from the label's {top!r})"
+        inherited = "" if own is not None else f" (inherited from the plannotation's {top!r})"
         found.append(
             finding(
                 "PL-PRV-001",
@@ -141,9 +141,9 @@ def _check_one_item(
             finding(
                 "PL-PRV-003",
                 message=(
-                    f"{collection[:-1]} {identifier!r} omits provenance in a label whose "
-                    f"top level is 'mixed'; 4.6.3 reads that silence as 'inferred', so a "
-                    f"mixed label must record provenance on every item"
+                    f"{collection[:-1]} {identifier!r} omits provenance in a plannotation "
+                    f"whose top level is 'mixed'; 4.6.3 reads that silence as 'inferred', "
+                    f"so a mixed plannotation must record provenance on every item"
                 ),
                 path=base,
                 source=source,
@@ -178,29 +178,29 @@ def _check_one_item(
     return found
 
 
-def check_provenance(label: Plannotation, *, source: str) -> list[Finding]:
-    """Check a label's top-level provenance against its items.
+def check_provenance(plannotation: Plannotation, *, source: str) -> list[Finding]:
+    """Check a plannotation's top-level provenance against its items.
 
     Args:
-        label: The loaded page label.
+        plannotation: The loaded plannotation.
         source: Which document it is, for the findings.
 
     Returns:
         A single finding when the declaration is not the aggregate, and nothing when it
         is, or when the page has no items and the rule therefore decides nothing.
     """
-    if label.provenance_is_consistent:
+    if plannotation.provenance_is_consistent:
         return []
-    aggregate = label.aggregate_provenance
+    aggregate = plannotation.aggregate_provenance
     spelled = "nothing" if aggregate is None else aggregate.value
     return [
         finding(
             "PL-PRV-002",
             message=(
-                f"the label declares provenance {label.provenance.value!r}, but its "
-                f"elements and annotations aggregate to {spelled!r}; 4.6.4 makes the top "
-                f"level 'authored' only if every value is authored, 'inferred' only if "
-                f"every value is inferred, and 'mixed' otherwise"
+                f"the plannotation declares provenance {plannotation.provenance.value!r}, "
+                f"but its elements and annotations aggregate to {spelled!r}; 4.6.4 makes "
+                f"the top level 'authored' only if every value is authored, 'inferred' "
+                f"only if every value is inferred, and 'mixed' otherwise"
             ),
             path="/provenance",
             source=source,
@@ -210,7 +210,7 @@ def check_provenance(label: Plannotation, *, source: str) -> list[Finding]:
 
 def check_index_provenance(
     index: PlannotationIndex,
-    labels: Sequence[tuple[int, Plannotation]],
+    plannotations: Sequence[tuple[int, Plannotation]],
     *,
     source: str,
 ) -> list[Finding]:
@@ -218,13 +218,14 @@ def check_index_provenance(
 
     Only reported when every page the index lists is in front of the validator. An
     index may legitimately describe a document whose pages the validator was not given
-    -- 4.3 forbids a reader from assuming the index lists every labelled page, and the
-    converse holds here -- and aggregating over a subset would report a disagreement
-    that is an artefact of what was read.
+    -- 4.3 forbids a reader from assuming the index lists every plannotated page, and
+    the converse holds here -- and aggregating over a subset would report a
+    disagreement that is an artefact of what was read.
 
     Args:
         index: The loaded index.
-        labels: Every page label in the carrier, paired with the page it was found on.
+        plannotations: Every plannotation in the carrier, paired with the page it was
+            found on.
         source: Which document it is, for the finding.
 
     Returns:
@@ -233,19 +234,19 @@ def check_index_provenance(
     """
     if index.provenance is None:
         return []
-    by_page = dict(labels)
+    by_page = dict(plannotations)
     listed = [entry.page_index for entry in index.pages]
     if not listed or any(page_index not in by_page for page_index in listed):
         return []
     items: list[Provenance | None] = []
     for page_index in listed:
-        label = by_page[page_index]
-        declared = [item.provenance for item in (label.elements or [])]
-        declared += [item.provenance for item in (label.annotations or [])]
+        plannotation = by_page[page_index]
+        declared = [item.provenance for item in (plannotation.elements or [])]
+        declared += [item.provenance for item in (plannotation.annotations or [])]
         items += [
             value
             if value is not None
-            else Provenance(effective_provenance(None, label.provenance.value))
+            else Provenance(effective_provenance(None, plannotation.provenance.value))
             for value in declared
         ]
     aggregate = aggregate_provenance(items)
@@ -257,7 +258,7 @@ def check_index_provenance(
             message=(
                 f"the index declares provenance {index.provenance.value!r}, but the "
                 f"{len(listed)} page(s) it lists aggregate to {aggregate.value!r}; the "
-                f"index aggregates the same way a label does"
+                f"index aggregates the same way a plannotation does"
             ),
             path="/provenance",
             source=source,

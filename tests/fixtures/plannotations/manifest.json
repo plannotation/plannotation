@@ -1,10 +1,10 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
-  "description": "Fixtures for the Plannotation 0.1 page-label schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided.",
+  "description": "Fixtures for the plannotation schema of Plannotation 0.1. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided.",
   "invalid": [
     {
       "derivedFrom": "valid/01-minimal-l1.json",
-      "description": "Minimal label announcing version 0.2, which no 0.1 reader may accept.",
+      "description": "Minimal plannotation announcing version 0.2, which no 0.1 reader may accept.",
       "errorPath": "$.plannotation",
       "file": "invalid/01-wrong-plannotation-const.json",
       "keyword": "const",
@@ -14,7 +14,7 @@
     },
     {
       "derivedFrom": "valid/11-l2-section-rotated-270.json",
-      "description": "A section label that forgets the mandatory top-level sheet object.",
+      "description": "A plannotation of a section that forgets the mandatory top-level sheet object.",
       "errorPath": "$",
       "file": "invalid/02-missing-required-sheet.json",
       "keyword": "required",
@@ -132,7 +132,7 @@
         "provenance authored",
         "A3 page"
       ],
-      "description": "The smallest legal label: the four required top-level keys and nothing else.",
+      "description": "The smallest legal plannotation: the four required top-level keys and nothing else.",
       "file": "valid/01-minimal-l1.json",
       "level": "L1"
     },
@@ -223,7 +223,7 @@
         "northArrow",
         "scaleBar"
       ],
-      "description": "Building-services plan mixing authored and inferred elements; its annotations carry no link, so the label stops at L2.",
+      "description": "Building-services plan mixing authored and inferred elements; its annotations carry no link, so the plannotation stops at L2.",
       "file": "valid/06-l2-mep-mixed-provenance.json",
       "level": "L2"
     },

@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The request each condition sends: one template, and the label as a tool result.
+"""The request each condition sends: one template, and the plannotation as a tool result.
 
 Both conditions send the same system prompt, the same page picture, the same
-extracted text, and the same question block. ``labelled`` differs only in that the
-conversation also holds a ``get_plannotation`` call and its result -- the label as
-canonical JSON -- before the question, which is how an MCP host hands a label over.
+extracted text, and the same question block. ``plannotated`` differs only in that the
+conversation also holds a ``get_plannotation`` call and its result -- the plannotation
+as canonical JSON -- before the question, which is how an MCP host hands a
+plannotation over.
 
 The prompt cache breakpoint sits after the page material and before the question, so
 every question about a sheet after the first reads the page from the cache.
@@ -20,8 +21,8 @@ if TYPE_CHECKING:
     from plannotation.bench.questions import Question
 
 #: The two conditions.
-Condition = Literal["plain", "labelled"]
-CONDITIONS: Final[tuple[Condition, ...]] = ("plain", "labelled")
+Condition = Literal["plain", "plannotated"]
+CONDITIONS: Final[tuple[Condition, ...]] = ("plain", "plannotated")
 
 #: Bumped whenever anything below changes what is sent, so cached answers to the old
 #: prompt are never served for the new one.
@@ -49,11 +50,11 @@ ANSWER_INSTRUCTIONS: Final = (
 PLANNOTATION_TOOL: Final[dict[str, object]] = {
     "name": "get_plannotation",
     "description": (
-        "Return the Plannotation page label for a page of the open drawing: a JSON "
-        "document naming the sheet, its viewports and how paper maps to model "
-        "coordinates, the model elements drawn with their IFC class, GlobalId and "
-        "mark, and the annotations -- grids, dimensions and what they measure, tags "
-        "and what they show, callouts and the sheet they point to."
+        "Return the plannotation for a page of the open drawing: a JSON document naming "
+        "the sheet, its viewports and how paper maps to model coordinates, the model "
+        "elements drawn with their IFC class, GlobalId and mark, and the annotations -- "
+        "grids, dimensions and what they measure, tags and what they show, callouts and "
+        "the sheet they point to."
     ),
     "input_schema": {
         "type": "object",
@@ -101,7 +102,7 @@ def build_request(
     Args:
         question: What to ask.
         page: The page it is about.
-        condition: ``plain`` or ``labelled``.
+        condition: ``plain`` or ``plannotated``.
         model: The model id.
         effort: An ``output_config.effort`` level, or None for the model's default.
 
@@ -109,7 +110,7 @@ def build_request(
         The request, as plain JSON-ready data.
 
     Raises:
-        ValueError: If the condition is ``labelled`` and the page has no label.
+        ValueError: If the condition is ``plannotated`` and the page has no plannotation.
     """
     picture = {
         "type": "image",
@@ -135,8 +136,8 @@ def build_request(
             }
         ]
     else:
-        if page.label is None:
-            msg = f"{question.document} page {question.page} has no label to supply"
+        if page.plannotation is None:
+            msg = f"{question.document} page {question.page} has no plannotation to supply"
             raise ValueError(msg)
         request["tools"] = [PLANNOTATION_TOOL]
         messages = [
@@ -158,7 +159,7 @@ def build_request(
                     {
                         "type": "tool_result",
                         "tool_use_id": PLANNOTATION_TOOL_USE_ID,
-                        "content": page.label,
+                        "content": page.plannotation,
                         "cache_control": _CACHE,
                     },
                     asking,

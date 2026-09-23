@@ -1,6 +1,6 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
-  "description": "Fixtures for the Plannotation 0.1 document-level index schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided -- the index schema carries no $ref, so the two agree. Every index here describes the page labels in tests/fixtures/plannotations: each entry's sheetId, title, revision and pageIndex are copied from that sheet's label fixture, its level is the level conformance_level() computes for that label, and its file is the attachment name plannotation_filename() produces for that page index.",
+  "description": "Fixtures for the Plannotation 0.1 document-level index schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided -- the index schema carries no $ref, so the two agree. Every index here describes the plannotations in tests/fixtures/plannotations: each entry's sheetId, title, revision and pageIndex are copied from that sheet's plannotation fixture, its level is the level conformance_level() computes for that plannotation, and its file is the attachment name plannotation_filename() produces for that page index.",
   "invalid": [
     {
       "derivedFrom": "valid/02-architecture-package-full.json",
@@ -24,7 +24,7 @@
     },
     {
       "derivedFrom": "valid/01-minimal-single-sheet.json",
-      "description": "A page entry that names the sheet but never says which level its label reaches.",
+      "description": "A page entry that names the sheet but never says which level its plannotation reaches.",
       "errorPath": "$.pages[0]",
       "file": "invalid/03-page-entry-missing-level.json",
       "keyword": "required",
@@ -42,9 +42,9 @@
         "plannotation const",
         "page entry with required members only",
         "level L1",
-        "describes labels/valid/01-minimal-l1.json (sheet A-101, page 0)"
+        "describes plannotations/valid/01-minimal-l1.json (sheet A-101, page 0)"
       ],
-      "description": "The smallest legal index: the version token and one page entry carrying nothing but pageIndex, sheetId and level. It indexes the minimal page label.",
+      "description": "The smallest legal index: the version token and one page entry carrying nothing but pageIndex, sheetId and level. It indexes the minimal plannotation.",
       "file": "valid/01-minimal-single-sheet.json"
     },
     {
@@ -57,8 +57,8 @@
         "page entries with title, revision and file",
         "file names as plannotation_filename produces them",
         "levels L1, L2 and L3 one per page",
-        "unlabelled pages absent, so pageIndex 0, 2, 6",
-        "describes labels/valid/07, /09 and /12 (ARC-100, ARC-201, ARC-301)"
+        "unplannotated pages absent, so pageIndex 0, 2, 6",
+        "describes plannotations/valid/07, /09 and /12 (ARC-100, ARC-201, ARC-301)"
       ],
       "description": "The architectural package written from one IFC4 model: every optional top-level member is present, and every optional member of every page entry.",
       "file": "valid/02-architecture-package-full.json"
@@ -73,9 +73,9 @@
         "conformance levels mixed across pages: L1, L2 and L3",
         "pages of four disciplines on one document",
         "sparse page indices 0-6, 8, 11",
-        "describes labels/valid/02, /03, /04, /05, /06, /08, /09, /11 and /12"
+        "describes plannotations/valid/02, /03, /04, /05, /06, /08, /09, /11 and /12"
       ],
-      "description": "The combined issue set: nine labelled pages from four disciplines, spanning all three conformance levels and all three provenances, so the index aggregates to mixed and names no single source model.",
+      "description": "The combined issue set: nine plannotated pages from four disciplines, spanning all three conformance levels and all three provenances, so the index aggregates to mixed and names no single source model.",
       "file": "valid/03-mixed-levels-issue-set.json"
     }
   ]

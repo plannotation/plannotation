@@ -4,7 +4,7 @@
 
 - Source: `<path>`
 - Carrier: plannotations
-- Page labels examined: 1
+- Plannotations examined: 1
 
 ## Pages
 

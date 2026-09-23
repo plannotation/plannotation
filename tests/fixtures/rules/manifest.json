@@ -1,7 +1,7 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
   "codes": "Each invalid case records the validator's stable rule code; `rule` is the human name.",
-  "description": "Fixtures for the rules a Plannotation 0.1 validator applies beyond the schema. Every document here -- valid and invalid alike -- is schema-valid against plannotation/schema/plannotation-0.1.json with zero errors: that is the point of the corpus, which describes documents that pass the schema and are still wrong. For the schema's own negative cases see tests/fixtures/plannotations/. Every file under valid/ is expected to produce no finding at all. Every file under invalid/ is expected to produce exactly one finding, of the stated severity, for the stated rule, at reportPath. reportPath is written in python-jsonschema json_path syntax and pointer is the same location as an RFC 6901 JSON Pointer, which is the form SPEC 4.4 (2) requires. The path names the smallest member whose value is wrong; where a rule constrains a relation among several members it names the smallest member that holds them all, and where the member that is wrong is one that is absent it names the object that should have carried it. For a uniqueness violation it names the later of the colliding occurrences, in the order viewports, elements, annotations. rule is a stable slug; several fixtures may share one, because one rule applied to two subjects is still one rule and must have one implementation. severity is error for a violation of a MUST and warning for a violation of a SHOULD or for a finding that rests on a tolerance or a heuristic, per SPEC 4.4. level is the conformance level SPEC 4.1 requires the validator to report, which it MUST do whether or not it also reports errors. documentPageCount, where present, is the page count of the document the label belongs to, which the target.pdfPage rule needs and a lone page label cannot carry. buildsThroughModel is false for the fixtures plannotation.model refuses at load time; those were written as JSON directly and a validator must reach their rule without going through the models.",
+  "description": "Fixtures for the rules a Plannotation 0.1 validator applies beyond the schema. Every document here -- valid and invalid alike -- is schema-valid against plannotation/schema/plannotation-0.1.json with zero errors: that is the point of the corpus, which describes documents that pass the schema and are still wrong. For the schema's own negative cases see tests/fixtures/plannotations/. Every file under valid/ is expected to produce no finding at all. Every file under invalid/ is expected to produce exactly one finding, of the stated severity, for the stated rule, at reportPath. reportPath is written in python-jsonschema json_path syntax and pointer is the same location as an RFC 6901 JSON Pointer, which is the form SPEC 4.4 (2) requires. The path names the smallest member whose value is wrong; where a rule constrains a relation among several members it names the smallest member that holds them all, and where the member that is wrong is one that is absent it names the object that should have carried it. For a uniqueness violation it names the later of the colliding occurrences, in the order viewports, elements, annotations. rule is a stable slug; several fixtures may share one, because one rule applied to two subjects is still one rule and must have one implementation. severity is error for a violation of a MUST and warning for a violation of a SHOULD or for a finding that rests on a tolerance or a heuristic, per SPEC 4.4. level is the conformance level SPEC 4.1 requires the validator to report, which it MUST do whether or not it also reports errors. documentPageCount, where present, is the page count of the document the plannotation belongs to, which the target.pdfPage rule needs and a lone plannotation cannot carry. buildsThroughModel is false for the fixtures plannotation.model refuses at load time; those were written as JSON directly and a validator must reach their rule without going through the models.",
   "invalid": [
     {
       "alsoReports": [
@@ -26,7 +26,7 @@
       "buildsThroughModel": true,
       "code": "PL-REF-002",
       "derivedFrom": "valid/01-referential-clean.json",
-      "description": "The window is placed in vp-sec-2, a second section viewport that was cut from the sheet without the elements being repointed. The label declares vp-sec, vp-key and vp-title and nothing else.",
+      "description": "The window is placed in vp-sec-2, a second section viewport that was cut from the sheet without the elements being repointed. The plannotation declares vp-sec, vp-key and vp-title and nothing else.",
       "family": "referential",
       "file": "invalid/02-element-names-missing-viewport.json",
       "level": "L3",
@@ -35,7 +35,7 @@
       "rule": "referential.viewport-resolves",
       "severity": "error",
       "spec": "SPEC 4.5; design brief 8.2",
-      "violates": "SPEC 4.5: element.viewport MUST reference a viewport in this label. A reference that does not resolve is an error."
+      "violates": "SPEC 4.5: element.viewport MUST reference a viewport in this plannotation. A reference that does not resolve is an error."
     },
     {
       "buildsThroughModel": true,
@@ -50,7 +50,7 @@
       "rule": "referential.viewport-resolves",
       "severity": "error",
       "spec": "SPEC 4.5; design brief 8.2",
-      "violates": "SPEC 4.5: annotation.viewport MUST reference a viewport in this label."
+      "violates": "SPEC 4.5: annotation.viewport MUST reference a viewport in this plannotation."
     },
     {
       "buildsThroughModel": true,
@@ -65,7 +65,7 @@
       "rule": "referential.measures-resolves",
       "severity": "error",
       "spec": "SPEC 4.5; design brief 8.2",
-      "violates": "SPEC 4.5: every measures entry MUST reference an element, or an annotation of type grid or level, in this label."
+      "violates": "SPEC 4.5: every measures entry MUST reference an element, or an annotation of type grid or level, in this plannotation."
     },
     {
       "buildsThroughModel": true,
@@ -95,13 +95,13 @@
       "rule": "referential.shows-element-resolves",
       "severity": "error",
       "spec": "SPEC 4.5; design brief 8.2",
-      "violates": "SPEC 4.5: annotation.shows.element MUST reference an element in this label."
+      "violates": "SPEC 4.5: annotation.shows.element MUST reference an element in this plannotation."
     },
     {
       "buildsThroughModel": true,
       "code": "PL-REF-012",
       "derivedFrom": "valid/01-referential-clean.json",
-      "description": "The tag says it prints the concrete cover out of Pset_ConcreteElementGeneral. The wall carries Pset_WallCommon and nothing else, so the absence is a positive fact about the element rather than a label that simply did not copy its property sets in. The printed text was changed with the reference so that the tag stays coherent; the rule it breaks is the reference, not the text.",
+      "description": "The tag says it prints the concrete cover out of Pset_ConcreteElementGeneral. The wall carries Pset_WallCommon and nothing else, so the absence is a positive fact about the element rather than a plannotation that simply did not copy its property sets in. The printed text was changed with the reference so that the tag stays coherent; the rule it breaks is the reference, not the text.",
       "family": "referential",
       "file": "invalid/07-shows-property-set-not-carried.json",
       "level": "L3",
@@ -146,7 +146,7 @@
       "buildsThroughModel": true,
       "code": "PL-REF-006",
       "derivedFrom": "valid/01-referential-clean.json",
-      "description": "The callout points at PDF page 40 of a 14-page issue -- the index survived a set being split in two. This rule needs the document, not the label: documentPageCount records the page count the validator is to be given, and the clean control carries the same count with pdfPage 9.",
+      "description": "The callout points at PDF page 40 of a 14-page issue -- the index survived a set being split in two. This rule needs the document, not the plannotation: documentPageCount records the page count the validator is to be given, and the clean control carries the same count with pdfPage 9.",
       "documentPageCount": 14,
       "family": "referential",
       "file": "invalid/10-target-pdf-page-past-end.json",
@@ -238,7 +238,7 @@
       "buildsThroughModel": true,
       "code": "PL-GEO-005",
       "derivedFrom": "valid/02-geometric-clean.json",
-      "description": "The north wall runs 12 mm past the right edge of the plan viewport: the wall is clipped by the viewport frame on the sheet but the writer emitted its untrimmed bounds. The box is still on the page. This is the corpus's proof that a validator separates warnings from errors -- a label with warnings and no errors is conforming.",
+      "description": "The north wall runs 12 mm past the right edge of the plan viewport: the wall is clipped by the viewport frame on the sheet but the writer emitted its untrimmed bounds. The box is still on the page. This is the corpus's proof that a validator separates warnings from errors -- a plannotation with warnings and no errors is conforming.",
       "family": "geometric",
       "file": "invalid/16-element-outside-its-viewport.json",
       "level": "L3",
@@ -298,7 +298,7 @@
       "buildsThroughModel": true,
       "code": "PL-GEO-007",
       "derivedFrom": "valid/02-geometric-clean.json",
-      "description": "The transform was built from the SVG the drawing was cut from and the y-flip of SPEC 3.3 was never applied, so d is negative and the determinant is -0.0025. The magnitude still matches 1:50 exactly; only the handedness is wrong, which is the whole point -- a mirrored plan reads as its own reflection and nothing else in the label says so.",
+      "description": "The transform was built from the SVG the drawing was cut from and the y-flip of SPEC 3.3 was never applied, so d is negative and the determinant is -0.0025. The magnitude still matches 1:50 exactly; only the handedness is wrong, which is the whole point -- a mirrored plan reads as its own reflection and nothing else in the plannotation says so.",
       "family": "geometric",
       "file": "invalid/20-transform-mirrored.json",
       "level": "L3",
@@ -352,13 +352,13 @@
       "rule": "geometric.dimension-matches-drawn-length",
       "severity": "warning",
       "spec": "SPEC 3.5, 4.4; design brief 8.4",
-      "violates": "The dimension's value must be the length it draws at its viewport's scale: 234 mm of paper at 1:50 is 11.7 m, and the label says 12.5 m. Reported as a warning: SPEC 4.4 (6) enumerates the geometric violations a validator MUST report and this is not among them, and SPEC 4.4 defines a warning as a finding that depends on a tolerance or a heuristic -- here, that the dimension line's path length is the quantity the value states, which a jogged or broken dimension legitimately breaks. The design brief puts re-measurement under the optional --ifc cross-check of 8.4, not under the errors of 8.3."
+      "violates": "The dimension's value must be the length it draws at its viewport's scale: 234 mm of paper at 1:50 is 11.7 m, and the plannotation says 12.5 m. Reported as a warning: SPEC 4.4 (6) enumerates the geometric violations a validator MUST report and this is not among them, and SPEC 4.4 defines a warning as a finding that depends on a tolerance or a heuristic -- here, that the dimension line's path length is the quantity the value states, which a jogged or broken dimension legitimately breaks. The design brief puts re-measurement under the optional --ifc cross-check of 8.4, not under the errors of 8.3."
     },
     {
       "buildsThroughModel": true,
       "code": "PL-GEO-013",
       "derivedFrom": "valid/02-geometric-clean.json",
-      "description": "The model block survives with its filename and hash and loses its length unit, as happens when the unit is read from a different code path than the rest of the header. The transform is still invertible and right-handed, and its scale can no longer be checked against the viewport's at all -- SPEC 3.5 makes that comparison depend on the unit -- so this one omission costs the label the whole of what a transform is for. The path is the viewport rather than $.model because it is the viewport carrying paperToPlane that triggers the obligation, and a label may carry several of which only some do.",
+      "description": "The model block survives with its filename and hash and loses its length unit, as happens when the unit is read from a different code path than the rest of the header. The transform is still invertible and right-handed, and its scale can no longer be checked against the viewport's at all -- SPEC 3.5 makes that comparison depend on the unit -- so this one omission costs the plannotation the whole of what a transform is for. The path is the viewport rather than $.model because it is the viewport carrying paperToPlane that triggers the obligation, and a plannotation may carry several of which only some do.",
       "family": "geometric",
       "file": "invalid/24-transform-without-length-unit.json",
       "level": "L3",
@@ -373,7 +373,7 @@
       "buildsThroughModel": true,
       "code": "PL-PRV-002",
       "derivedFrom": "valid/06-provenance-authored-clean.json",
-      "description": "The column was recovered off the old formwork drawing rather than taken from the model, and says so honestly with a confidence of 0.78 -- but the label still calls itself authored. The item is right and the aggregate is wrong, so the finding belongs on the top-level member.",
+      "description": "The column was recovered off the old formwork drawing rather than taken from the model, and says so honestly with a confidence of 0.78 -- but the plannotation still calls itself authored. The item is right and the aggregate is wrong, so the finding belongs on the top-level member.",
       "family": "provenance",
       "file": "invalid/25-provenance-contradicts-aggregate.json",
       "level": "L3",
@@ -382,7 +382,7 @@
       "rule": "provenance.aggregate-matches-items",
       "severity": "error",
       "spec": "SPEC 4.6.4; design brief 6, 8.5",
-      "violates": "SPEC 4.6.4: the top-level provenance MUST be authored if and only if every value in the label is authored, and mixed otherwise. One element is inferred, so the aggregate is mixed."
+      "violates": "SPEC 4.6.4: the top-level provenance MUST be authored if and only if every value in the plannotation is authored, and mixed otherwise. One element is inferred, so the aggregate is mixed."
     },
     {
       "alsoReports": [
@@ -407,7 +407,7 @@
       "buildsThroughModel": true,
       "code": "PL-PRV-001",
       "derivedFrom": "valid/08-provenance-inferred-clean.json",
-      "description": "The same rule as the case before it, reached by inheritance rather than by declaration: the tag says nothing about its provenance and the label says inferred, so 4.6.3 makes the tag inferred and 4.6.5 then wants a confidence. This one does load through plannotation.model, whose item rule only fires on an explicit 'inferred' -- so it is the case that shows what a validator built on the models can and cannot see by itself.",
+      "description": "The same rule as the case before it, reached by inheritance rather than by declaration: the tag says nothing about its provenance and the plannotation says inferred, so 4.6.3 makes the tag inferred and 4.6.5 then wants a confidence. This one does load through plannotation.model, whose item rule only fires on an explicit 'inferred' -- so it is the case that shows what a validator built on the models can and cannot see by itself.",
       "family": "provenance",
       "file": "invalid/27-inherited-inferred-without-confidence.json",
       "level": "L3",
@@ -416,7 +416,7 @@
       "rule": "provenance.inferred-carries-confidence",
       "severity": "error",
       "spec": "SPEC 4.6.3, 4.6.5; design brief 6, 8.5",
-      "violates": "SPEC 4.6.3 and 4.6.5: an item that omits provenance takes the label's own, so this tag's effective provenance is inferred and it MUST carry a confidence."
+      "violates": "SPEC 4.6.3 and 4.6.5: an item that omits provenance takes the plannotation's own, so this tag's effective provenance is inferred and it MUST carry a confidence."
     },
     {
       "buildsThroughModel": true,
@@ -437,7 +437,7 @@
       "buildsThroughModel": true,
       "code": "PL-PRV-004",
       "derivedFrom": "valid/06-provenance-authored-clean.json",
-      "description": "The slab is authored and carries a confidence of 0.9, which has no meaning there and invites a reader to discount a value that is not in doubt. SPEC 4.6.5 makes the asymmetry deliberate: a missing confidence on an inferred item is an error because it withholds what makes the value safe to use, and a spurious one on an authored item is untidiness, so rejecting a label over it 'would serve nobody'.",
+      "description": "The slab is authored and carries a confidence of 0.9, which has no meaning there and invites a reader to discount a value that is not in doubt. SPEC 4.6.5 makes the asymmetry deliberate: a missing confidence on an inferred item is an error because it withholds what makes the value safe to use, and a spurious one on an authored item is untidiness, so rejecting a plannotation over it 'would serve nobody'.",
       "family": "provenance",
       "file": "invalid/29-confidence-on-authored-item.json",
       "level": "L3",
@@ -555,10 +555,10 @@
         "L3",
         "provenance mixed at the top level",
         "authored and inferred items side by side",
-        "every item marked, as a mixed label requires",
+        "every item marked, as a mixed plannotation requires",
         "confidence on every inferred item"
       ],
-      "description": "Survey plan at 1:100 on A2: two walls came from the model and two elements plus one dimension were measured off the existing building. The top level is mixed and every element and annotation records its own provenance, as SPEC 4.6.4 requires of a mixed label.",
+      "description": "Survey plan at 1:100 on A2: two walls came from the model and two elements plus one dimension were measured off the existing building. The top level is mixed and every element and annotation records its own provenance, as SPEC 4.6.4 requires of a mixed plannotation.",
       "file": "valid/07-provenance-mixed-clean.json",
       "level": "L3"
     },
@@ -571,7 +571,7 @@
         "a viewport with a scale but no plane and no paperToPlane",
         "shows.element with no property"
       ],
-      "description": "A legacy sheet reconstructed from the drawing alone: no model block, no transform, and every element and annotation inferred with a confidence. The top level is inferred, which is what SPEC 4.6.4 requires of a label recovered entirely from an unlabelled drawing.",
+      "description": "A legacy sheet reconstructed from the drawing alone: no model block, no transform, and every element and annotation inferred with a confidence. The top level is inferred, which is what SPEC 4.6.4 requires of a plannotation recovered entirely from an unplannotated drawing.",
       "file": "valid/08-provenance-inferred-clean.json",
       "level": "L3"
     },
@@ -594,7 +594,7 @@
         "annotations of types that have nothing to link to",
         "no annotation link, so no L3"
       ],
-      "description": "Reinforcement plan whose four elements are described but whose annotations are a north arrow, a scale bar, a hatch legend and a concrete note -- four types SPEC 4.1 lists as having nothing to link to. No annotation carries a link, so the label stops at L2.",
+      "description": "Reinforcement plan whose four elements are described but whose annotations are a north arrow, a scale bar, a hatch legend and a concrete note -- four types SPEC 4.1 lists as having nothing to link to. No annotation carries a link, so the plannotation stops at L2.",
       "file": "valid/10-level-l2.json",
       "level": "L2"
     },

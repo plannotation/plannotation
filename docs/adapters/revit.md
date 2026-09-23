@@ -2,20 +2,20 @@
 
 **Status: design only.** This project ships no Revit add-in. This note is for someone
 who wants authored Plannotation output from Revit: which API calls give each part of a
-label, what the paper-to-model arithmetic has to be, and the smallest prototype that
-would work. API names are from the Revit 2022–2025 API; check them against the version
-you build for, and note that several of the calls below arrived in 2022.
+plannotation, what the paper-to-model arithmetic has to be, and the smallest prototype
+that would work. API names are from the Revit 2022–2025 API; check them against the
+version you build for, and note that several of the calls below arrived in 2022.
 
 ## The shape of it
 
 Revit stays the leading tool and never learns Plannotation. An add-in (or a pyRevit
-script) collects, for each sheet, what a label needs and writes it as a JSON label
-beside the PDF Revit exported; Plannotation's CLI attaches and validates it:
+script) collects, for each sheet, what a plannotation needs and writes it as a JSON
+file beside the PDF Revit exported; Plannotation's CLI attaches and validates it:
 
 ```text
 Revit  ──Document.Export(PDFExportOptions)──▶  A-101.pdf
-  └────collect sheet, viewports, elements──▶  A-101.plannotation.json
-plannotation attach A-101.pdf A-101.plannotation.json -o A-101.plannotated.pdf
+  └────collect sheet, viewports, elements──▶  A-101.plannotations.json
+plannotation attach A-101.pdf A-101.plannotations.json -o A-101.plannotated.pdf
 plannotation validate A-101.plannotated.pdf
 ```
 
@@ -23,9 +23,9 @@ Keeping the Revit side free of Python dependencies is the point: the add-in writ
 plain JSON, and everything Plannotation guarantees about the PDF is guaranteed by the
 library that is tested for it.
 
-## Where each part of a label comes from
+## Where each part of a plannotation comes from
 
-| Label | Revit API |
+| Plannotation | Revit API |
 | --- | --- |
 | `sheet.id`, `title`, `revision` | `ViewSheet.SheetNumber`, `ViewSheet.Name`, the current revision via `ViewSheet.GetCurrentRevision()` |
 | `page.widthMm`, `heightMm` | The title block's extents on the sheet: `FamilyInstance.get_BoundingBox(sheet)` of the `OST_TitleBlocks` instance, in feet |
@@ -98,7 +98,7 @@ A pyRevit script is the smallest thing that works. pyRevit is GPL-3.0; that is f
 since it is a tool someone runs, not a dependency of Plannotation.
 
 1. For each selected `ViewSheet`: export the PDF with `Document.Export`.
-2. Build the label as a Python dict following the table above, with
+2. Build the plannotation as a Python dict following the table above, with
    `provenance: "authored"` at the top level, and `json.dump` it with sorted keys.
 3. Run `plannotation attach` and `plannotation validate` on the result with
    `subprocess.run`, using a CPython that has `plannotation` installed.

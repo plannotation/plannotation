@@ -14,7 +14,7 @@ format may still change between minor versions (8.2).
 
 The canonical location of this document is
 <https://plannotation.github.io/spec/0.1>. The `conformsTo` value written into
-a labelled PDF's XMP declaration is exactly that URI.
+a plannotated PDF's XMP declaration is exactly that URI.
 
 The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT,
 RECOMMENDED, MAY and OPTIONAL are to be interpreted as described in
@@ -29,54 +29,67 @@ appear in all capitals.
 ### 1.1 What this specification defines
 
 This specification defines **Plannotation 0.1**: a small JSON document, called a
-*label*, that states what is on one page of a 2-D construction drawing — which
-sheet the page is, which viewports it contains and how paper maps to model space,
-which elements are drawn and which annotations are placed on them — together with
-a document-level *index* of the labelled pages, the rules for the coordinates both
-use, and the obligations of the programs that write and read them.
+*plannotation*, that states what is on one page of a 2-D construction drawing —
+which sheet the page is, which viewports it contains and how paper maps to model
+space, which elements are drawn and which annotations are placed on them —
+together with a document-level *index* of the plannotated pages, the rules for the
+coordinates both use, and the obligations of the programs that write and read
+them.
 
 It specifies the payload and its meaning. It does not specify how a drawing is
 produced, how it is drawn, or what it should contain.
 
 ### 1.2 The governing principle
 
-> **The PDF page is the leading document. The label is auxiliary.**
+> **The PDF page is the leading document. The plannotation is auxiliary.**
 
 Everything below follows from that sentence, so it is stated normatively here and
 its consequences are given as requirements.
 
 1. **Appearance is untouched.** A conforming writer MUST NOT change how any page
-   of a document looks or prints. Rendering any page of the labelled document
+   of a document looks or prints. Rendering any page of the plannotated document
    MUST produce output identical to rendering the corresponding page of the input
    document, for the same renderer at the same settings, at any resolution and on
    any medium. A conforming writer MUST NOT modify a page's content streams and
    MUST NOT add a visible mark of any kind. The file's bytes necessarily change —
-   a label has to be stored somewhere — but nothing a reader of the drawing can
-   see does.
+   a plannotation has to be stored somewhere — but nothing a reader of the drawing
+   can see does.
 
 2. **Additive, never subtractive.** A conforming writer MUST NOT remove or alter
    content that it did not itself write, including attachments, annotations,
    form fields and metadata placed by other producers. The only metadata a
    conforming writer adds is the declaration described in section 6.
 
-3. **A label is not a drawing.** A label is never sufficient to reconstruct the
-   drawing it describes, and this specification makes no attempt to make it so.
-   It records bounding boxes, outlines and identities — what is where and what it
-   means — not line weights, hatching, text placement or any other matter of
-   presentation. A program that needs the drawing MUST read the page.
+3. **A plannotation is not a drawing.** A plannotation is never sufficient to
+   reconstruct the drawing it describes, and this specification makes no attempt
+   to make it so. It records bounding boxes, outlines and identities — what is
+   where and what it means — not line weights, hatching, text placement or any
+   other matter of presentation. A program that needs the drawing MUST read the
+   page.
 
-4. **A label is not a model.** Where a label carries model-derived values, it
-   carries them at the precision defined in section 3.8, which is coarser than
-   the model's. A program that needs model geometry MUST read the model.
+4. **A plannotation is not a model.** Where a plannotation carries model-derived
+   values, it carries them at the precision defined in section 3.8, which is
+   coarser than the model's. A program that needs model geometry MUST read the
+   model.
 
-5. **Ignoring the label is conforming.** A reader that does not know about
-   Plannotation, or that chooses not to use it, behaves exactly as it did before the
-   label existed. It loses nothing but meaning. No part of this specification may
-   be read as requiring a consumer of the document to process the label.
+5. **Ignoring the plannotation is conforming.** A reader that does not know about
+   Plannotation, or that chooses not to use it, behaves exactly as it did before
+   the plannotation existed. It loses nothing but meaning. No part of this
+   specification may be read as requiring a consumer of the document to process
+   the plannotation.
 
-6. **The page wins.** Where a label and the page it describes disagree, the page
-   is correct and the label is wrong. A reader MUST resolve such a disagreement
-   in favour of the page. A writer MUST NOT repair a page to agree with a label.
+6. **The page wins.** Where a plannotation and the page it describes disagree, the
+   page is correct and the plannotation is wrong. A reader MUST resolve such a
+   disagreement in favour of the page. A writer MUST NOT repair a page to agree
+   with a plannotation.
+
+7. **No PDF annotations.** A conforming writer MUST NOT add an annotation object
+   to any page — no entry in a page's `/Annots` array, visible or hidden — and
+   MUST NOT change what the page shows. In AEC practice and in PDF alike, an
+   *annotation* usually means visible markup — a dimension or tag on the sheet
+   (2.6), a comment, stamp or redline added in a viewer — whereas the name
+   Plannotation means annotating plans for machines: a plannotation describes the
+   annotations a page already shows and adds none of its own.
 
 ### 1.3 Exclusions
 
@@ -87,12 +100,12 @@ it has been asked for, not because it is unimaginable.
 | --- | --- |
 | A new drawing file format | Plannotation annotates documents in formats that already exist. |
 | Any change to how a PDF is drawn | See 1.2 (1). Content streams are out of bounds. |
-| Reconstruction of a drawing from a label | See 1.2 (3). The label is lossy by design. |
-| Reconstruction of a model from a label | See 1.2 (4). A label references a model; it does not contain one. |
+| Reconstruction of a drawing from a plannotation | See 1.2 (3). The plannotation is lossy by design. |
+| Reconstruction of a model from a plannotation | See 1.2 (4). A plannotation references a model; it does not contain one. |
 | Authoring-tool integration | How a CAD application obtains the values is its own business; this specification constrains only what it writes. |
-| The inference process | How a label is recovered from an unlabelled drawing is unspecified. This specification constrains only how such a label is marked — see 4.6. |
+| The inference process | How a plannotation is recovered from an unplannotated drawing is unspecified. This specification constrains only how such a plannotation is marked — see 4.6. |
 | Presentation | No viewer behaviour, no overlay style, no user interface is normative. |
-| Networked exchange | No service, protocol or API is defined. A label travels with its document. |
+| Networked exchange | No service, protocol or API is defined. A plannotation travels with its document. |
 | The IFC vocabulary itself | Class names, GlobalIds and property-set names are IFC's and are used, not redefined. |
 
 ### 1.4 Carriers
@@ -110,7 +123,8 @@ Where [SWAPP ifc-docs](https://github.com/SWAPP-eu) has already named a concept,
 this specification uses SWAPP's name for it, and says so in the definition. That
 reuse is deliberate: two vocabularies for one idea help nobody, and the credit is
 part of the point. Where a term has a correspondence in IFC, the correspondence is
-given; it is informative, and does not make IFC a prerequisite for reading a label.
+given; it is informative, and does not make IFC a prerequisite for reading a
+plannotation.
 
 Terms defined here are printed in *italics* on first use elsewhere in this
 document. JSON member names are printed as `code`.
@@ -125,7 +139,8 @@ A sheet is not a page: it is what the page is a printing of.
 In IFC a sheet corresponds to an `IfcDocumentInformation` whose `Scope` is
 `"SHEET"`.
 
-In a label, the sheet is the `sheet` member, and there is exactly one per page.
+In a plannotation, the sheet is the `sheet` member, and there is exactly one per
+page.
 
 ### 2.2 page
 
@@ -133,11 +148,12 @@ One page of the document that carries the drawing, identified by its zero-based
 index within that document, and having a width, a height and a rotation. The page
 is the leading document of section 1.2.
 
-In a label, the page is the `page` member. `page.index` MUST equal the zero-based
-index of the page the label describes.
+In a plannotation, the page is the `page` member. `page.index` MUST equal the
+zero-based index of the page the plannotation describes.
 
-A page carries exactly one sheet. A sheet MAY be printed on more than one page,
-in which case each page carries its own label and the labels repeat the sheet.
+A page carries exactly one sheet. A sheet MAY be printed on more than one page, in
+which case each page carries its own plannotation and the plannotations repeat the
+sheet.
 
 ### 2.3 viewport
 
@@ -164,7 +180,7 @@ In IFC a view corresponds to an `IfcAnnotation` with `ObjectType = "DRAWING"`,
 described by the `EPset_Drawing` property set.
 
 One viewport holds one view. Where an authoring tool places the same view in two
-viewports, the label records two viewports.
+viewports, the plannotation records two viewports.
 
 ### 2.5 element
 
@@ -180,8 +196,8 @@ In IFC an element corresponds to the `IfcProduct` occurrence itself, referenced 
 its `GlobalId`. SWAPP relates a drawn annotation to that product with
 `IfcRelAssignsToProduct`.
 
-An element MAY have no `ifcGuid` — a label recovered from a drawing usually knows
-that a wall is there without knowing which wall it is.
+An element MAY have no `ifcGuid` — a plannotation recovered from a drawing usually
+knows that a wall is there without knowing which wall it is.
 
 ### 2.6 annotation
 
@@ -196,38 +212,44 @@ What makes an annotation useful to a machine is its *link* — the member that s
 what it annotates: `measures`, `shows`, `target`, `axis` or `ifcGuid`. Conformance
 level L3 is defined in terms of those links; see 4.1.
 
-### 2.7 label
+### 2.7 plannotation
 
-The JSON object that describes exactly one page, conforming to the page-label
-schema `plannotation.schema.json`. A label is data. It is never executable, and a
-reader MUST NOT treat it as though it were; see section 9.
+The JSON object that describes exactly one page, conforming to the plannotation
+schema `plannotation.schema.json`. A plannotation is data. It is never executable,
+and a reader MUST NOT treat it as though it were; see section 9.
 
-"Label" without qualification means a page label. The index of 2.8 is not a label.
+Written with a capital, *Plannotation* names this specification and the format it
+defines; in lower case, *plannotation* always means the per-page object defined
+here. A document whose pages carry plannotations is *plannotated*, and attaching
+them is *plannotating* it. The index of 2.8 is not a plannotation.
 
 ### 2.8 index
 
-The JSON object that lists, for one document, which pages carry labels, what sheet
-each of them is, and which conformance level each label reaches. It conforms to
-`plannotation-index.schema.json`, which is deliberately self-contained so that an
-index can be validated without also fetching the page-label schema.
+The JSON object that lists, for one document, which pages carry plannotations,
+what sheet each of them is, and which conformance level each plannotation reaches.
+It conforms to `plannotation-index.schema.json`, which is deliberately
+self-contained so that an index can be validated without also fetching the
+plannotation schema.
 
 The index is a convenience, not a source of truth: it lets a reader see what a
-document contains without opening every page label. Where the index and a page
-label disagree, the page label is correct — the index is to the labels what the
-labels are to the page. **SWAPP's DocumentSet is the nearest concept**, though
-SWAPP's is a set of sheets and Plannotation's is a manifest of one document's pages.
+document contains without opening every plannotation. Where the index and a
+plannotation disagree, the plannotation is correct — the index is to the
+plannotations what the plannotations are to the page. **SWAPP's DocumentSet is the
+nearest concept**, though SWAPP's is a set of sheets and Plannotation's is a
+manifest of one document's pages.
 
 ### 2.9 carrier
 
-The mechanism that binds a label to the document it describes: embedded files in a
-PDF, added data in an SVG, or a sidecar JSON file. A carrier changes how a label
-travels, never what it means. The three carriers are specified in section 6.
+The mechanism that binds a plannotation to the document it describes: embedded
+files in a PDF, added data in an SVG, or a sidecar JSON file. A carrier changes
+how a plannotation travels, never what it means. The three carriers are specified
+in section 6.
 
 ### 2.10 provenance
 
 Where a value came from: from the record that produced the drawing (`authored`),
 or from a reconstruction of the drawing after the fact (`inferred`), or, at the
-level of a whole label, from both (`mixed`).
+level of a whole plannotation, from both (`mixed`).
 
 Provenance is an assertion the writer makes about its own knowledge, and it is the
 one assertion this specification will not let a writer make loosely. The rules are
@@ -235,13 +257,13 @@ normative in 4.6.
 
 ### 2.11 conformance level
 
-One of L1, L2 or L3: a statement about how much of a page a label describes, not
-about how well it describes it. The levels are cumulative and are defined in 4.1.
-A level is a property of a single page label.
+One of L1, L2 or L3: a statement about how much of a page a plannotation
+describes, not about how well it describes it. The levels are cumulative and are
+defined in 4.1. A level is a property of a single plannotation.
 
 ### 2.12 paper coordinates
 
-The coordinate system in which every geometric value in a label is expressed:
+The coordinate system in which every geometric value in a plannotation is expressed:
 millimetres, origin at the bottom-left corner of the page, y increasing upwards.
 Defined normatively in section 3.1.
 
@@ -263,19 +285,20 @@ tool's record, can produce `authored` values.
 
 ### 2.15 writer
 
-A program that produces a label, an index, or both, and attaches them to a
+A program that produces a plannotation, an index, or both, and attaches them to a
 document through a carrier. Obligations in 4.2.
 
 ### 2.16 reader
 
-A program that obtains a label from a document and uses it. Obligations in 4.3.
+A program that obtains a plannotation from a document and uses it. Obligations in
+4.3.
 
 ### 2.17 validator
 
-A reader whose output is a report about a label's conformance rather than a use of
-the label's content. Obligations in 4.4. A validator is a reader and is bound by
-everything 4.3 requires of one, including the requirement not to modify what it
-reads.
+A reader whose output is a report about a plannotation's conformance rather than a
+use of the plannotation's content. Obligations in 4.4. A validator is a reader and
+is bound by everything 4.3 requires of one, including the requirement not to
+modify what it reads.
 
 ### 2.18 Correspondence summary (informative)
 
@@ -287,7 +310,7 @@ reads.
 | view | **View** | `IfcAnnotation`, `ObjectType = "DRAWING"`, `EPset_Drawing` |
 | annotation | **Annotation** | `IfcAnnotation` |
 | element | referenced, not named | the `IfcProduct` occurrence, by `GlobalId`; related with `IfcRelAssignsToProduct` |
-| label, carrier, provenance, conformance level, paper coordinates, model plane | — | — |
+| plannotation, carrier, provenance, conformance level, paper coordinates, model plane | — | — |
 
 ---
 
@@ -299,9 +322,9 @@ in step and neither may be changed alone.
 
 ### 3.1 Paper coordinates
 
-Every geometric value in a label — every `bbox`, every `point`, every `polyline`,
-and the `x` and `y` inputs of every `paperToPlane` — is expressed in **paper
-coordinates**:
+Every geometric value in a plannotation — every `bbox`, every `point`, every
+`polyline`, and the `x` and `y` inputs of every `paperToPlane` — is expressed in
+**paper coordinates**:
 
 - the unit is the **millimetre**;
 - the origin is the **bottom-left corner of the page**;
@@ -310,11 +333,12 @@ coordinates**:
 
 The choice is not arbitrary and is not a matter of taste. It is the PDF
 convention: default PDF user space has its origin at the bottom-left of the page
-with y increasing upwards. Adopting it means a label and the page it describes
-agree about which way is up, so that no implementation has to flip anything to
-compare them, and so that a coordinate read out of a label can be handed to a PDF
-operation unchanged but for a scale factor. The governing principle of 1.2 decides
-this: the page's convention leads, and the label follows it.
+with y increasing upwards. Adopting it means a plannotation and the page it
+describes agree about which way is up, so that no implementation has to flip
+anything to compare them, and so that a coordinate read out of a plannotation can
+be handed to a PDF operation unchanged but for a scale factor. The governing
+principle of 1.2 decides this: the page's convention leads, and the plannotation
+follows it.
 
 "The page" means the page as displayed and printed, which in PDF terms is the
 page's `CropBox`, defaulting to the `MediaBox` where no `CropBox` is present.
@@ -352,15 +376,15 @@ x_mm = (x_pt − cropBox.x0) × UserUnit × 25.4 / 72
 ```
 
 `UserUnit` is common on large-format drawings and omitting it scales an entire
-label wrongly, silently.
+plannotation wrongly, silently.
 
 An A3 page, 420 mm × 297 mm, is 1190.551 pt × 841.89 pt at `UserUnit` 1.
 
 ### 3.3 Relation to SVG
 
 SVG is **y-down**: its origin is the top-left corner and y increases downwards.
-Every coordinate crossing the boundary between an SVG carrier and a label MUST
-therefore be flipped about the horizontal axis. For a page of height `h`
+Every coordinate crossing the boundary between an SVG carrier and a plannotation
+MUST therefore be flipped about the horizontal axis. For a page of height `h`
 millimetres the flip is its own inverse, and x is unchanged:
 
 ```
@@ -373,10 +397,10 @@ writer MUST convert to millimetres before flipping; where the SVG's root
 coordinate system is offset from the page corner, the writer MUST remove that
 offset first.
 
-Forgetting the flip produces a label that is mirrored about the page's horizontal
-centre line — an error that is invisible on a small, roughly centred drawing and
-obvious on a title block. Implementations SHOULD apply the flip in exactly one
-place per direction rather than at each call site.
+Forgetting the flip produces a plannotation that is mirrored about the page's
+horizontal centre line — an error that is invisible on a small, roughly centred
+drawing and obvious on a title block. Implementations SHOULD apply the flip in
+exactly one place per direction rather than at each call site.
 
 ### 3.4 Bounding boxes
 
@@ -425,7 +449,7 @@ row-major order of a mathematics textbook. `[a b c d e f]` denotes
         ⎣ e  f  1 ⎦
 ```
 
-so that a transform read out of a label can be handed to a PDF operator, or
+so that a transform read out of a plannotation can be handed to a PDF operator, or
 composed with one, without being rearranged. In particular `b` is the second
 component of the image of the x axis, not the first component of the image of the
 y axis.
@@ -498,8 +522,9 @@ X = (P − origin)·xAxis        Y = (P − origin)·yAxis
 ```
 
 A model point that does not lie on the plane projects along the plane normal. A
-label records where a thing was **drawn**, not where it is; for anything cut or
-projected, the two differ, and the label does not carry the difference.
+plannotation records where a thing was **drawn**, not where it is; for anything
+cut or projected, the two differ, and the plannotation does not carry the
+difference.
 
 **The view direction.** The plane's normal is
 
@@ -544,14 +569,14 @@ coordinates, and MUST NOT swap width and height, whatever `page.rotation` says.
 This follows from 1.2: the page's geometry is the leading document's geometry.
 Everything else in a PDF that refers to a position on the page — `MediaBox`,
 `CropBox`, annotation rectangles, the content stream itself — is expressed before
-rotation, and a label that were expressed after it would be the only thing in the
-file that needed converting before it could be compared with anything else.
+rotation, and a plannotation that were expressed after it would be the only thing
+in the file that needed converting before it could be compared with anything else.
 
 `page.rotation` is recorded so that a reader can reproduce the displayed
-orientation, and for no other purpose. A reader overlaying label geometry on a
-rotated rendering of the page MUST apply the same rotation to that geometry. For a
-page of unrotated width `w` and height `h`, a paper point `(x, y)` appears in the
-displayed page at:
+orientation, and for no other purpose. A reader overlaying plannotation geometry
+on a rotated rendering of the page MUST apply the same rotation to that geometry.
+For a page of unrotated width `w` and height `h`, a paper point `(x, y)` appears
+in the displayed page at:
 
 | `page.rotation` | displayed position | displayed page size |
 | --- | --- | --- |
@@ -564,11 +589,11 @@ with the displayed coordinates still measured from the bottom-left corner, y up.
 
 ### 3.8 Serialisation
 
-**Precision.** Every number in a label and in an index, without exception, MUST be
-serialised with **at most three decimal places**, rounded **to nearest, ties to
-even**: of the two three-decimal candidates, the nearer is chosen, and where the
-value lies exactly halfway between them the candidate whose last digit is even is
-chosen.
+**Precision.** Every number in a plannotation and in an index, without exception,
+MUST be serialised with **at most three decimal places**, rounded **to nearest,
+ties to even**: of the two three-decimal candidates, the nearer is chosen, and
+where the value lies exactly halfway between them the candidate whose last digit
+is even is chosen.
 
 "Exactly halfway" is decided on the **exact value of the number as the
 implementation holds it**, not on a decimal spelling of it. In binary floating
@@ -584,10 +609,10 @@ in the fractional part, no trailing decimal point, integral values written witho
 a fractional part — a page width of 841 mm is `841`, never `841.0` — and negative
 zero written as `0`.
 
-A label MUST NOT contain a NaN or an infinity. Neither is JSON, neither can be a
-coordinate, and a writer that arrives at one MUST fail rather than emit it.
+A plannotation MUST NOT contain a NaN or an infinity. Neither is JSON, neither can
+be a coordinate, and a writer that arrives at one MUST fail rather than emit it.
 
-**Canonical form.** A label or index MUST be serialised as:
+**Canonical form.** A plannotation or index MUST be serialised as:
 
 - UTF-8, without a byte order mark, with characters that UTF-8 can represent
   written literally and not escaped as `\uXXXX` — `Maßstab` and not `Ma\u00dfstab`;
@@ -603,8 +628,9 @@ language that has one, and an exception for numeric arrays would have to be
 specified, agreed and implemented identically everywhere to buy nothing but a
 shorter file.
 
-Two writers given the same label therefore produce the same bytes, so a label can
-be compared, hashed and checked into version control like any other source.
+Two writers given the same plannotation therefore produce the same bytes, so a
+plannotation can be compared, hashed and checked into version control like any
+other source.
 
 **What the precision means.** Three decimals of a millimetre is one micrometre on
 paper, which is finer than any drawing is worth. In the model it is coarser, and
@@ -624,7 +650,7 @@ viewport is not, because its coefficients carry a sine and a cosine.
 Therefore: a reader MUST treat plane coordinates obtained through `paperToPlane`
 as approximate, with the bound above, and MUST NOT present them as measurements of
 the building. Where a reader needs model geometry to a finer tolerance, it MUST
-obtain it from the model. The label says what is on the page; it is no more a
+obtain it from the model. The plannotation says what is on the page; it is no more a
 substitute for the model than it is for the drawing.
 
 ### 3.9 A worked example
@@ -664,7 +690,7 @@ canonical form each of their elements sits on its own line.
 
 Follow one corner of one wall through every coordinate system. The arithmetic below
 is shown with three decimals throughout so that the precision stays visible; in a
-label the trailing zeros would be dropped, by 3.8.
+plannotation the trailing zeros would be dropped, by 3.8.
 
 **1. SVG to paper.** The exporter's SVG has the corner at user-unit position
 `(168.400, 165.800)`, measured from the top-left. The page is 297 mm high, so by
@@ -712,9 +738,9 @@ exact at three decimals here, so step 3 loses nothing. Rotate the viewport by 13
 and they are not: `a` becomes 0.048719, serialised as 0.049. By the bound in 3.8
 the point recovered in step 3 may then sit
 `0.0005 × (168.400 + 131.200 + 1) = 0.150` m from where the model has the corner —
-150 mm, on a drawing whose own tolerance is a few millimetres. The label still says
-correctly that a wall corner is drawn at paper (168.400, 131.200) — that is a fact
-about the page, and it is what the label is for.
+150 mm, on a drawing whose own tolerance is a few millimetres. The plannotation
+still says correctly that a wall corner is drawn at paper (168.400, 131.200) —
+that is a fact about the page, and it is what the plannotation is for.
 
 ---
 
@@ -722,15 +748,16 @@ about the page, and it is what the label is for.
 
 ### 4.1 Conformance levels
 
-A conformance level says how much of a page a label describes. It says nothing
-about how accurate the description is: accuracy is what provenance (4.6) and
-validation (4.4) are for, and a careless L3 label is worth less than a careful L1
-one. A label may reach L3 and still violate rules in 4.5 or 4.6; a validator
-reports the level and the errors side by side, and neither cancels the other.
+A conformance level says how much of a page a plannotation describes. It says
+nothing about how accurate the description is: accuracy is what provenance (4.6)
+and validation (4.4) are for, and a careless L3 plannotation is worth less than a
+careful L1 one. A plannotation may reach L3 and still violate rules in 4.5 or 4.6;
+a validator reports the level and the errors side by side, and neither cancels the
+other.
 
-| Level | A label reaches this level when |
+| Level | A plannotation reaches this level when |
 | --- | --- |
-| **L1** | It is valid against the page-label schema. `page` and `sheet` are therefore present; `viewports` MAY be. |
+| **L1** | It is valid against the plannotation schema. `page` and `sheet` are therefore present; `viewports` MAY be. |
 | **L2** | L1, and `elements` is present and non-empty. Every element carries `ifcClass` and `paperBBox`, both of which the schema requires. |
 | **L3** | L2, and at least one annotation carries at least one link. |
 
@@ -748,30 +775,31 @@ warning. That is a quality signal, not a level boundary: making it one would let
 single unlinked dimension among fifty demote a sheet, which tells a consumer less,
 not more.
 
-The levels are cumulative: L3 implies L2 implies L1. A label that is not valid
-against the schema reaches no level at all, and a reader MUST treat it as absent
-(4.3).
+The levels are cumulative: L3 implies L2 implies L1. A plannotation that is not
+valid against the schema reaches no level at all, and a reader MUST treat it as
+absent (4.3).
 
-A writer MUST NOT omit or weaken an annotation in order to reach a level. A label
-that describes the page less truthfully in exchange for a higher letter has
-defeated its own purpose; a validator cannot detect this and the obligation is on
-the writer.
+A writer MUST NOT omit or weaken an annotation in order to reach a level. A
+plannotation that describes the page less truthfully in exchange for a higher
+letter has defeated its own purpose; a validator cannot detect this and the
+obligation is on the writer.
 
-A level is a property of one page label. The index records the level of each
-labelled page. This specification defines no conformance level for a document as a
-whole, and a reader MUST NOT infer one; where a single level is quoted for a
-document informally, it is the lowest reached by any of its labelled pages.
+A level is a property of one plannotation. The index records the level of each
+plannotated page. This specification defines no conformance level for a document
+as a whole, and a reader MUST NOT infer one; where a single level is quoted for a
+document informally, it is the lowest reached by any of its plannotated pages.
 
 ### 4.2 Conforming writers
 
 A conforming writer MUST:
 
-1. produce labels valid against the page-label schema, and, where it writes one,
-   an index valid against the index schema, both at the version named in
-   `plannotation`;
+1. produce plannotations valid against the plannotation schema, and, where it
+   writes one, an index valid against the index schema, both at the version named
+   in their `plannotation` member;
 2. serialise both in the canonical form of 3.8, with every number at three
    decimals or fewer;
-3. leave every page's appearance unchanged, and add nothing visible — 1.2 (1);
+3. leave every page's appearance unchanged, add nothing visible, and add no PDF
+   annotation object to any page — 1.2 (1), (7);
 4. leave content it did not write alone, including third-party attachments,
    annotations and metadata — 1.2 (2);
 5. express every geometric value in paper coordinates as defined in section 3,
@@ -785,9 +813,10 @@ A conforming writer MUST:
    failure than a wrong one.
 
 A conforming writer SHOULD record `generator` with its own name and version, so
-that a label whose provenance is later doubted can be traced to the program that
-made it. A writer whose output is deterministic SHOULD make `generator.created`
-injectable, so that two runs over the same input produce the same bytes.
+that a plannotation whose provenance is later doubted can be traced to the program
+that made it. A writer whose output is deterministic SHOULD make
+`generator.created` injectable, so that two runs over the same input produce the
+same bytes.
 
 Obligations specific to each carrier — where files are attached, what the
 declaration says, what to do with a signed document — are in section 6.
@@ -796,45 +825,46 @@ declaration says, what to do with a signed document — are in section 6.
 
 A conforming reader MUST:
 
-1. **validate before trusting.** It MUST validate a label against the page-label
-   schema for the version the label declares, before using any value in it. No
-   value in an unvalidated label may be relied on, displayed as fact, or passed
-   to another system;
-2. **treat an invalid label as absent.** A label that fails validation MUST be
-   treated exactly as though the document carried no label: the reader falls back
-   to the page. A reader MUST NOT use the parts of an invalid label that happen to
-   parse, and MUST NOT repair it;
+1. **validate before trusting.** It MUST validate a plannotation against the
+   plannotation schema for the version the plannotation declares, before using any
+   value in it. No value in an unvalidated plannotation may be relied on,
+   displayed as fact, or passed to another system;
+2. **treat an invalid plannotation as absent.** A plannotation that fails
+   validation MUST be treated exactly as though the document carried no
+   plannotation: the reader falls back to the page. A reader MUST NOT use the
+   parts of an invalid plannotation that happen to parse, and MUST NOT repair it;
 3. **treat an unknown version as absent.** A reader that does not implement the
-   version in `plannotation` MUST treat the label as absent rather than parse it
-   partially;
+   version its `plannotation` member names MUST treat the plannotation as absent
+   rather than parse it partially;
 4. **resolve disagreement in favour of the page** — 1.2 (6);
-5. **not present inferred content as fact.** A reader that presents label content
-   to a person or to another system MUST make the provenance of that content
-   available with it, and MUST NOT present content whose effective provenance is
-   `inferred` as though it were `authored` — 4.6;
+5. **not present inferred content as fact.** A reader that presents plannotation
+   content to a person or to another system MUST make the provenance of that
+   content available with it, and MUST NOT present content whose effective
+   provenance is `inferred` as though it were `authored` — 4.6;
 6. **ignore what it does not understand** inside `extensions`, and never require an
    extension to be present;
-7. **treat the label as untrusted input**: not execute it, not dereference it, and
-   bound the resources it spends parsing it — section 9.
+7. **treat the plannotation as untrusted input**: not execute it, not dereference
+   it, and bound the resources it spends parsing it — section 9.
 
-A conforming reader MAY ignore labels entirely. Ignoring a label is always
-conforming behaviour, and a reader that does so is not a lesser reader of the
-document — only a reader that gets less out of it.
+A conforming reader MAY ignore plannotations entirely. Ignoring a plannotation is
+always conforming behaviour, and a reader that does so is not a lesser reader of
+the document — only a reader that gets less out of it.
 
-A reader MUST NOT assume that the presence of an index implies a label on every
-page, or that the absence of an index implies no labels: the index lists what was
-labelled, and pages that were not labelled are simply absent from it.
+A reader MUST NOT assume that the presence of an index implies a plannotation on
+every page, or that the absence of an index implies no plannotations: the index
+lists what was plannotated, and pages that were not plannotated are simply absent
+from it.
 
 ### 4.4 Conforming validators
 
-A validator MUST NOT modify the document or the label it validates, under any
+A validator MUST NOT modify the document or the plannotation it validates, under any
 circumstance, including to repair an error it has just reported.
 
-A validator MUST report, for each label it examines:
+A validator MUST report, for each plannotation it examines:
 
 1. the declared version, and whether the validator implements it;
 2. **schema validity**, and for each failure a machine-readable location — a JSON
-   Pointer into the label — together with a human-readable message;
+   Pointer into the plannotation — together with a human-readable message;
 3. the **conformance level reached**, or that none was, per 4.1;
 4. **counts** of viewports, elements and annotations;
 5. every violation of the **identity and reference rules** of 4.5;
@@ -851,7 +881,7 @@ report which. An error is a violation of a MUST in this specification. A warning
 is a violation of a SHOULD, or a finding that depends on a tolerance or a heuristic
 — an element's bounding box falling outside its viewport's, for instance, which is
 legitimate for a tag drawn in the margin. A validator MUST NOT report a warning as
-an error; a label with warnings and no errors is conforming.
+an error; a plannotation with warnings and no errors is conforming.
 
 A validator MUST report the level reached even when it also reports errors, since
 "L3 with four referential errors" is a more useful statement than either half.
@@ -859,7 +889,7 @@ A validator MUST report the level reached even when it also reports errors, sinc
 ### 4.5 Identity and references
 
 **localId.** Every viewport, element and annotation carries an `id`, matching the
-`localId` pattern `^[A-Za-z0-9_.:-]+$`. Within one page label, all `id` values
+`localId` pattern `^[A-Za-z0-9_.:-]+$`. Within one plannotation, all `id` values
 MUST be unique **across all three collections**, which share a single namespace.
 They share one because references do not say which collection they point into:
 `measures` may name an element or a grid annotation, and uniqueness across the page
@@ -875,13 +905,13 @@ element entries on one page MAY carry the same `ifcGuid`. A reader MUST NOT use
 MAY use it to join a page to a model, which is what it is for.
 
 **References within a page.** These members hold `localId` references and MUST
-resolve within the same page label:
+resolve within the same plannotation:
 
 | Member | MUST reference |
 | --- | --- |
-| `element.viewport`, `annotation.viewport` | a viewport in this label |
-| `annotation.shows.element` | an element in this label |
-| `annotation.measures[*]` | an element, or an annotation of type `grid` or `level`, in this label |
+| `element.viewport`, `annotation.viewport` | a viewport in this plannotation |
+| `annotation.shows.element` | an element in this plannotation |
+| `annotation.measures[*]` | an element, or an annotation of type `grid` or `level`, in this plannotation |
 
 `measures` admits levels as well as grids because a dimension in a section runs
 between levels, and refusing to record that link would lose a meaning that is
@@ -891,9 +921,9 @@ A reference that does not resolve is an error; a validator MUST report it, and a
 reader MUST treat the referencing object as though the member were absent rather
 than invent a target.
 
-**References across pages.** `target` is the only member through which a label may
-refer to another page, and a `localId` from another page MUST NOT appear anywhere
-else. Within `target`:
+**References across pages.** `target` is the only member through which a
+plannotation may refer to another page, and a `localId` from another page MUST NOT
+appear anywhere else. Within `target`:
 
 - `pdfPage` is a zero-based page index **within the same document**, and MUST be
   less than that document's page count;
@@ -907,16 +937,16 @@ a `target` MUST prefer `pdfPage` if it is present, and MAY resolve to any matchi
 page otherwise.
 
 **Page identity.** `page.index` MUST equal the zero-based index of the page the
-label is attached to, and an index entry's `pageIndex` MUST equal the `page.index`
-of the label it describes. A reader that finds otherwise MUST trust the attachment
-over the value: the page a label is attached to is a fact about the document, and
-`page.index` is a claim inside a label.
+plannotation is attached to, and an index entry's `pageIndex` MUST equal the
+`page.index` of the plannotation it describes. A reader that finds otherwise MUST
+trust the attachment over the value: the page a plannotation is attached to is a
+fact about the document, and `page.index` is a claim inside a plannotation.
 
 ### 4.6 Provenance
 
 Provenance is the member that says where a value came from. It is what lets a
 reader tell a measurement taken from the model from a number recovered off a
-picture, and it is the reason a label can be trusted at all.
+picture, and it is the reason a plannotation can be trusted at all.
 
 **4.6.1 The three values.**
 
@@ -924,7 +954,7 @@ picture, and it is the reason a label can be trusted at all.
 | --- | --- |
 | `authored` | The value came from the record from which the drawing was produced — the model, or the authoring tool's own account of the drawing. It was **known**, not recovered. |
 | `inferred` | The value was reconstructed after the fact, from the drawing or from any other evidence, by a process without access to that record. It was **recovered**, however carefully. |
-| `mixed` | Aggregate only: some values in this label are authored and some are inferred. |
+| `mixed` | Aggregate only: some values in this plannotation are authored and some are inferred. |
 
 **4.6.2 `mixed` is an aggregate.** A writer SHOULD NOT put `mixed` on an element or
 an annotation. An object whose members come from both sources SHOULD be recorded as
@@ -941,24 +971,24 @@ version, where the restriction could be expressed and checked rather than merely
 asserted.
 
 **4.6.3 Absence.** `provenance` is optional on an element and on an annotation.
-Where it is absent, the object's *effective provenance* is the label's top-level
-`provenance`, except that where the top level is `mixed` the effective provenance
-is `inferred`. Every rule in this section is written in terms of effective
-provenance. A reader MUST NOT read an absent `provenance` as `authored` unless the
-top level is `authored`.
+Where it is absent, the object's *effective provenance* is the plannotation's
+top-level `provenance`, except that where the top level is `mixed` the effective
+provenance is `inferred`. Every rule in this section is written in terms of
+effective provenance. A reader MUST NOT read an absent `provenance` as `authored`
+unless the top level is `authored`.
 
-**4.6.4 Aggregation.** The top-level `provenance` describes the whole label —
+**4.6.4 Aggregation.** The top-level `provenance` describes the whole plannotation —
 `sheet`, `page` and `viewports` as well as the elements and annotations. It MUST
 be:
 
-- `authored` if and only if **every** value in the label is authored;
-- `inferred` if and only if **every** value in the label is inferred;
+- `authored` if and only if **every** value in the plannotation is authored;
+- `inferred` if and only if **every** value in the plannotation is inferred;
 - `mixed` otherwise.
 
 In particular the top level MUST NOT be `authored` unless every element and every
-annotation is authored; and a label recovered entirely from an unlabelled drawing
-is `inferred`, not `mixed`. The index's `provenance` aggregates the same way over
-every page of the document.
+annotation is authored; and a plannotation recovered entirely from an
+unplannotated drawing is `inferred`, not `mixed`. The index's `provenance`
+aggregates the same way over every page of the document.
 
 Only elements and annotations carry a provenance of their own. Where the top level
 is `mixed`, a reader MUST NOT assume that any value outside them — a sheet number,
@@ -978,9 +1008,10 @@ is not in doubt. A validator MUST report a missing `confidence` on an inferred o
 as an error, and SHOULD report a `confidence` on an authored object as a warning.
 
 The asymmetry is deliberate. The design brief requires the first — an inferred value
-that does not say how sure it is has withheld the thing that makes it safe to use —
-and the schema cannot express it, so the validator must. The second is untidiness
-rather than a loss of meaning, and rejecting a label over it would serve nobody.
+that does not say how sure it is has withheld the thing that makes it safe to use
+— and the schema cannot express it, so the validator must. The second is
+untidiness rather than a loss of meaning, and rejecting a plannotation over it
+would serve nobody.
 
 `confidence` is monotone — a higher value means the writer considers the value more
 likely to be right — and nothing more. It is not calibrated, and a reader MUST NOT
@@ -991,13 +1022,13 @@ Values outside elements and annotations have no `confidence` member. A reader MU
 treat such a value as unquantified whenever its effective provenance is not
 `authored`.
 
-**4.6.6 A writer MUST NOT label reconstructed data as `authored`.**
+**4.6.6 A writer MUST NOT mark reconstructed data as `authored`.**
 
 This is the rule the rest of the section exists to support, and the one violation
-of this specification that is not merely a defect. Every other error makes a label
-less useful; this one makes it a claim about where the drawing's meaning came
-from that the writer cannot support, in a document that may be issued, checked and
-relied upon.
+of this specification that is not merely a defect. Every other error makes a
+plannotation less useful; this one makes it a claim about where the drawing's
+meaning came from that the writer cannot support, in a document that may be
+issued, checked and relied upon.
 
 Three consequences:
 
@@ -1007,9 +1038,9 @@ Three consequences:
   about anyone's belief in it. A writer MUST NOT promote `inferred` to `authored`
   on review, on agreement with a model, or on any other evidence short of having
   the authoring record itself.
-- **Provenance survives copying.** A writer that copies, merges or re-emits labels
-  produced elsewhere MUST preserve their provenance and confidence, and MUST
-  recompute the aggregate of 4.6.4 over the result.
+- **Provenance survives copying.** A writer that copies, merges or re-emits
+  plannotations produced elsewhere MUST preserve their provenance and confidence,
+  and MUST recompute the aggregate of 4.6.4 over the result.
 - **Under-claiming is not an error.** Marking an authored value `inferred` wastes
   information but asserts nothing false. A writer SHOULD NOT do it; a validator
   MUST NOT report it as an error, because it cannot distinguish it from an honest
@@ -1030,7 +1061,7 @@ already use.
 ### 6.1 General
 
 A *carrier* is a way of transporting a payload, not a kind of payload. The
-payload is what sections 1 to 4 define: page labels, and the index that lists
+payload is what sections 1 to 4 define: plannotations, and the index that lists
 them. It is the same payload in all three carriers, it means the same thing in
 all three, and every rule in sections 3 and 4 applies to it unchanged, however it
 arrived.
@@ -1049,12 +1080,12 @@ carrier; there is no primary carrier from the payload's point of view, and a
 program that reads only sidecars is a conforming reader of Plannotation.
 
 Supporting no carrier at all is also conforming, by 4.3: a reader that ignores
-labels entirely loses nothing but meaning.
+plannotations entirely loses nothing but meaning.
 
 **6.1.2 The carriers are equal in authority.** No carrier makes a stronger claim
-than another. A page label embedded in a PDF and the same page label in a sidecar
-are the same statement about the same page, and a reader MUST treat them as
-equally authoritative. In particular, a reader MUST NOT treat a sidecar as a
+than another. A plannotation embedded in a PDF and the same plannotation in a
+sidecar are the same statement about the same page, and a reader MUST treat them
+as equally authoritative. In particular, a reader MUST NOT treat a sidecar as a
 draft, a cache or a second-class copy.
 
 **6.1.3 Disagreement between carriers.** Equal authority is a statement about
@@ -1063,7 +1094,7 @@ payloads for the same page from more than one carrier and they are not identical
 it MUST resolve the disagreement as follows.
 
 1. A reader MUST NOT merge payloads from two carriers. It selects one and uses it
-   whole. Merging would produce a label that no writer ever wrote, whose
+   whole. Merging would produce a plannotation that no writer ever wrote, whose
    provenance aggregate (4.6.4) no longer describes anything, and whose internal
    references (4.5) may resolve across two documents that were never checked
    against each other.
@@ -1085,47 +1116,49 @@ document is the one that is still attached to the thing it describes.
 
 The rule costs less than it appears to. In the case the sidecar exists for — a
 document that MUST NOT be modified, so that nothing could be embedded in it —
-there is no embedded payload and therefore no conflict. The case the rule
-actually decides is a document that was labelled, then re-labelled into a sidecar
+there is no embedded payload and therefore no conflict. The case the rule actually
+decides is a document that was plannotated, then re-plannotated into a sidecar
 because it had since been signed. There the sidecar may well be the better
 payload, which is why 6.1.3 (3) and (4) exist: the reader must say that the two
 disagree, and its user may overrule it.
 
 **6.1.4 Disagreement within a payload** is not a carrier question and is settled
-elsewhere. Where the index and a page label disagree, the page label is correct
-(2.8). Where a label and the page it describes disagree, the page is correct
+elsewhere. Where the index and a plannotation disagree, the plannotation is correct
+(2.8). Where a plannotation and the page it describes disagree, the page is correct
 (1.2 (6)). Both rules apply in every carrier.
 
 ---
 
 ### 6.2 The PDF carrier
 
-The PDF carrier embeds the payload as associated files: one file per labelled
+The PDF carrier embeds the payload as associated files: one file per plannotated
 page, associated with that page, and one index file associated with the document.
 It is the carrier the rest of this specification was designed around, and it is
-the only carrier that a labelled document cannot be separated from.
+the only carrier that a plannotated document cannot be separated from.
 
-**6.2.1 What is written.** A conforming writer labelling a PDF:
+**6.2.1 What is written.** A conforming writer plannotating a PDF:
 
-1. MUST embed, for each page it labels, one file containing the canonical bytes
-   (3.8) of that page's label, associated with **that page** with
+1. MUST embed, for each page it plannotates, one file containing the canonical bytes
+   (3.8) of that page's plannotation, associated with **that page** with
    `/AFRelationship /Data`;
 2. MUST embed exactly one file containing the canonical bytes of the index,
    associated with the **document catalog** with `/AFRelationship /Data`;
 3. MUST register every file it embeds in the document's `EmbeddedFiles` name tree
    (6.2.5);
 4. MUST write the XMP PDF Declaration of 6.3;
-5. MUST leave every page it does not label without any Plannotation association.
+5. MUST leave every page it does not plannotate without any Plannotation
+   association.
 
-A writer MUST NOT associate a page label with the catalog, and MUST NOT associate
-the index with a page. The association is what says which page a label describes,
-and 4.5 makes it the fact that outranks the label's own `page.index`.
+A writer MUST NOT associate a plannotation with the catalog, and MUST NOT
+associate the index with a page. The association is what says which page a
+plannotation describes, and 4.5 makes it the fact that outranks the plannotation's
+own `page.index`.
 
 **6.2.2 Names.** The embedded files are named:
 
 | File | Name |
 | --- | --- |
-| The label for page *n* | `plannotation-p` followed by *n* in decimal, left-padded with zeros to a minimum of four digits, followed by `.json` |
+| The plannotation for page *n* | `plannotation-p` followed by *n* in decimal, left-padded with zeros to a minimum of four digits, followed by `.json` |
 | The index | `plannotation-index.json` |
 
 so page 0 is `plannotation-p0000.json`, page 42 is `plannotation-p0042.json`, and page
@@ -1165,11 +1198,11 @@ values ISO 32000-2 defines are the only ones permitted, so a Plannotation-specif
 relationship name is not available and would not be wanted.
 
 `/Desc` MUST be present and non-empty. A conforming writer writes exactly
-`Plannotation 0.1 label for page N`, with *N* the zero-based page index, for a page
-label, and exactly `Plannotation 0.1 index` for the index. The number is zero-based
-so that the description agrees with the filename beside which a viewer displays
-it. `/Desc` is for a person reading an attachment pane: a reader MUST NOT derive
-any value from it, and MUST NOT use it to identify a file.
+`Plannotation 0.1 for page N`, with *N* the zero-based page index,
+for a plannotation, and exactly `Plannotation 0.1 index` for the index. The number
+is zero-based so that the description agrees with the filename beside which a
+viewer displays it. `/Desc` is for a person reading an attachment pane: a reader
+MUST NOT derive any value from it, and MUST NOT use it to identify a file.
 
 **6.2.4 The embedded-file stream.** The stream referenced from `/EF` carries:
 
@@ -1202,11 +1235,11 @@ bytes of an embedded file after computing them. A validator MUST decode the
 stream and MUST report a `/Size` or a `/CheckSum` that does not match what it
 decoded.
 
-*Informative.* `/CheckSum` is an integrity check against accidental corruption
-and nothing more. MD5 is not a sound basis for authenticity, ISO 32000-2 fixes
-the algorithm so Plannotation cannot improve on it, and a reader MUST NOT treat a
-matching `/CheckSum` as evidence that a label is genuine. Section 9 governs what
-a reader may conclude from attacker-supplied input.
+*Informative.* `/CheckSum` is an integrity check against accidental corruption and
+nothing more. MD5 is not a sound basis for authenticity, ISO 32000-2 fixes the
+algorithm so Plannotation cannot improve on it, and a reader MUST NOT treat a
+matching `/CheckSum` as evidence that a plannotation is genuine. Section 9 governs
+what a reader may conclude from attacker-supplied input.
 
 **6.2.5 The `EmbeddedFiles` name tree.** Every file a writer embeds MUST also
 appear in the document catalog's `/Names` `/EmbeddedFiles` name tree, under a key
@@ -1228,12 +1261,12 @@ directions are therefore required:
 The `/AF` entry and the name-tree entry MUST be one indirect object referenced
 twice, never two objects with equal contents. One object cannot disagree with
 itself, and duplication is the only way a document could offer two different
-labels for one page.
+plannotations for one page.
 
 Name-tree keys MUST be sorted as ISO 32000-2 requires, and a reader MUST walk the
 tree's `/Kids` rather than assuming a single `/Names` array: a document with many
 attachments will have a branching tree, and a reader that reads only the root
-node will silently miss labels.
+node will silently miss plannotations.
 
 **6.2.6 Name collisions.** A document MAY already contain an embedded file whose
 name is a Plannotation name. Assigning over it would destroy a file Plannotation never
@@ -1252,10 +1285,10 @@ colliding file. A writer MUST NOT rename its own file to avoid the collision:
 the names in 6.2.2 are how a reader finds the payload, and a payload under a
 different name is not findable.
 
-Re-labelling a document that already carries a Plannotation payload is otherwise
+Re-plannotating a document that already carries a Plannotation payload is otherwise
 unconstrained: a writer MAY replace the payload in place, and MAY instead remove
 it (6.2.12) and write a fresh one. Either way the result MUST satisfy every rule
-in this section, and MUST NOT leave a label for a page it did not label.
+in this section, and MUST NOT leave a plannotation for a page it did not plannotate.
 
 **6.2.7 Associated-file arrays.** The `/AF` array of a page or of the catalog MUST
 be **appended to**, never assigned. Documents that already carry associated files
@@ -1279,7 +1312,7 @@ have read.
 **6.2.8 The appearance guarantee.** 1.2 (1) states the guarantee. This paragraph
 states it as something a validator given both documents can check.
 
-Let *D* be the input document and *D′* the labelled output. A conforming writer
+Let *D* be the input document and *D′* the plannotated output. A conforming writer
 MUST satisfy all of the following, and a validator given both MUST check all of
 them and MUST report each failure as an error.
 
@@ -1321,7 +1354,7 @@ precisely the class of difference the rule exists to forbid.
 rewrites it: object numbers are renumbered, the cross-reference table is rebuilt,
 the document `/ID` changes, and the output is never a byte-superset of the input.
 A validator MUST NOT test the guarantee by comparing files, and a reader MUST NOT
-expect a labelled document to contain its input.
+expect a plannotated document to contain its input.
 
 **6.2.9 What a writer MUST NOT do.** In addition to everything above, a
 conforming writer MUST NOT:
@@ -1352,7 +1385,7 @@ downstream diff will show and none of them is Plannotation's business.
 **6.2.10 The PDF header version.** Page-level associated files are a PDF 2.0
 feature: ISO 32000-2 defines `/AF` on a page dictionary, and ISO 32000-1 does not.
 A writer might therefore be tempted to raise the header version of every document
-it labels. It MUST NOT do so unconditionally.
+it plannotates. It MUST NOT do so unconditionally.
 
 - A writer MUST NOT lower the header version, ever.
 - A writer MUST NOT change the header version of a document that identifies
@@ -1384,7 +1417,7 @@ A conforming writer MUST NOT invalidate a signature silently. Specifically:
    for a field with `/FT /Sig` carrying a `/V`, and MUST examine the catalog's
    `/Perms` for `/DocMDP` and `/UR3`. Any of these makes the document signed for
    the purpose of this rule.
-2. **Refuse.** A writer MUST refuse, by default, to write a labelled copy of a
+2. **Refuse.** A writer MUST refuse, by default, to write a plannotated copy of a
    signed document. Its message MUST say that the document is signed and MUST
    name the sidecar of 6.5 as the carrier for a signed document.
 3. **Never pretend.** A writer MUST NOT remove, alter or re-write a signature
@@ -1416,32 +1449,33 @@ modifying it, and 6.2.13 does not exempt it.
 order.
 
 1. **Page-level `/AF` first.** For each page, scan the `/AF` array for a file
-   specification whose `/UF` — or `/F`, where `/UF` is absent — is a page-label
-   name. For the index, scan the catalog's `/AF` for `plannotation-index.json`.
+   specification whose `/UF` — or `/F`, where `/UF` is absent — is a plannotation
+   file name. For the index, scan the catalog's `/AF` for `plannotation-index.json`.
 2. **The name tree as a fallback.** For a page with no such entry, look up the
    page's name from 6.2.2 in the `EmbeddedFiles` name tree; likewise for the
    index.
 
 Both paths are required. A producer may have written only one of them, or a
 downstream tool may have dropped one, and a reader that implements a single path
-will report a labelled document as unlabelled.
+will report a plannotated document as unplannotated.
 
 Having found a candidate, a reader:
 
-- MUST validate it against the page-label or index schema before using any value
+- MUST validate it against the plannotation or index schema before using any value
   in it, and MUST treat it as absent if it fails — 4.3 (1) and (2);
 - MUST treat the association as the fact and `page.index` as a claim, where a
-  label found on page *i* declares a different index — 4.5;
-- MUST treat the label as absent, and a validator MUST report an error, where a
-  label found **only** through the name tree has a `page.index` that disagrees
-  with the index encoded in its filename. There the filename and the label are two
-  claims and there is no fact to prefer;
-- MUST treat a page's label as absent, and a validator MUST report an error,
-  where a page's `/AF` array references more than one page-label file. Two labels
-  for one page is a defect, and a reader has no basis for choosing between them;
+  plannotation found on page *i* declares a different index — 4.5;
+- MUST treat the plannotation as absent, and a validator MUST report an error,
+  where a plannotation found **only** through the name tree has a `page.index`
+  that disagrees with the index encoded in its filename. There the filename and
+  the plannotation are two claims and there is no fact to prefer;
+- MUST treat a page's plannotation as absent, and a validator MUST report an
+  error, where a page's `/AF` array references more than one plannotation file.
+  Two plannotations for one page is a defect, and a reader has no basis for
+  choosing between them;
 - MUST NOT require the declaration of 6.3 to be present in order to read a payload
   it has found. A missing declaration is a writer's error (6.6) and not a reason
-  to withhold a valid label from a user.
+  to withhold a valid plannotation from a user.
 
 **6.2.13 Removing a payload.** A writer MAY remove a Plannotation payload from a
 document. When it does, it MUST remove exactly:
@@ -1457,7 +1491,7 @@ and MUST NOT remove anything else. In particular a foreign attachment, a foreign
 `/AF` entry and a foreign PDF Declaration MUST all survive.
 
 **Removal is reversible in the only sense that matters.** Where *D* is a document,
-removing the payload from a labelled copy of *D* MUST produce a document
+removing the payload from a plannotated copy of *D* MUST produce a document
 equivalent to *D*: the same page count, the same decoded content streams, the
 same annotations, the same document information dictionary, an XMP packet with
 the same properties and the same bytes for every property *D* had, the same
@@ -1470,11 +1504,11 @@ same payload and the same supplied timestamps MUST produce byte-identical output
 
 Every timestamp a writer records — `/Params` `/ModDate`, `pdfd:claimDate` (6.3.4),
 `generator.created` — MUST be taken from the writer's inputs. A conforming writer
-MUST NOT read the system clock while labelling. A writer SHOULD derive the
+MUST NOT read the system clock while plannotating. A writer SHOULD derive the
 document `/ID` from the output's content rather than from a clock or a random
 source, so that the requirement above is achievable at all.
 
-Determinism is what makes a labelled document diffable, cacheable and testable,
+Determinism is what makes a plannotated document diffable, cacheable and testable,
 and it is cheap: the only values that would otherwise vary are the three named
 above.
 
@@ -1509,7 +1543,7 @@ endobj
 << /Type            /Filespec
    /F               (plannotation-p0000.json)
    /UF              (plannotation-p0000.json)
-   /Desc            (Plannotation 0.1 label for page 0)
+   /Desc            (Plannotation 0.1 for page 0)
    /AFRelationship  /Data
    /EF              << /F 13 0 R /UF 13 0 R >>
 >>
@@ -1547,8 +1581,8 @@ PDF Association, *PDF Declarations* (2019), listed in the normative references,
 defines the mechanism. This subsection specifies what Plannotation writes into it,
 what it must leave alone, and what a reader may conclude from it.
 
-**6.3.1 The claim.** A labelled PDF MUST carry exactly one Plannotation declaration:
-one Declaration structure whose `pdfd:conformsTo` is exactly
+**6.3.1 The claim.** A plannotated PDF MUST carry exactly one Plannotation
+declaration: one Declaration structure whose `pdfd:conformsTo` is exactly
 
 ```
 https://plannotation.github.io/spec/0.1
@@ -1630,7 +1664,7 @@ validator MUST report it as an error rather than interpret it.
   worse than an absent one.
 
 **6.3.5 A complete packet.** A document that had no XMP packet at all, after
-labelling:
+plannotating:
 
 ```xml
 <?xpacket begin="&#xFEFF;" id="W5M0MpCehiHzreSzNTczkc9d"?>
@@ -1691,7 +1725,7 @@ packet describes the `pdfd` namespace — adding the PDF Association's published
 extension schema for it where the packet does not already contain one, and MUST
 at minimum report the risk to its caller when it does not. Without
 it, the declaration itself invalidates the document's conformance claim, which
-would make labelling a PDF/A-3 document a destructive act.
+would make plannotating a PDF/A-3 document a destructive act.
 
 PDF/A-4 (ISO 19005-4) removed the extension-schema requirement, keeping only that
 the XMP conform to ISO 16684-1. Where the document identifies itself as
@@ -1706,8 +1740,8 @@ silently broken the document's conformance.
 **6.3.8 What the declaration does and does not mean.** The declaration is a claim
 that this document carries a Plannotation 0.1 payload. It is not a validation
 result, it says nothing about the payload's conformance level, and a reader MUST
-NOT treat it as evidence that any label in the document is valid — 4.3 (1) still
-requires the reader to validate what it finds.
+NOT treat it as evidence that any plannotation in the document is valid — 4.3 (1)
+still requires the reader to validate what it finds.
 
 A declaration with no payload is a claim the document does not support. A
 validator MUST report it as an error. A payload with no declaration is a writer's
@@ -1746,7 +1780,7 @@ A writer MUST NOT add a rendered element, MUST NOT add or alter a presentation
 attribute, style rule or transform, and MUST NOT reorder elements.
 
 **6.4.3 Coordinates.** SVG is y-down and paper coordinates are y-up. Every
-coordinate crossing the boundary between an SVG document and a label MUST be
+coordinate crossing the boundary between an SVG document and a plannotation MUST be
 flipped as 3.3 requires, after conversion to millimetres and after removal of any
 offset between the SVG's root coordinate system and the page corner. This is the
 single most likely error in an SVG implementation, and 3.3 explains why it is
@@ -1755,19 +1789,19 @@ invisible on some drawings and obvious on others.
 **6.4.4 Reserved.** The following are not specified at 0.1 and a future version
 will settle them: the element name, namespace and content model of the
 `<metadata>` payload; the `data-plannotation-*` attribute vocabulary and which of
-the two mechanisms carries which part of the payload; whether a whole page label
+the two mechanisms carries which part of the payload; whether a whole plannotation
 or per-element fragments are carried; and how an SVG document announces that it
 carries a payload, the declaration of 6.3 having no SVG equivalent.
 
 **6.4.5 Reading IFC identity from an SVG *(informative)*.** An SVG written by
 IfcOpenShell's serializer already says which product each group draws and how each
-view maps to the model, so a writer can derive a label for the PDF rendered from that
-SVG without an SVG payload: the GlobalId from `ifc:guid`, or from the serializer's
-`id="product-<uuid>"` by 7.1.2; the class from the group's `class`; and the paper
-transform of 3.5 from the view group's `ifc:matrix3` and `ifc:plane` composed with
-every transform and viewport above it, followed by the flip of 3.3. The reference
-implementation's `plannotation from-svg` and its Bonsai operator do exactly this, and
-write nothing into the SVG.
+view maps to the model, so a writer can derive a plannotation for the PDF rendered
+from that SVG without an SVG payload: the GlobalId from `ifc:guid`, or from the
+serializer's `id="product-<uuid>"` by 7.1.2; the class from the group's `class`;
+and the paper transform of 3.5 from the view group's `ifc:matrix3` and `ifc:plane`
+composed with every transform and viewport above it, followed by the flip of 3.3.
+The reference implementation's `plannotation from-svg` and its Bonsai operator do
+exactly this, and write nothing into the SVG.
 
 ---
 
@@ -1783,27 +1817,27 @@ documents that MUST NOT be modified — a signed document above all (6.2.11).
 | --- | --- | --- |
 | `plannotation` | REQUIRED | `"0.1"`, the format version |
 | `index` | REQUIRED | one index document, valid against the index schema |
-| `pages` | REQUIRED | an array of page labels, each valid against the page-label schema |
-| `generator` | OPTIONAL | the program that wrote the sidecar, as in a label |
-| `extensions` | OPTIONAL | namespaced extras, as in a label; a reader ignores what it does not understand — 4.3 (6) |
+| `pages` | REQUIRED | an array of plannotations, each valid against the plannotation schema |
+| `generator` | OPTIONAL | the program that wrote the sidecar, as in a plannotation |
+| `extensions` | OPTIONAL | namespaced extras, as in a plannotation; a reader ignores what it does not understand — 4.3 (6) |
 
 It is described by `plannotation-sidecar.schema.json`, published beside the
-page-label and index schemas, and a reader MUST validate a sidecar against it
+plannotation and index schemas, and a reader MUST validate a sidecar against it
 before using any value in it — 4.3 (1) applies to a sidecar exactly as it applies
-to a label.
+to a plannotation.
 
 The members MUST agree with each other:
 
 - `plannotation` MUST equal the `plannotation` of `index` and of every member of
   `pages`;
-- `pages` MUST contain exactly one page label for each entry of `index.pages`,
-  matched by `page.index` against `pageIndex`, and no page label that `index.pages`
-  does not list;
+- `pages` MUST contain exactly one plannotation for each entry of `index.pages`,
+  matched by `page.index` against `pageIndex`, and no plannotation that
+  `index.pages` does not list;
 - `pages` MUST be ordered by `page.index`, ascending, and MUST NOT contain two
-  labels with the same `page.index`.
+  plannotations with the same `page.index`.
 
 A validator MUST report each of these as an error. The redundancy is deliberate:
-the index and the labels are separate documents in the PDF carrier, so the
+the index and the plannotations are separate documents in the PDF carrier, so the
 sidecar carries both rather than deriving one from the other, and the price of
 that is a consistency rule.
 
@@ -1825,8 +1859,8 @@ that travels outside.
 above, **in the same directory as the document and nowhere else**. It MUST NOT
 search parent directories, MUST NOT search a configured location, and MUST NOT
 dereference any path or URL found inside a sidecar in order to locate its
-document — section 9 forbids a reader from dereferencing label content, and a
-sidecar is label content.
+document — section 9 forbids a reader from dereferencing anything in a Plannotation
+payload, and a sidecar is one.
 
 A reader MAY be given a sidecar alone, with no document. It MAY then use the
 payload, and MUST make clear that it did so without the document: with no page to
@@ -1835,30 +1869,30 @@ payload is unverified.
 
 **6.5.5 Binding a sidecar to its document.** Nothing in a filename proves that a
 sidecar was written for the document beside it. The payload's `index` may carry the
-hash of the *model* the labels came from, which says nothing about the PDF.
+hash of the *model* the plannotations came from, which says nothing about the PDF.
 
 Plannotation 0.1 does not add a member for this. The binding is the naming rule of
 6.5.4, checked against what the payload already states about the document's pages.
 A reader pairing a sidecar with a document MUST:
 
-1. treat a page label as absent where its `page.index` is not a page of the
+1. treat a plannotation as absent where its `page.index` is not a page of the
    document;
-2. treat a page label as absent where its `page.widthMm` or `page.heightMm`
+2. treat a plannotation as absent where its `page.widthMm` or `page.heightMm`
    differs from that page's own unrotated dimensions (3.2) by more than the
    geometric tolerance of 0.5 mm (3.1);
-3. treat the whole payload as absent where no page label pairs with any page.
+3. treat the whole payload as absent where no plannotation pairs with any page.
 
 A validator MUST report each of the three as an error.
 
 **Why this and not a hash.** A byte hash is the only exact binding available, and
 it is exact about the wrong thing. A PDF's bytes change under operations that
-change nothing a label describes: every re-save renumbers its objects and rewrites
-its cross-reference table, a signature-preserving incremental update appends to it,
-an archive may recompress it. Requiring a matching hash would make a sidecar refuse
-a document that is, in every respect a label cares about, the document it was
-written for — and it would do so first in the workflow the sidecar exists to serve,
-where the document is passed between systems precisely because it cannot be
-modified.
+change nothing a plannotation describes: every re-save renumbers its objects and
+rewrites its cross-reference table, a signature-preserving incremental update
+appends to it, an archive may recompress it. Requiring a matching hash would make
+a sidecar refuse a document that is, in every respect a plannotation cares about,
+the document it was written for — and it would do so first in the workflow the
+sidecar exists to serve, where the document is passed between systems precisely
+because it cannot be modified.
 
 Requiring nothing is the opposite failure: a sidecar left behind from an earlier
 revision would be read as though it described the sheet in front of the reader.
@@ -1901,20 +1935,20 @@ does not.
 
 **6.6.1 The PDF carrier.**
 
-A conforming **writer** MUST: embed a label for every page it labels, associated
-with that page, and one index associated with the document (6.2.1); name them as
-6.2.2 requires; write every required file-specification and embedded-file member
-(6.2.3, 6.2.4); register every file in the name tree and associate every
-registered file (6.2.5); refuse a foreign name collision (6.2.6); append to `/AF`
-and never assign, deleting an array it empties (6.2.7); satisfy the appearance
-guarantee (6.2.8); do none of the things in 6.2.9; leave the header version alone
-except as 6.2.10 permits; detect a signature and refuse by default (6.2.11);
-write the declaration (6.3); and be deterministic (6.2.14).
+A conforming **writer** MUST: embed a plannotation for every page it plannotates,
+associated with that page, and one index associated with the document (6.2.1);
+name them as 6.2.2 requires; write every required file-specification and
+embedded-file member (6.2.3, 6.2.4); register every file in the name tree and
+associate every registered file (6.2.5); refuse a foreign name collision (6.2.6);
+append to `/AF` and never assign, deleting an array it empties (6.2.7); satisfy
+the appearance guarantee (6.2.8); do none of the things in 6.2.9; leave the header
+version alone except as 6.2.10 permits; detect a signature and refuse by default
+(6.2.11); write the declaration (6.3); and be deterministic (6.2.14).
 
 A conforming **reader** MUST: implement both the `/AF` path and the name-tree
 fallback (6.2.12); tolerate a null `/AF` entry (6.2.7) and a branching name tree
-(6.2.5); validate before trusting and treat an invalid, unknown-version,
-ambiguous or misattached label as absent (6.2.12, 4.3); and read a payload whose
+(6.2.5); validate before trusting and treat an invalid, unknown-version, ambiguous
+or misattached plannotation as absent (6.2.12, 4.3); and read a payload whose
 declaration is missing (6.3.8).
 
 A conforming **validator** MUST report: every missing or wrong file-specification
@@ -1922,14 +1956,14 @@ or embedded-file member, including a `/Size` or `/CheckSum` that disagrees with
 the decoded bytes (6.2.3, 6.2.4); every embedded file not registered in the name
 tree and every registered file not associated (6.2.5); an `/AFRelationship` other
 than `/Data` on a Plannotation file (6.2.3); an empty `/AF` array (6.2.7); a page
-with more than one label, and a name-tree-only label whose `page.index`
-contradicts its filename (6.2.12); a declaration without a payload and a payload
-without a declaration (6.3.8); more than one Plannotation declaration, or one that is
-not a `rdf:Bag` of structures (6.3.1, 6.3.3); and, where it is given the input
-document as well as the labelled one, every failure of the appearance guarantee
-(6.2.8) and of the removal equivalence (6.2.13).
+with more than one plannotation, and a name-tree-only plannotation whose
+`page.index` contradicts its filename (6.2.12); a declaration without a payload
+and a payload without a declaration (6.3.8); more than one Plannotation
+declaration, or one that is not a `rdf:Bag` of structures (6.3.1, 6.3.3); and,
+where it is given the input document as well as the plannotated one, every failure
+of the appearance guarantee (6.2.8) and of the removal equivalence (6.2.13).
 
-A validator given only a labelled document MUST say so, and MUST NOT report the
+A validator given only a plannotated document MUST say so, and MUST NOT report the
 appearance guarantee as satisfied. It cannot check it, and silence about a check
 that was not run reads as a pass.
 
@@ -1969,10 +2003,10 @@ correspondence. It aligns with two descriptions of drawings in IFC:
 - **SWAPP's `ifc-docs` draft** (CC0, 2024), which structures documentation as
   *DocumentSet → Sheet → ViewPort → View → Annotation*, with annotations as
   `IfcAnnotation` aggregated by `IfcRelAggregates` and cross-referenced to the
-  products they describe by `IfcRelAssignsToProduct`. Plannotation reuses these names
-  where it has the same concept: its *sheet*, *viewport*, *view* and *annotation*
-  (2.1–2.6) are SWAPP's, and a labelled document's *index* (2.8) plays the part of
-  the document set.
+  products they describe by `IfcRelAssignsToProduct`. Plannotation reuses these
+  names where it has the same concept: its *sheet*, *viewport*, *view* and
+  *annotation* (2.1–2.6) are SWAPP's, and a plannotated document's *index* (2.8)
+  plays the part of the document set.
 - **The IfcOpenShell and Bonsai conventions**, in which a sheet is an
   `IfcDocumentInformation` with `Scope` `SHEET`, a drawing is an `IfcAnnotation`
   with `ObjectType` `DRAWING` whose view settings, scale among them, are in
@@ -1980,9 +2014,9 @@ correspondence. It aligns with two descriptions of drawings in IFC:
   drawing's annotations are `IfcAnnotation`s whose type says what they are.
 
 2.18 summarises which names correspond; this section adds the attributes. 7.1 and
-7.3 are normative; 7.2 is an informative correspondence, because Plannotation
-0.1 reads and writes labels, not IFC files, and does not require a writer to have a
-model at all.
+7.3 are normative; 7.2 is an informative correspondence, because Plannotation 0.1
+reads and writes plannotations, not IFC files, and does not require a writer to
+have a model at all.
 
 ### 7.1 Identity
 
@@ -2012,8 +2046,8 @@ described with a `paperToPlane`, and a writer MUST NOT write one for it.
 | Plannotation | IFC | Notes |
 | --- | --- | --- |
 | `sheet` | SWAPP's Sheet; `IfcDocumentInformation` with `Scope` `SHEET` | `Identification` → `sheet.id`, `Name` → `title`, `Revision` → `revision` |
-| The PDF of a sheet | `IfcDocumentReference` with the file's `Location` | The label travels in the PDF; the model need not know it exists |
-| The index of a labelled document | SWAPP's DocumentSet | The sheets one PDF carries |
+| The PDF of a sheet | `IfcDocumentReference` with the file's `Location` | The plannotation travels in the PDF; the model need not know it exists |
+| The index of a plannotated document | SWAPP's DocumentSet | The sheets one PDF carries |
 | `viewport` | SWAPP's ViewPort, an `IfcAnnotation` aggregated with `IfcRelAggregates`; in Bonsai, a drawing placed on the sheet by an `IfcDocumentReference` | Its box on the paper is `viewport.paperBBox` |
 | `viewport.plane`, `paperToPlane`, `scale` | SWAPP's View; in Bonsai, the `IfcAnnotation` with `ObjectType` `DRAWING` and its `EPset_Drawing` | The annotation's placement is `viewport.plane`; the scale in `EPset_Drawing` is `viewport.scale` |
 | `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name`, `elevation` and `ifcGuid` are the storey's `Name`, `Elevation` and `GlobalId` |
@@ -2031,13 +2065,13 @@ described with a `paperToPlane`, and a writer MUST NOT write one for it.
 
 ### 7.3 Round trip
 
-Given the model a label was written from, a reader SHOULD resolve every `ifcGuid` in
-it, and a validator given the model (4.4) MUST report an `ifcGuid` the model does not
-contain, and an `ifcClass` that is neither the class of the entity with that
-GlobalId nor a supertype of it (PL-IFC-001, PL-IFC-002). A
-label MAY name entities the reader's copy of the model lacks — the model may have
-moved on since the drawing was issued — and a reader MUST then treat the drawing, not
-the model, as the record of what was issued (1.2).
+Given the model a plannotation was written from, a reader SHOULD resolve every
+`ifcGuid` in it, and a validator given the model (4.4) MUST report an `ifcGuid`
+the model does not contain, and an `ifcClass` that is neither the class of the
+entity with that GlobalId nor a supertype of it (PL-IFC-001, PL-IFC-002). A
+plannotation MAY name entities the reader's copy of the model lacks — the model
+may have moved on since the drawing was issued — and a reader MUST then treat the
+drawing, not the model, as the record of what was issued (1.2).
 
 ## 8. Versioning policy
 
@@ -2046,49 +2080,51 @@ the model, as the record of what was issued (1.2).
 A version of Plannotation is one `MAJOR.MINOR` number, and it appears in exactly three
 places, which always move together:
 
-1. the `plannotation` member of every label, index and sidecar (`"0.1"`);
+1. the `plannotation` member of every plannotation, index and sidecar (`"0.1"`);
 2. the `$id` of each schema, `https://plannotation.github.io/schema/0.1/…`;
 3. the `conformsTo` URI of the PDF declaration, `https://plannotation.github.io/spec/0.1`.
 
-A writer MUST write the same version in all three. A reader selects the schema by the
-`plannotation` member and, where the version is one it does not implement, treats the
-label as absent (4.3 (3)); a validator reports such a label as unvalidatable rather
-than invalid (4.4).
+A writer MUST write the same version in all three. A reader selects the schema by
+the `plannotation` member and, where the version is one it does not implement,
+treats the plannotation as absent (4.3 (3)); a validator reports such a
+plannotation as unvalidatable rather than invalid (4.4).
 
 ### 8.2 What a version may change
 
 While the major number is `0`, the format is a draft and any new minor version MAY
 change anything. From `1.0`:
 
-- a **major** version is required for any **breaking change**: removing or renaming a
-  member; changing a member's meaning, unit or coordinate convention; making an
-  optional member required; tightening a constraint so that a previously valid label
-  becomes invalid; removing a value from an enumeration; or changing the carrier —
-  the attachment names, their relationship, their placement or the declaration;
+- a **major** version is required for any **breaking change**: removing or
+  renaming a member; changing a member's meaning, unit or coordinate convention;
+  making an optional member required; tightening a constraint so that a previously
+  valid plannotation becomes invalid; removing a value from an enumeration; or
+  changing the carrier — the attachment names, their relationship, their placement
+  or the declaration;
 - a **minor** version MAY add optional members, add values to an enumeration, add
   annotation types, and relax constraints. A reader of `1.n` MUST therefore treat an
   enumeration value it does not know as though it were `other`, where the enumeration
   has one, and otherwise ignore the object that carries it;
 - **errata** change neither number. An erratum may correct an example, a typo or an
-  ambiguity, and MUST NOT make a valid label invalid or an invalid one valid.
+  ambiguity, and MUST NOT make a valid plannotation invalid or an invalid one valid.
 
 A member deprecated in `1.n` remains valid until the next major version, and a writer
 SHOULD stop writing it.
 
 ### 8.3 Permanence
 
-A version's specification and schemas, once published under the canonical URLs above,
-are never withdrawn and never changed except by errata, which are listed in the
-document they amend. A label written today must mean the same thing when it is read
-from an archive in thirty years.
+A version's specification and schemas, once published under the canonical URLs
+above, are never withdrawn and never changed except by errata, which are listed in
+the document they amend. A plannotation written today must mean the same thing
+when it is read from an archive in thirty years.
 
 ### 8.4 Software and extensions
 
-The version of a program that reads or writes labels — including this project's
-`plannotation` package, which follows semantic versioning of its own — is independent of
-the format's, and is recorded in `generator.version`. Members under `extensions` whose
-keys begin `x-` are outside the version entirely: they may appear, change and disappear
-in any version, and a reader never requires them (4.3 (6)).
+The version of a program that reads or writes plannotations — including this
+project's `plannotation` package, which follows semantic versioning of its own —
+is independent of the format's, and is recorded in `generator.version`. Members
+under `extensions` whose keys begin `x-` are outside the version entirely: they
+may appear, change and disappear in any version, and a reader never requires them
+(4.3 (6)).
 
 ## 9. Security considerations
 
@@ -2097,13 +2133,13 @@ A drawing arrives by email, from a contractor's portal or out of an archive, and
 program that reads it is often a long-running service. This section states what a
 reader owes its caller, and — equally important — what it cannot promise.
 
-### 9.1 A label is data
+### 9.1 A plannotation is data
 
-A label is **data, never executable**. A conforming reader MUST NOT evaluate,
-execute, or dereference as code any value it finds in a label. In particular, a
-reader MUST NOT fetch a URI found in a label, MUST NOT resolve a filename in it
-against the filesystem, and MUST NOT pass any part of it to a template engine, a
-query language or a shell.
+A plannotation is **data, never executable**. A conforming reader MUST NOT
+evaluate, execute, or dereference as code any value it finds in a plannotation. In
+particular, a reader MUST NOT fetch a URI found in a plannotation, MUST NOT
+resolve a filename in it against the filesystem, and MUST NOT pass any part of it
+to a template engine, a query language or a shell.
 
 `extensions` and an element's `properties` hold arbitrary JSON by design (6.5). A
 reader that forwards either into a system that interprets structure — a document
@@ -2112,11 +2148,11 @@ them as untrusted data at that boundary too.
 
 ### 9.2 Validate before trusting
 
-A conforming reader MUST validate a label against the schema before trusting any
-value in it, and MUST treat a label that fails validation as **absent** (4.3 (2)):
-no partial parse, no repair, no best effort. The page is in front of the reader and
-the page is the leading document (1.2), so falling back to it is always available and
-always correct.
+A conforming reader MUST validate a plannotation against the schema before
+trusting any value in it, and MUST treat a plannotation that fails validation as
+**absent** (4.3 (2)): no partial parse, no repair, no best effort. The page is in
+front of the reader and the page is the leading document (1.2), so falling back to
+it is always available and always correct.
 
 A reader MUST NOT treat a document-level PDF Declaration as evidence that a payload
 is valid. The declaration is a claim; the schema is the check.
@@ -2136,11 +2172,11 @@ Concretely, a reader:
    as a payload;
 3. MUST restrict which stream filters it will decode, and MUST treat a payload under
    any other filter chain as absent. A reader is not obliged to decode arbitrary PDF
-   filters in order to find a label;
+   filters in order to find a plannotation;
 4. MUST validate `/DecodeParms` — the predictor, colour count, bit depth and column
    count — against its own limits **before** allocating anything sized from them;
 5. MUST bound the depth of the JSON it parses, or convert the resulting failure into
-   an ordinary "this label is absent" outcome;
+   an ordinary "this plannotation is absent" outcome;
 6. MUST bound the work it does reporting a failure: the number of schema violations,
    and the length of any fragment quoted back from the document, are both the
    document's to choose;
@@ -2186,18 +2222,19 @@ A conforming writer:
   the signature (6.2).
 - MUST NOT overwrite an embedded file it did not write, MUST NOT remove a third
   party's attachment, associated file or metadata, and MUST NOT leave a document it
-  refused to label partly written (6.2).
-- SHOULD NOT record in a label anything it was not asked to record. A drawing label
-  travels with the drawing, and a filesystem path, a user name or a machine name in a
-  `generator` or an `extensions` member travels with it too.
+  refused to plannotate partly written (6.2).
+- SHOULD NOT record in a plannotation anything it was not asked to record. A
+  plannotation travels with the drawing, and a filesystem path, a user name or a
+  machine name in a `generator` or an `extensions` member travels with it too.
 
 ### 9.6 Privacy
 
-A label describes a drawing, and a drawing describes a building. `sheet.author`,
-`sheet.checker` and `model.file` can carry personal names and internal paths. A writer
-SHOULD record only what the drawing itself prints, and a tool that publishes labelled
-drawings SHOULD offer to remove those members. This specification does not define a
-redaction mechanism; `plannotation strip` removes the payload entirely.
+A plannotation describes a drawing, and a drawing describes a building.
+`sheet.author`, `sheet.checker` and `model.file` can carry personal names and
+internal paths. A writer SHOULD record only what the drawing itself prints, and a
+tool that publishes plannotated drawings SHOULD offer to remove those members.
+This specification does not define a redaction mechanism; `plannotation strip`
+removes the payload entirely.
 
 ---
 

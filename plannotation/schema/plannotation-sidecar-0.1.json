@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://plannotation.github.io/schema/0.1/plannotation-sidecar.schema.json",
   "title": "Plannotation sidecar 0.1",
-  "description": "The sidecar twin of a labelled document: the document-level index and every page label of one document, in one JSON file written beside it as X.plannotation.json. It exists for consumers that cannot read PDF attachments, and for documents that must not be rewritten at all -- a signed PDF above all. The document remains the leading document; this file is auxiliary and deleting it changes nothing about the document. The page-label and index schemas are inlined here verbatim rather than referenced, so that a reader can validate a sidecar without fetching either of them.",
+  "description": "The sidecar twin of a plannotated document: the document-level index and every plannotation of one document, in one JSON file written beside it as X.plannotation.json. It exists for consumers that cannot read PDF attachments, and for documents that must not be rewritten at all -- a signed PDF above all. The document remains the leading document; this file is auxiliary and deleting it changes nothing about the document. The plannotation and index schemas are inlined here verbatim rather than referenced, so that a reader can validate a sidecar without fetching either of them.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,7 +13,7 @@
   "properties": {
     "plannotation": {
       "const": "0.1",
-      "description": "version of the sidecar format, which is the version of the label format it carries"
+      "description": "version of the sidecar format, which is the version of the Plannotation format it carries"
     },
     "generator": {
       "type": "object",
@@ -22,7 +22,7 @@
         "name",
         "version"
       ],
-      "description": "the tool that wrote this file, which may not be the tool that wrote the labels in it -- each label records its own generator",
+      "description": "the tool that wrote this file, which may not be the tool that wrote the plannotations in it -- each plannotation records its own generator",
       "properties": {
         "name": {
           "type": "string",
@@ -42,7 +42,7 @@
     "index": {
       "type": "object",
       "additionalProperties": false,
-      "description": "the document-level index of this document, the same payload that a labelled PDF carries as its embedded plannotation-index.json: which pages are labelled, at which conformance level, and from which model",
+      "description": "the document-level index of this document, the same payload that a plannotated PDF carries as its embedded plannotation-index.json: which pages are plannotated, at which conformance level, and from which model",
       "required": [
         "plannotation",
         "pages"
@@ -83,7 +83,7 @@
         "model": {
           "type": "object",
           "additionalProperties": false,
-          "description": "the source model the labels were written from, if there was one",
+          "description": "the source model the plannotations were written from, if there was one",
           "properties": {
             "file": {
               "type": "string"
@@ -111,7 +111,7 @@
         },
         "pages": {
           "type": "array",
-          "description": "one entry per labelled page; unlabelled pages are simply absent",
+          "description": "one entry per plannotated page; unplannotated pages are simply absent",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -143,11 +143,11 @@
                   "L2",
                   "L3"
                 ],
-                "description": "conformance level this page's label reaches"
+                "description": "conformance level this page's plannotation reaches"
               },
               "file": {
                 "type": "string",
-                "description": "name of the embedded label file, e.g. plannotation-p0000.json"
+                "description": "name of the embedded plannotation file, e.g. plannotation-p0000.json"
               }
             }
           }
@@ -163,9 +163,9 @@
     },
     "pages": {
       "type": "array",
-      "description": "every page label of the document, one entry per labelled page, ascending by page.index; unlabelled pages are simply absent",
+      "description": "every plannotation of the document, one entry per plannotated page, ascending by page.index; unplannotated pages are simply absent",
       "items": {
-        "description": "Machine-readable semantics for one 2D construction-drawing page. The page is the leading document; the label is auxiliary.",
+        "description": "Machine-readable semantics for one 2D construction-drawing page. The page is the leading document; the plannotation is auxiliary.",
         "type": "object",
         "additionalProperties": false,
         "required": [

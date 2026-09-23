@@ -6,7 +6,7 @@ be checked here is everything that is not Blender: that Blender can read ``bl_in
 without executing the file, that the file avoids the one import that breaks operator
 properties, that the operators register and unregister cleanly, that the guesses at a
 sheet's files are right, and -- with a stand-in for Bonsai that serves a real sample
-model -- that the operator labels a sample sheet end to end.
+model -- that the operator plannotates a sample sheet end to end.
 """
 
 from __future__ import annotations
@@ -180,10 +180,10 @@ class TestRegistration:
 class TestGuesses:
     """Where the active sheet's files are, and whose sheet it is."""
 
-    def test_the_newest_unlabelled_files_are_taken(
+    def test_the_newest_unplannotated_files_are_taken(
         self, addon: types.ModuleType, tmp_path: Path
     ) -> None:
-        """A labelled copy from an earlier run is never mistaken for the sheet."""
+        """A plannotated copy from an earlier run is never mistaken for the sheet."""
         sheets = tmp_path / "sheets"
         sheets.mkdir()
         old = sheets / "A-101 - Plan.pdf"
@@ -208,7 +208,7 @@ class TestGuesses:
         assert addon.sheet_files(None, "A-101") == (None, None)
         assert addon.sheet_files(Path("model.ifc"), "") == (None, None)
 
-    def test_the_labelled_copy_sits_beside_the_pdf(self, addon: types.ModuleType) -> None:
+    def test_the_plannotated_copy_sits_beside_the_pdf(self, addon: types.ModuleType) -> None:
         """Named so it is never taken for the sheet next time."""
         assert addon.plannotated_path(Path("s/A-101.pdf")) == Path("s/A-101.plannotated.pdf")
 
@@ -315,10 +315,10 @@ class TestExecute:
         not (SAMPLES / "floorplan" / "model.ifc").is_file(),
         reason="samples are not built; run make samples",
     )
-    def test_a_sample_sheet_is_labelled_as_bonsai_would_ask(
+    def test_a_sample_sheet_is_plannotated_as_bonsai_would_ask(
         self, addon: types.ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        """Prefilled from the active sheet, labelled, and valid."""
+        """Prefilled from the active sheet, plannotated, and valid."""
         ifcopenshell = pytest.importorskip("ifcopenshell")
         model = ifcopenshell.open(str(SAMPLES / "floorplan" / "model.ifc"))
         (tmp_path / "sheets").mkdir()

@@ -2,13 +2,13 @@
 
 `bonsai_ext/plannotation_bonsai.py` is a Blender add-on for
 [Bonsai](https://bonsaibim.org). After Bonsai has produced a sheet, it attaches a
-Plannotation page label to the sheet's PDF. The PDF looks and prints exactly as before;
-the label is an attachment.
+plannotation to the sheet's PDF. The PDF looks and prints exactly as before; the
+plannotation is an attachment.
 
 ## How it works
 
 Bonsai draws with IfcOpenShell's SVG serializer, so the sheet SVG it writes already
-carries what a label needs:
+carries what a plannotation needs:
 
 | In the SVG | Becomes |
 | --- | --- |
@@ -18,15 +18,15 @@ carries what a label needs:
 | A view group's `ifc:matrix3` and `ifc:plane`, and where the view is placed | `viewport.paperToPlane`, `plane`, `scale` |
 
 The IFC model Bonsai has open supplies the rest: its length unit, its schema, and each
-element's `Tag`, which becomes `element.tag`. The label is `authored` and reaches
+element's `Tag`, which becomes `element.tag`. The plannotation is `authored` and reaches
 conformance level L2 (sheet, viewports, elements). Dimensions, tags and grids are not
 derived as annotations: the serializer does not mark them, and guessing them from line
 work is what `plannotation infer` is for.
 
 All of that is done by `plannotation.svg`, which is tested in Plannotation's CI against the
-serializer's own output: a label derived from each sample's sheet SVG must agree with
-the label written from the model, element for element. The add-on is only the Blender
-side. The same step runs outside Blender as
+serializer's own output: a plannotation derived from each sample's sheet SVG must agree
+with the plannotation written from the model, element for element. The add-on is only
+the Blender side. The same step runs outside Blender as
 
 ```bash
 plannotation from-svg sheet.svg sheet.pdf -o sheet.plannotated.pdf --sheet-id A-101 --ifc model.ifc
@@ -48,12 +48,12 @@ plannotation from-svg sheet.svg sheet.pdf -o sheet.plannotated.pdf --sheet-id A-
 
 ## Using it
 
-- **File > Export > Plannotation: Attach to Sheet PDF.** The dialog is filled from the
+- **File > Export > Plannotate sheet PDF.** The dialog is filled from the
   sheet selected in Bonsai's sheet list: its number and title, and the newest
   `<number>*.svg` and `<number>*.pdf` in the `sheets` folder beside the IFC file.
-  Correct anything it guessed wrong. The labelled copy is written beside the PDF as
+  Correct anything it guessed wrong. The plannotated copy is written beside the PDF as
   `<name>.plannotated.pdf` unless another path is given; the PDF itself is not modified.
-- **Create Sheet and Attach Plannotation** (search for it with F3) runs Bonsai's own
+- **Create and plannotate sheet** (search for it with F3) runs Bonsai's own
   *Create Sheets* first, then opens the same dialog.
 
 ## Manual test protocol
@@ -66,20 +66,20 @@ and a project with at least one sheet that has a plan view with walls on it.
 
 1. **It loads.** Enable the add-on. Expect no error in the system console (Window >
    Toggle System Console on Windows; the terminal Blender was started from elsewhere),
-   and **Plannotation: Attach to Sheet PDF** under File > Export.
+   and **Plannotate sheet PDF** under File > Export.
 2. **It is prefilled.** Select the sheet in Bonsai's sheet list, create it with Bonsai,
    then open the operator. Expect the sheet number and title filled in, and the SVG
    and PDF paths pointing into the project's `sheets` folder.
-3. **It labels.** Confirm. Expect *Labelled <name>.plannotated.pdf: N element(s)* in the
-   status bar, where N is the number of model elements on the sheet.
-4. **The label is right.** In a terminal:
+3. **It plannotates.** Confirm. Expect *Plannotated <name>.plannotated.pdf: N element(s)*
+   in the status bar, where N is the number of model elements on the sheet.
+4. **The plannotation is right.** In a terminal:
 
    ```bash
    plannotation validate "<name>.plannotated.pdf"     # expect: no errors, level L2
    plannotation inspect "<name>.plannotated.pdf"      # expect: every element, its class and GlobalId
    ```
 
-   Open the labelled PDF in `inspector/index.html` and check that each outline sits on
+   Open the plannotated PDF in `inspector/index.html` and check that each outline sits on
    the element it names, and that hovering shows the GlobalId Bonsai shows for it.
 5. **The page is untouched.** Expect both files to render identically:
 

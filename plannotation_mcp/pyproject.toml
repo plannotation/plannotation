@@ -16,7 +16,7 @@ build-backend = "hatchling.build"
 [project]
 name = "plannotation-mcp"
 dynamic = ["version"]
-description = "MCP server exposing Plannotation-labelled construction drawings to MCP hosts."
+description = "MCP server exposing plannotated construction drawings to MCP hosts."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]

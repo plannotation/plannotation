@@ -13,20 +13,20 @@ from typing import Final
 #: Root of every public Plannotation URL. Published via GitHub Pages.
 BASE_URL: Final = "https://plannotation.github.io"
 
-#: Version of the label format implemented here. Distinct from the package version.
+#: Version of the Plannotation format implemented here. Distinct from the package version.
 SCHEMA_VERSION: Final = "0.1"
 
-#: ``$id`` of the page-label JSON Schema.
+#: ``$id`` of the plannotation JSON Schema.
 SCHEMA_ID: Final = f"{BASE_URL}/schema/{SCHEMA_VERSION}/plannotation.schema.json"
 
 #: ``$id`` of the document-level index JSON Schema.
 INDEX_SCHEMA_ID: Final = f"{BASE_URL}/schema/{SCHEMA_VERSION}/plannotation-index.schema.json"
 
 #: Canonical URI of the specification, and the exact value written as ``conformsTo``
-#: in the XMP PDF Declaration of a labelled PDF.
+#: in the XMP PDF Declaration of a plannotated PDF.
 SPEC_URI: Final = f"{BASE_URL}/spec/{SCHEMA_VERSION}"
 
-#: Filename of the document-level index embedded in a labelled PDF.
+#: Filename of the document-level index embedded in a plannotated PDF.
 INDEX_FILENAME: Final = "plannotation-index.json"
 
 #: MIME type recorded as ``/Subtype`` on every embedded Plannotation file.
@@ -37,7 +37,7 @@ SIDECAR_SUFFIX: Final = ".plannotation.json"
 
 
 def plannotation_filename(page_index: int) -> str:
-    """Return the embedded filename for a page label.
+    """Return the embedded filename for a page's plannotation.
 
     Args:
         page_index: Zero-based PDF page index.

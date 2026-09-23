@@ -6,8 +6,8 @@
     plannotation validate file.pdf|plannotations.json [--ifc model.ifc] [--strict]
                           [--report md|json]
 
-One entry point, :func:`validate`, which takes a labelled PDF, a sidecar, a bare page
-label, an array of page labels or an index, and returns a
+One entry point, :func:`validate`, which takes a plannotated PDF, a sidecar, a bare
+plannotation, an array of plannotations or an index, and returns a
 :class:`~plannotation.validate.report.Report`. Two rule engines for a single page, for a
 caller that has already read one: :func:`check_page_document` for the rules that must
 see the parsed JSON, and :func:`check_plannotation` for everything the loaded model can
@@ -28,8 +28,8 @@ that cannot be inverted, an inferred value that does not say how sure it is.
 heuristic.** 4.4 gives the canonical example itself -- an element's bounding box
 falling outside its viewport's, which is exactly what a tag drawn in the margin beside
 the view looks like. A warning is a thing worth a person's attention that the validator
-cannot be sure about, and a label with warnings and no errors **is conforming**. The
-validator says so: it exits 0.
+cannot be sure about, and a plannotation with warnings and no errors **is
+conforming**. The validator says so: it exits 0.
 
 Every rule's severity is decided once, in :mod:`plannotation.validate.codes`, with the
 reasoning recorded beside it. No module decides a severity at a call site, so one rule
@@ -44,8 +44,8 @@ it, so it is stated here and will not move without a major version.
 Code    Meaning
 ======  =======================================================================
 ``0``   The input was validated and has no errors. It may have warnings: 4.4
-        says a label with warnings and no errors is conforming, so reporting
-        anything else here would contradict the specification.
+        says a plannotation with warnings and no errors is conforming, so
+        reporting anything else here would contradict the specification.
 ``1``   The input was validated and has at least one error. With ``--strict``,
         also when it has at least one warning -- a project may hold its own
         drawings to the SHOULDs, and that is the switch for it. ``--strict``
@@ -72,8 +72,8 @@ statement.
 A validator is a reader
 -----------------------
 4.4 opens with the one prohibition that has no exception: *a validator MUST NOT modify
-the document or the label it validates, under any circumstance, including to repair an
-error it has just reported.* Nothing in this package opens a file for writing.
+the document or the plannotation it validates, under any circumstance, including to
+repair an error it has just reported.* Nothing in this package opens a file for writing.
 
 Section 9 binds it as well, because a validator reads attacker-supplied input by
 definition. A PDF is read through the bounded reader in :mod:`plannotation.pdf.embed`,

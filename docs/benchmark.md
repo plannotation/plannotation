@@ -1,6 +1,6 @@
 # The benchmark
 
-How much better does a model answer questions about a drawing when the page label is
+How much better does a model answer questions about a drawing when its plannotation is
 available? `plannotation-bench` measures it on the sample sheets.
 
 ```bash
@@ -20,11 +20,11 @@ rendered at 150 dpi, the text a PDF reader extracts from it, and the same questi
 | Condition | What the model gets |
 | --- | --- |
 | `plain` | The page image and its extracted text. |
-| `labelled` | The same, then a `get_plannotation` tool call and its result: the page's label as canonical JSON. |
+| `plannotated` | The same, then a `get_plannotation` tool call and its result: the page's plannotation as canonical JSON. |
 
-The label arrives as a tool result because that is how it reaches a model in practice,
-through the MCP server's `get_plannotation` tool. The model is asked for `{"answer": "..."}`
-through structured output, and the answer is scored against the key.
+The plannotation arrives as a tool result because that is how it reaches a model in
+practice, through the MCP server's `get_plannotation` tool. The model is asked for
+`{"answer": "..."}` through structured output, and the answer is scored against the key.
 
 ## The questions
 
@@ -43,12 +43,12 @@ mistake with the thing it grades.
 | `tag` | The IFC class of the element carrying a mark | exact |
 | `section` | A member's cross-section, or a slab's thickness | exact, numeric |
 | `level` | The elevation of a level mark, in metres | numeric |
-| `model` | The IFC GlobalId of a marked element | exact; **label only** |
+| `model` | The IFC GlobalId of a marked element | exact; **plannotation only** |
 
 Every category but `model` is about something the sheet prints or draws, so a careful
-reader of the page alone could answer it; the label is meant to make that reliable, not
-possible. `model` asks for something no drawing prints, and is reported apart so it
-cannot inflate the headline number.
+reader of the page alone could answer it; the plannotation is meant to make that
+reliable, not possible. `model` asks for something no drawing prints, and is reported
+apart so it cannot inflate the headline number.
 
 ## Scoring
 
@@ -67,8 +67,8 @@ The parsing is deliberately narrow, so a wrong answer cannot be argued into a ri
 
 ```bash
 cp .env.example .env               # then put your key in it
-uv run plannotation-bench run --condition plain    --model claude-opus-5 --n 100
-uv run plannotation-bench run --condition labelled --model claude-opus-5 --n 100
+uv run plannotation-bench run --condition plain       --model claude-opus-5 --n 100
+uv run plannotation-bench run --condition plannotated --model claude-opus-5 --n 100
 uv run plannotation-bench report --model claude-opus-5
 uv run plannotation-bench readme --model claude-opus-5
 ```
@@ -108,7 +108,7 @@ that table is reported without a cost rather than with a guessed one.
 ## Reading the result
 
 The samples are three clean sheets drawn by this project's own exporter. They show
-whether a label helps on drawings where everything is legible; they say nothing about a
-scanned sheet, a crowded one, or an office's own conventions. Add questions for real
-drawings to a separate question file (not committed: the drawings are someone else's)
-and pass it with `--questions`.
+whether a plannotation helps on drawings where everything is legible; they say nothing
+about a scanned sheet, a crowded one, or an office's own conventions. Add questions for
+real drawings to a separate question file (not committed: the drawings are someone
+else's) and pass it with `--questions`.

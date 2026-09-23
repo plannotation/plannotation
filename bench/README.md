@@ -1,7 +1,7 @@
 # Plannotation benchmark
 
-The question it answers: *how much better does a model understand a drawing when the
-page label is available?* See [`docs/benchmark.md`](../docs/benchmark.md) for the method.
+The question it answers: *how much better does a model understand a drawing when its
+plannotation is available?* See [`docs/benchmark.md`](../docs/benchmark.md) for the method.
 
 - `questions.jsonl` — merged from each `samples/*/groundtruth.jsonl` by
   `plannotation-bench questions`, so every answer is derived from the source model rather

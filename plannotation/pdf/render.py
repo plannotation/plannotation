@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Rasterise PDF pages, and prove that two documents look identical.
 
-This module exists to hold one promise to account: writing a label must not change
-how a page looks (specification section 1.2 (1)). :func:`assert_same_appearance`
+This module exists to hold one promise to account: writing a plannotation must not
+change how a page looks (specification section 1.2 (1)). :func:`assert_same_appearance`
 renders both documents and compares them pixel for pixel, with no tolerance at all,
 and when they differ it says which page, how many pixels, and where.
 
@@ -226,9 +226,10 @@ def render_page(source: Path | str, page_index: int, *, dpi: float = DPI) -> NDA
     """Rasterise one page of a document.
 
     The page's own ``/Rotate`` is honoured, so the array has the page's displayed
-    shape: a ``/Rotate 90`` A4 page renders landscape. Paper coordinates in a label
-    are unrotated (specification section 3.7), so do not read a page's size off this
-    array -- :func:`plannotation.pdf.embed.page_geometry` is what measures a page.
+    shape: a ``/Rotate 90`` A4 page renders landscape. Paper coordinates in a
+    plannotation are unrotated (specification section 3.7), so do not read a page's
+    size off this array -- :func:`plannotation.pdf.embed.page_geometry` is what measures
+    a page.
 
     Args:
         source: The PDF to read.
@@ -481,7 +482,7 @@ def assert_same_appearance(before: Path | str, after: Path | str, *, dpi: float 
     msg = (
         f"appearance changed between {before} and {after}:\n"
         f"{describe_diffs(diffs)}\n"
-        "The PDF page is the leading document: writing or removing a label must "
+        "The PDF page is the leading document: writing or removing a plannotation must "
         "leave every page rendering exactly as it did."
     )
     raise AppearanceChangedError(msg)
