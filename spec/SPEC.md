@@ -1167,12 +1167,13 @@ digits — is `plannotation-p12345.json`. The index *n* is the zero-based page i
 2.2, not the number printed on the sheet and not the position a viewer displays.
 
 A reader MUST parse the digits as a decimal integer and MUST NOT assume exactly
-four of them. A name matching `^plannotation-p[0-9]{4,}\.json$` or equal to
-`plannotation-index.json` is a *Plannotation name*; every other name is foreign, and
-6.2.6 says what a writer does when one collides.
+four of them. A name matching `^plannotation-p([0-9]{4}|[1-9][0-9]{4,})\.json$` —
+exactly the names the rule above produces, so `plannotation-p00000.json` is not one
+— or equal to `plannotation-index.json` is a *Plannotation name*; every other name is
+foreign, and 6.2.6 says what a writer does when one collides.
 
 The name is a claim about which page a file describes. The association of 6.2.1
-is the fact. Where they disagree, 6.2.11 decides.
+is the fact. Where they disagree, 6.2.12 decides.
 
 **6.2.3 The file specification.** Each embedded file is described by a file
 specification dictionary carrying exactly these members:
@@ -1225,7 +1226,7 @@ hexadecimal digits is not significant.
 
 `/CreationDate` is OPTIONAL; a writer SHOULD omit it, because it duplicates
 `/ModDate` for a file that has only ever been written once and is one more value
-to keep deterministic (6.2.13).
+to keep deterministic (6.2.14).
 
 `/Size` and `/CheckSum` describe the payload, not the stream as stored. A writer
 MAY compress the stream with any standard filter, and MUST NOT recompute either
@@ -1270,7 +1271,7 @@ node will silently miss plannotations.
 
 **6.2.6 Name collisions.** A document MAY already contain an embedded file whose
 name is a Plannotation name. Assigning over it would destroy a file Plannotation never
-owned, and a later strip (6.2.12) would then delete a third party's data.
+owned, and a later strip (6.2.13) would then delete a third party's data.
 
 A writer MUST NOT overwrite an existing name-tree entry or embedded file whose
 name is a Plannotation name unless **all** of the following hold, in which case the
@@ -1287,7 +1288,7 @@ different name is not findable.
 
 Re-plannotating a document that already carries a Plannotation payload is otherwise
 unconstrained: a writer MAY replace the payload in place, and MAY instead remove
-it (6.2.12) and write a fresh one. Either way the result MUST satisfy every rule
+it (6.2.13) and write a fresh one. Either way the result MUST satisfy every rule
 in this section, and MUST NOT leave a plannotation for a page it did not plannotate.
 
 **6.2.7 Associated-file arrays.** The `/AF` array of a page or of the catalog MUST
@@ -1370,7 +1371,7 @@ conforming writer MUST NOT:
    each of which a naive metadata round-trip will rewrite;
 4. record any trace of itself outside the payload and the declaration: not in
    `x:xmptk`, not in `pdf:Producer`, not in `/Info`, not in a custom key. After a
-   strip (6.2.12) the document must retain no evidence that Plannotation touched it;
+   strip (6.2.13) the document must retain no evidence that Plannotation touched it;
 5. overwrite an embedded file whose name collides with a Plannotation name, except
    as 6.2.6 permits;
 6. add, remove or change the document's encryption, or its permissions;
