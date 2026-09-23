@@ -1758,10 +1758,10 @@ _RDF_CLOSE: Final = re.compile(rb"</([A-Za-z_][\w.\-]*:)?RDF\s*>")
 #: The opening tag of a ``declarations`` property, whatever prefix it carries. Group 3
 #: is ``/`` for the self-closing form, which is a property that is not an array at all.
 #:
-#: This and every other opening-tag pattern the declaration census runs stop at the next
-#: ``<``, which XML forbids inside an attribute value, so a well-formed tag matches as it
-#: always did. Stopping only at ``>`` let each ``<declarations`` in a packet with no
-#: ``>`` after it scan to the end, and a megabyte of them took minutes to search.
+#: This and every other opening-tag pattern in this module stop at the next ``<``, which
+#: XML forbids inside an attribute value, so a well-formed tag matches as it always did.
+#: Stopping only at ``>`` let each ``<declarations`` in a packet with no ``>`` after it
+#: scan to the end, and a megabyte of them took minutes to search.
 _DECLARATIONS_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?declarations(\s[^<>]*?)?(/?)>")
 
 #: The closing tag of a ``declarations`` property, which bounds the search for its Bag:
@@ -1777,11 +1777,14 @@ _BAG_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?Bag(\s[^<>]*?)?(/?)>")
 _BAG_CLOSE: Final = re.compile(rb"</([A-Za-z_][\w.\-]*:)?Bag\s*>")
 
 #: The opening tag of an ``rdf:Description``, with its attributes as group 2.
-_DESCRIPTION_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?Description(\s[^>]*?)?/?>")
+_DESCRIPTION_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?Description(\s[^<>]*?)?/?>")
 
 #: An ``rdf:about`` attribute inside such a tag, with the quoted literal as group 1 so
-#: that the value can be reused exactly as the packet spells it, quotes and all.
-_ABOUT_ATTRIBUTE: Final = re.compile(rb"(?:[A-Za-z_][\w.\-]*:)?about\s*=\s*(\"[^\"]*\"|'[^']*')")
+#: that the value can be reused exactly as the packet spells it, quotes and all. It
+#: begins only where a name does, for the reason :data:`_PARSE_TYPE` gives.
+_ABOUT_ATTRIBUTE: Final = re.compile(
+    rb"(?<![\w.\-])(?:[A-Za-z_][\w.\-]*:)?about\s*=\s*(\"[^\"]*\"|'[^']*')"
+)
 
 #: The opening tag of any element: its prefix as group 1, its local name as group 2, its
 #: attributes as group 3, and ``/`` for the self-closing form as group 4. A processing
@@ -1822,9 +1825,10 @@ _RDF_SYNTAX_ATTRIBUTES: Final = frozenset(
 #: An expanded self-closing Bag holding nothing but Plannotation's claim, which is what
 #: :func:`remove_declaration` collapses back to ``<rdf:Bag/>``. Group 1 is the original
 #: opening tag without its ``>``, so restoring the packet is a matter of putting the
-#: solidus back where it was.
+#: solidus back where it was. Its opening tag is read as :data:`_BAG_OPEN` reads the Bag
+#: that :func:`add_declaration` expands.
 _SOLE_MEMBER: Final = re.compile(
-    rb"(<(?:[A-Za-z_][\w.\-]*:)?Bag(?:\s[^>]*?)?)>"
+    rb"(<(?:[A-Za-z_][\w.\-]*:)?Bag(?:\s[^<>]*?)?)>"
     + re.escape(_SOLE_DECLARATION_LI)
     + rb"</(?:[A-Za-z_][\w.\-]*:)?Bag\s*>"
 )

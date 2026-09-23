@@ -3027,6 +3027,59 @@ class TestTheMetadataPacketIsBounded:
         assert time.perf_counter() - started < 1.0
         assert report.declaration_count == 0
 
+    @pytest.mark.parametrize(
+        ("inside", "after"),
+        [
+            pytest.param(b"", b"<rdf:Description " * 50_000, id="descriptions-never-closed"),
+            pytest.param(
+                b"<rdf:Description " + b"a" * 900_000 + b"/>",
+                b"",
+                id="one-long-attribute-on-a-description",
+            ),
+            pytest.param(
+                b'<rdf:Description rdf:about="">'
+                + b"<rdf:Bag " * 90_000
+                + b"<pdfd:declarations><rdf:Bag/></pdfd:declarations></rdf:Description>",
+                b"",
+                id="bags-never-closed-before-the-expanded-one",
+            ),
+        ],
+    )
+    def test_attaching_and_stripping_are_bounded_in_time_as_well(
+        self, tmp_path: Path, inside: bytes, after: bytes
+    ) -> None:
+        """The writer reads a packet inside the byte bound in one pass, and restores it.
+
+        Attaching reads the subject the packet's ``rdf:Description`` elements describe,
+        and stripping reads it again and looks for the ``rdf:Bag`` that attaching
+        expanded. Before those tag patterns stopped at the next ``<``, and before the
+        ``rdf:about`` pattern began only where a name does, each of these packets took
+        minutes to plannotate.
+        """
+        packet = (
+            b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="'
+            + embed.NS_RDF.encode()
+            + b'" xmlns:pdfd="'
+            + embed.NS_PDFD.encode()
+            + b'">'
+            + inside
+            + b"</rdf:RDF></x:xmpmeta>"
+            + after
+        )
+        assert len(packet) <= embed._MAX_XMP_BYTES
+        source = write_bytes(tmp_path / "slow.pdf", fx.build_with_xmp(packet))
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        with pikepdf.open(source) as pdf:
+            started = time.perf_counter()
+            embed.attach_in_place(pdf, plannotations, None, mod_date=MOD_DATE)
+            assert time.perf_counter() - started < 1.0
+            assert embed.has_declaration(pdf)
+            started = time.perf_counter()
+            report = embed.strip_in_place(pdf)
+            assert time.perf_counter() - started < 1.0
+            assert report.declaration_removed
+            assert bytes(pdf.Root[Name.Metadata].read_bytes()) == packet
+
     def test_attach_refuses_rather_than_writing_a_document_with_no_declaration(
         self, metadata_bomb: Path, tmp_path: Path
     ) -> None:
