@@ -293,7 +293,8 @@ def normalise(text: str) -> str:
         The report with the run-specific parts replaced by stable placeholders.
     """
     text = re.sub(r"plannotation \d+\.\d+\.\d+[^\s,]*", "plannotation <version>", text)
-    return re.sub(r"`[^`]*tests/fixtures/[^`]*`", "`<path>`", text)
+    text = re.sub(r"`[^`]*tests/fixtures/[^`]*`", "`<path>`", text)
+    return re.sub(r'"[^"]*tests/fixtures/[^"]*"', '"<path>"', text)
 
 
 def compare_golden(name: str, actual: str) -> None:

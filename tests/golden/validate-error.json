@@ -37,7 +37,7 @@
     }
   ],
   "reportVersion": "1",
-  "source": "tests/fixtures/rules/invalid/13-bbox-reversed.json",
+  "source": "<path>",
   "strict": false,
   "validator": {
     "name": "plannotation",

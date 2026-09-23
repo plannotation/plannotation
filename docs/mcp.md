@@ -22,7 +22,7 @@ Add this to `claude_desktop_config.json` (on macOS,
   "mcpServers": {
     "plannotation": {
       "command": "uvx",
-      "args": ["plannotation-mcp", "--root", "/Users/you/Drawings"]
+      "args": ["plannotation-mcp", "--root", "/absolute/path/to/Drawings"]
     }
   }
 }

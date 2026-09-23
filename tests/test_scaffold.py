@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -129,6 +131,54 @@ def test_every_source_file_has_an_spdx_header() -> None:
         if path.read_text(encoding="utf-8").split("\n", 1)[0].strip() != expected
     ]
     assert not missing, f"missing SPDX header: {missing}"
+
+
+#: A path into somebody's home directory: macOS, Linux or Windows. Spelled in pieces
+#: so this file does not match itself.
+HOME_PATH = re.compile(
+    "|".join(
+        [
+            "/" + "Users/[^/\\s]+/",
+            "/" + "home/[^/\\s]+/",
+            "[A-Za-z]:[\\\\/]+" + "Users[\\\\/]+[^\\\\/\\s]+",
+        ]
+    )
+)
+
+
+def test_no_tracked_file_contains_a_home_directory_path() -> None:
+    """A path into a home directory is private and only true on one machine.
+
+    It leaks a user name, and a golden file that records one fails everywhere
+    else. Reports use paths as they were given.
+    """
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git is not installed")
+    try:
+        listing = subprocess.run(  # noqa: S603 - a probed binary, run with no shell
+            [git, "ls-files", "-z"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        pytest.skip("not a git checkout")
+    offenders = []
+    for name in listing.decode("utf-8").split("\0"):
+        path = REPO_ROOT / name
+        if not name or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        offenders += [
+            f"{name}:{number}"
+            for number, line in enumerate(text.splitlines(), start=1)
+            if HOME_PATH.search(line)
+        ]
+    assert not offenders, f"home-directory paths in: {offenders}"
 
 
 def test_scaffold_covers_the_architecture() -> None:
