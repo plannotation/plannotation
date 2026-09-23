@@ -232,7 +232,7 @@
       "rule": "geometric.bbox-within-page",
       "severity": "error",
       "spec": "SPEC 3.1, 4.4 (6)",
-      "violates": "SPEC 4.4 (6): viewport boxes do not exceed the page. This is the same rule as invalid/09, applied to a viewport; a viewport's box and an item's box are two cases of one rule, and one implementation must serve both."
+      "violates": "SPEC 4.4 (6): viewport boxes do not exceed the page. This is the same rule as invalid/12, applied to a viewport; a viewport's box and an item's box are two cases of one rule, and one implementation must serve both."
     },
     {
       "buildsThroughModel": true,
