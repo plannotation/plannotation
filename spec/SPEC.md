@@ -580,6 +580,15 @@ that floor, has `storey.elevation` 3.0, `cutHeight` 1.2, and a `plane.origin` wh
 normal component is 4.2. `storey.elevation` is absolute; `cutHeight` is relative to
 it.
 
+**Storey elevation.** Absolute means in model coordinates: `storey.elevation` is the z
+of the storey's floor in the coordinates `plane.origin` is stated in, which is what
+lets the sum above be compared with the plane. It is not the storey's height above the
+building's own ±0,00, which is what a level mark prints and what IFC records in
+`IfcBuildingStorey.Elevation`; the two agree only where the model places that datum at
+z = 0. The Maleva 18 model stands its ground floor at z = 14.30 m, so a plan of that
+floor cut 1.2 m above it has `storey.elevation` 14300 and a plane at z = 15500 in
+millimetres, and the floor's level mark reads ±0,00.
+
 ### 3.7 Page rotation
 
 `page.rotation` records the page's effective `/Rotate` value, normalised to one of
@@ -2109,7 +2118,7 @@ the document (6.5.5).
 | The index of a plannotated document | SWAPP's DocumentSet | The sheets one PDF carries |
 | `viewport` | SWAPP's ViewPort, an `IfcAnnotation` aggregated with `IfcRelAggregates`; in Bonsai, a drawing placed on the sheet by an `IfcDocumentReference` | Its box on the paper is `viewport.paperBBox` |
 | `viewport.plane`, `paperToPlane`, `scale` | SWAPP's View; in Bonsai, the `IfcAnnotation` with `ObjectType` `DRAWING` and its `EPset_Drawing` | The annotation's placement is `viewport.plane`; the scale in `EPset_Drawing` is `viewport.scale` |
-| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name`, `elevation` and `ifcGuid` are the storey's `Name`, `Elevation` and `GlobalId` |
+| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name` and `ifcGuid` are the storey's `Name` and `GlobalId`; `storey.elevation` is the z of its placement, which is its `Elevation` only where the building's ±0,00 is at z = 0 (3.6) |
 | `element` | An `IfcProduct`, usually an `IfcElement` | `GlobalId`, the entity class, `PredefinedType`, `Name` and `Tag` map one to one |
 | `element.properties` | The element's property sets and quantity sets | Keyed by set name (`Pset_WallCommon`), then property name |
 | `shows.property` | `Tag`, an attribute, or a dotted `Pset_Name.Property` | A mark shows `Tag`; a member's cross-section shows `Pset_ColumnCommon.Reference` |
@@ -2131,6 +2140,11 @@ entity with that GlobalId nor a supertype of it (PL-IFC-001, PL-IFC-002). A
 plannotation MAY name entities the reader's copy of the model lacks — the model
 may have moved on since the drawing was issued — and a reader MUST then treat the
 drawing, not the model, as the record of what was issued (1.2).
+
+A validator given the model SHOULD also report a `storey.elevation` that is not the
+z at which the model places the storey (3.6), as a warning (PL-IFC-004): a model may
+leave its storeys' placements at the building's datum and state their levels only
+in `Elevation`, so the comparison rests on a heuristic (4.4).
 
 ## 8. Versioning policy
 

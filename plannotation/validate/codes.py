@@ -515,6 +515,15 @@ _CATALOGUE: Final = (
         "the heuristic that the distance between two elements is the distance between "
         "their bounding geometry projected on the viewport's plane.",
     ),
+    _rule(
+        "PL-IFC-004",
+        _WARNING,
+        "a viewport's storey.elevation is the z the model places that storey at",
+        "SPEC 3.6, 7.3",
+        "Warning. It rests on the heuristic that a storey's placement carries its level; "
+        "IFC also states the level in Elevation, and a model whose placements leave it "
+        "there is not wrong.",
+    ),
     # -- Rule 7: veraPDF --------------------------------------------------------
     _rule(
         "PL-PDF-001",

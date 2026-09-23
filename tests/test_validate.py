@@ -537,6 +537,177 @@ class TestTheModelCrossCheck:
         assert "PL-IFC-002" in result.stdout
 
 
+class TestStoreyElevationIsInModelCoordinates:
+    """SPEC 3.6: ``storey.elevation`` is a z in the coordinates ``plane.origin`` is in.
+
+    The case that decided it is a building whose ±0,00 is not at the model's z = 0. The
+    Maleva 18 model stands its ground floor at z = 14.30 m, so the storey's IFC
+    ``Elevation`` is 0 while its placement, and every plane cut through it, is at 14.3 m.
+    """
+
+    #: The model z of the building's ±0,00, in millimetres.
+    DATUM_MM = 14300.0
+
+    @classmethod
+    def _plan(
+        cls,
+        elevation: float,
+        *,
+        guid: str | None = None,
+        unit: str = "mm",
+        cut_at: float | None = None,
+    ) -> Plannotation:
+        """Build a plan of the ground floor, cut 1.2 m above it.
+
+        Args:
+            elevation: The ``storey.elevation`` to state, in ``unit``.
+            guid: The storey's GlobalId, if the plannotation records one.
+            unit: ``model.lengthUnit``.
+            cut_at: The plane's z in ``unit``; by default 1.2 m above the ground floor
+                in model coordinates.
+
+        Returns:
+            The parsed plannotation.
+        """
+        per_mm = {"mm": 1.0, "m": 0.001}[unit]
+        storey: dict[str, Any] = {"elevation": elevation, "name": "1.korrus"}
+        if guid is not None:
+            storey["ifcGuid"] = guid
+        document = {
+            "plannotation": "0.1",
+            "provenance": "authored",
+            "page": {"index": 0, "widthMm": 841, "heightMm": 594},
+            "sheet": {"id": "M18-101"},
+            "model": {"lengthUnit": unit},
+            "viewports": [
+                {
+                    "cutHeight": 1200 * per_mm,
+                    "id": "vp-plan",
+                    "kind": "plan",
+                    "paperBBox": [44, 144, 796, 496],
+                    "plane": {
+                        "origin": [
+                            0,
+                            0,
+                            (cls.DATUM_MM + 1200) * per_mm if cut_at is None else cut_at,
+                        ],
+                        "xAxis": [0.873, -0.487, 0],
+                        "yAxis": [0.487, 0.873, 0],
+                    },
+                    "storey": storey,
+                }
+            ],
+        }
+        return load_plannotation(json.dumps(document))
+
+    def test_a_storey_above_the_models_origin_validates(self) -> None:
+        """14300 + 1200 = 15500: the storey and the cut, both in model coordinates."""
+        assert check_plannotation(self._plan(self.DATUM_MM)) == []
+
+    def test_the_ifc_elevation_attribute_is_not_the_storeys_elevation(self) -> None:
+        """Elevation 0 with the plane at 15500 is the misplacement PL-GEO-012 names."""
+        codes = [f.code for f in check_plannotation(self._plan(0.0))]
+        assert codes == ["PL-GEO-012"]
+
+    @staticmethod
+    def _model(tmp_path: Path) -> tuple[Path, str, str]:
+        """Write a millimetre model whose building's ±0,00 is at model z 14300.
+
+        The storeys are placed relative to the building, as authoring tools place them,
+        and carry the ``Elevation`` IFC measures from the building's ±0,00.
+
+        Args:
+            tmp_path: Directory to write into.
+
+        Returns:
+            The model's path, and the GlobalIds of the ground and first floors.
+        """
+        import ifcopenshell
+        import ifcopenshell.api.root
+        import ifcopenshell.api.unit
+
+        model = ifcopenshell.file(schema="IFC4")
+        ifcopenshell.api.root.create_entity(model, ifc_class="IfcProject", name="Fixture")
+        length = ifcopenshell.api.unit.add_si_unit(model, unit_type="LENGTHUNIT", prefix="MILLI")
+        ifcopenshell.api.unit.assign_unit(model, units=[length])
+
+        def placed(entity: Any, z: float, relative_to: Any) -> None:  # noqa: ANN401
+            point = model.createIfcCartesianPoint((0.0, 0.0, z))
+            entity.ObjectPlacement = model.createIfcLocalPlacement(
+                relative_to, model.createIfcAxis2Placement3D(point, None, None)
+            )
+
+        site = ifcopenshell.api.root.create_entity(model, ifc_class="IfcSite")
+        placed(site, 0.0, None)
+        building = ifcopenshell.api.root.create_entity(model, ifc_class="IfcBuilding")
+        placed(building, TestStoreyElevationIsInModelCoordinates.DATUM_MM, site.ObjectPlacement)
+        guids: list[str] = []
+        for name, elevation in (("1.korrus", 0.0), ("2.korrus", 3350.0)):
+            storey = ifcopenshell.api.root.create_entity(
+                model, ifc_class="IfcBuildingStorey", name=name
+            )
+            placed(storey, elevation, building.ObjectPlacement)
+            storey.Elevation = elevation
+            guids.append(storey.GlobalId)
+        path = tmp_path / "datum.ifc"
+        model.write(str(path))
+        return path, guids[0], guids[1]
+
+    def _against_model(self, tmp_path: Path, plannotation_of: Any) -> list[Finding]:  # noqa: ANN401
+        """Cross-check a plan of the ground floor against the model.
+
+        Args:
+            tmp_path: Directory for the model.
+            plannotation_of: Builds the plannotation from the ground floor's GlobalId.
+
+        Returns:
+            The cross-check's findings.
+        """
+        from plannotation.validate.ifc import check_against_model, open_model
+
+        path, ground, _ = self._model(tmp_path)
+        return check_against_model(plannotation_of(ground), open_model(path), source="page 0")
+
+    @needs_ifc
+    def test_the_storeys_placement_is_its_elevation(self, tmp_path: Path) -> None:
+        """The model places the ground floor at 14300, and the plannotation says so."""
+        findings = self._against_model(tmp_path, lambda guid: self._plan(self.DATUM_MM, guid=guid))
+        assert findings == []
+
+    @needs_ifc
+    def test_the_unit_is_the_plannotations_own(self, tmp_path: Path) -> None:
+        """14.3 in metres is the same z as 14300 in the model's millimetres."""
+        findings = self._against_model(
+            tmp_path, lambda guid: self._plan(self.DATUM_MM / 1000, guid=guid, unit="m")
+        )
+        assert findings == []
+
+    @needs_ifc
+    def test_writing_the_elevation_attribute_is_reported(self, tmp_path: Path) -> None:
+        """Storey and plane both measured from the building's ±0,00, not the model's z.
+
+        Consistent with itself, so PL-GEO-012 cannot see it; only the model can.
+        """
+        assert check_plannotation(self._plan(0.0, cut_at=1200)) == []
+        findings = self._against_model(
+            tmp_path, lambda guid: self._plan(0.0, guid=guid, cut_at=1200)
+        )
+        assert [f.code for f in findings] == ["PL-IFC-004"]
+        assert findings[0].severity is Severity.WARNING
+        assert findings[0].path == "/viewports/0/storey/elevation"
+        assert "z = 14300 mm" in findings[0].message
+        assert "Elevation attribute" in findings[0].message
+
+    @needs_ifc
+    def test_any_other_elevation_is_reported_without_blaming_the_attribute(
+        self, tmp_path: Path
+    ) -> None:
+        """3000 is neither the placement nor the attribute."""
+        findings = self._against_model(tmp_path, lambda guid: self._plan(3000.0, guid=guid))
+        assert [f.code for f in findings] == ["PL-IFC-004"]
+        assert "Elevation attribute" not in findings[0].message
+
+
 class TestTheModelCrossCheckWithoutIfcopenshell:
     """The extra is optional, so its absence must be explained rather than crash."""
 
