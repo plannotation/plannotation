@@ -228,6 +228,7 @@ def test_the_site_serves_every_schema_at_its_id_and_the_spec_at_its_uri(
     assert staged(INDEX_SCHEMA_ID).is_file()
     assert (staged(SPEC_URI) / "index.md").is_file()
     assert (tmp_path / "inspector" / "index.html").is_file()
+    assert (tmp_path / "index.html").is_file()
 
 
 @pytest.mark.parametrize("name", ["LICENSE", "NOTICE"])

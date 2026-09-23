@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- A template: tools/stage_site.py fills it in from examples/index.json. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plannotation</title>
+<meta name="description" content="A JSON file attached to each page of a PDF drawing that records what the page shows: sheet, viewports, IFC elements, dimensions, grids, levels, marks and callouts.">
+<link rel="canonical" href="{{base}}/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20x='3'%20y='6'%20width='26'%20height='20'%20rx='2'%20fill='%23fff'%20stroke='%231b1b19'%20stroke-width='2'/%3E%3Crect%20x='8'%20y='11'%20width='10'%20height='10'%20fill='none'%20stroke='%231d6fa5'%20stroke-width='2.5'/%3E%3Cpath%20d='M21%2021h4'%20stroke='%239a5b00'%20stroke-width='2.5'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{base}}/">
+<meta property="og:title" content="Plannotation">
+<meta property="og:description" content="A JSON file attached to each page of a PDF drawing that records what the page shows.">
+{{og}}<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fff; --fg: #1b1b19; --muted: #5f5f5a; --line: #dcdcd6;
+    --link: #1d5f8f; --code: #f4f4f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151517; --fg: #e6e6e2; --muted: #a0a09a; --line: #34343a;
+      --link: #7cb8e4; --code: #1e1e22;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  a { color: var(--link); }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+           gap: 8px 24px; padding-top: 24px; }
+  h1 { font-size: 1.25rem; margin: 0; letter-spacing: -0.01em; }
+  nav { display: flex; gap: 20px; }
+  p { margin: 0 0 12px; }
+  .lead { max-width: 42rem; font-size: 1.0625rem; margin: 16px 0 32px; }
+  .muted { color: var(--muted); font-size: 0.875rem; }
+  .sheets { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 32px 24px;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+  .sheets img { display: block; width: 100%; height: auto; background: #fff;
+                border: 1px solid var(--line); }
+  .sheets h2 { font-size: 1rem; margin: 10px 0 2px; }
+  .sheets p { font-size: 0.875rem; color: var(--muted); margin: 0; }
+  h2 { font-size: 1.0625rem; margin: 40px 0 8px; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 4px;
+        padding: 12px 14px; margin: 0 0 12px; overflow-x: auto; }
+  code { font: 0.8125rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  footer { margin-top: 48px; padding-bottom: 32px; }
+  footer p { border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>Plannotation</h1>
+  <nav>
+    <a href="{{spec}}">Spec</a>
+    <a href="https://github.com/plannotation/plannotation">GitHub</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <p class="lead">Plannotation attaches a JSON file, a <em>plannotation</em>, to each page of
+  a PDF drawing without changing the page. It records what the page shows: sheet,
+  viewports and scale, IFC elements with GlobalId and outline, dimensions, grids, levels,
+  marks and callouts.</p>
+<!-- examples -->
+  <p class="muted">The outlines are drawn from each sheet's plannotation. Open a sheet to inspect it.</p>
+  <ul class="sheets">
+<!-- card -->
+    <li>
+      <a href="inspector/?pdf=../examples/{{pdf}}" tabindex="-1" aria-hidden="true"><img
+        src="examples/{{png}}" width="{{width}}" height="{{height}}" alt=""></a>
+      <h2><a href="inspector/?pdf=../examples/{{pdf}}">{{sheet}}&ensp;{{title}}</a></h2>
+      <p>{{paper}}, {{scale}}. {{counts}}.{{credit}} <a href="examples/{{pdf}}">PDF</a></p>
+    </li>
+<!-- /card -->
+  </ul>
+<!-- credits -->
+  <p class="muted">{{credit}}</p>
+<!-- /credits -->
+<!-- /examples -->
+  <h2>Run it</h2>
+  <p>Not on PyPI yet. From a clone, with <a href="https://docs.astral.sh/uv/">uv</a>:</p>
+<pre><code>git clone https://github.com/plannotation/plannotation
+cd plannotation
+{{fetch}}uv run plannotation inspect {{inspect}}</code></pre>
+</main>
+
+<footer class="wrap muted">
+  <p>Version 0.1 is a draft; the format may change before 1.0.
+    JSON Schemas: {{schemas}}.
+    <a href="https://github.com/plannotation/plannotation/blob/main/LICENSE">Apache-2.0</a>.</p>
+</footer>
+</body>
+</html>
