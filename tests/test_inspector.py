@@ -72,12 +72,13 @@ class TestItReadsWhatThisProjectWrites:
 
     def test_its_filename_pattern_matches_the_one_we_write(self) -> None:
         """A pattern that drifted from plannotation_filename would find nothing at all."""
-        assert r"/^plannotation-p(\d+)\.json$/" in html(), (
-            "the inspector's filename pattern has changed shape"
-        )
-        compiled = re.compile(r"^plannotation-p(\d+)\.json$")
-        for index in (0, 7, 1234):
+        pattern = r"^plannotation-p([0-9]{4}|[1-9][0-9]{4,})\.json$"
+        assert f"/{pattern}/" in html(), "the inspector's filename pattern has changed shape"
+        compiled = re.compile(pattern)
+        for index in (0, 7, 1234, 12345):
             assert compiled.match(plannotation_filename(index))
+        for foreign in ("plannotation-p1.json", "plannotation-p00000.json"):
+            assert not compiled.match(foreign)
 
     def test_it_flips_paper_coordinates(self) -> None:
         """SPEC 3.3: paper is y-up from the bottom left, a canvas is y-down."""

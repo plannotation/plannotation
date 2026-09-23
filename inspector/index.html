@@ -180,7 +180,7 @@ async function readPlannotations(doc) {
   const found = new Map();
   const attachments = (await doc.getAttachments()) || {};
   for (const [name, entry] of Object.entries(attachments)) {
-    const match = /^plannotation-p(\d+)\.json$/.exec(name);
+    const match = /^plannotation-p([0-9]{4}|[1-9][0-9]{4,})\.json$/.exec(name);
     if (!match) continue;
     try {
       found.set(Number(match[1]) + 1, JSON.parse(new TextDecoder().decode(entry.content)));

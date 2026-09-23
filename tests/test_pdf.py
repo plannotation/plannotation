@@ -1328,6 +1328,10 @@ class TestStrip:
         assert embed.is_plannotation_filename("plannotation-p0000.json") is True
         assert embed.is_plannotation_filename(INDEX_FILENAME) is True
         assert embed.is_plannotation_filename("plannotation-p12.json") is False
+        assert embed.is_plannotation_filename(plannotation_filename(12345)) is True
+        assert (
+            embed.is_plannotation_filename("plannotation-p\u0661\u0662\u0663\u0664.json") is False
+        )
         assert embed.is_plannotation_filename("factur-x.xml") is False
         assert embed.is_plannotation_filename(fx.FOREIGN_DOC_FILENAME) is False
 

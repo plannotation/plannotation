@@ -223,7 +223,13 @@ PAGE_DIMENSION_TOLERANCE_MM: Final = 0.5
 #: Section 3 of the specification already notes this difference between Python ``re``
 #: and the Rust engine pydantic validates with, which has no such rule; ``\Z`` means the
 #: same thing in both.
-_PLANNOTATION_FILENAME: Final = re.compile(r"\Aplannotation-p\d{4}\.json\Z")
+#:
+#:
+#: The digits are the ones :func:`~plannotation.constants.plannotation_filename` writes
+#: (SPEC 6.2.2): exactly four, or five and more without a leading zero, so page 12345
+#: is ``plannotation-p12345.json`` and ``plannotation-p00000.json`` is nobody's page.
+#: ASCII only, because ``\d`` would also admit other scripts' digits.
+_PLANNOTATION_FILENAME: Final = re.compile(r"\Aplannotation-p(?:[0-9]{4}|[1-9][0-9]{4,})\.json\Z")
 
 #: An upper bound on the form-field nodes the signature walk will visit. The field
 #: tree comes from an untrusted document and may be cyclic or enormous; section 9 of
