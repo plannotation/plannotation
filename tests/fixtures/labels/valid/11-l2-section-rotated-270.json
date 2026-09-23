@@ -99,7 +99,7 @@
   ],
   "generator": {
     "created": "2026-04-02T09:03:27Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -114,7 +114,7 @@
     "rotation": 270,
     "widthMm": 297
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "authored",
   "sheet": {
     "author": "A. Neumann",

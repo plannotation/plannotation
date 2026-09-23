@@ -1,4 +1,4 @@
-# PlanLabel -- ignored files.
+# Plannotation -- ignored files.
 #
 # Deliberately NOT ignored:
 #   uv.lock          CI runs `uv sync --locked` against it.

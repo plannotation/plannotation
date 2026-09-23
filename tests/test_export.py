@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The authored exporter: paper arithmetic, sheet composition and PDF conversion.
 
-The transform in :mod:`planlabel.export.paper` is the piece of arithmetic the whole
+The transform in :mod:`plannotation.export.paper` is the piece of arithmetic the whole
 phase rests on. Three conventions meet in it -- the serializer's y negation, SVG's
 y-down, and the model's own length unit -- and each is a chance to be wrong in a way
 that looks plausible on a drawing and is wrong by metres in the model. It is therefore
@@ -21,9 +21,9 @@ from typing import Any
 import pikepdf
 import pytest
 
-from planlabel.errors import ExportError
-from planlabel.export.geometry import bounding_box, path_points, union_box
-from planlabel.export.paper import (
+from plannotation.errors import ExportError
+from plannotation.export.geometry import bounding_box, path_points, union_box
+from plannotation.export.paper import (
     apply,
     invert,
     paper_to_plane,
@@ -31,7 +31,7 @@ from planlabel.export.paper import (
     scale_denominator,
     svg_to_paper,
 )
-from planlabel.export.sheet import PAPER_SIZES, Sheet, frame_box, title_block_box
+from plannotation.export.sheet import PAPER_SIZES, Sheet, frame_box, title_block_box
 
 MOD_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 
@@ -237,7 +237,7 @@ class TestPdfConversion:
 
     def test_an_a3_sheet_converts_to_an_a3_page(self, tmp_path: Path) -> None:
         """An A3 that comes out 396 mm wide is not an A3, and every label on it is wrong."""
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.export.to_pdf import svg_to_pdf
 
         svg, width, height = self._sheet()
         out = svg_to_pdf(
@@ -254,7 +254,7 @@ class TestPdfConversion:
 
     def test_conversion_is_reproducible(self, tmp_path: Path) -> None:
         """Design brief section 16: two runs over the same input, the same bytes."""
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.export.to_pdf import svg_to_pdf
 
         svg, width, height = self._sheet()
         stamp = datetime(2024, 1, 1, tzinfo=UTC)
@@ -268,8 +268,8 @@ class TestPdfConversion:
 
     def test_a_page_of_the_wrong_size_is_refused(self, tmp_path: Path) -> None:
         """The check exists because a silent mis-size poisons every coordinate."""
-        from planlabel.errors import ExportError
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.errors import ExportError
+        from plannotation.export.to_pdf import svg_to_pdf
 
         svg, _, _ = self._sheet()
         with pytest.raises(ExportError, match="does not exist"):
@@ -330,19 +330,19 @@ class TestReadingProductsOutOfASvg:
         with one fewer element rather than as an error, which is the worst way to be
         wrong.
         """
-        from planlabel.export.svg_render import read_products
+        from plannotation.export.svg_render import read_products
 
         assert [p.name for p in read_products(self.NESTED)] == ["First", "Second"]
 
     def test_the_view_group_is_not_itself_a_product(self) -> None:
         """It carries a class but no guid, which is what tells them apart."""
-        from planlabel.export.svg_render import read_products
+        from plannotation.export.svg_render import read_products
 
         assert all(p.guid for p in read_products(self.NESTED))
 
     def test_each_product_keeps_only_its_own_paths(self) -> None:
         """A product that collected its neighbour's geometry would have a wrong bbox."""
-        from planlabel.export.svg_render import read_products
+        from plannotation.export.svg_render import read_products
 
         first, second = read_products(self.NESTED)
         assert first.paths == ("M0,0 L10,0",)
@@ -359,7 +359,7 @@ class TestTheSampleModel:
         Without that, nothing downstream -- the SVG, the labels, the ground truth --
         could be reproducible, and the benchmark's answers would change every run.
         """
-        from planlabel.export.models import build_floorplan
+        from plannotation.export.models import build_floorplan
 
         first = build_floorplan(tmp_path / "a.ifc")
         second = build_floorplan(tmp_path / "b.ifc")
@@ -373,7 +373,7 @@ class TestTheSampleModel:
         land in the same second -- which is most of the time, and not under coverage,
         which is how this was found. Asserting the stamp itself catches it always.
         """
-        from planlabel.export.models import FIXED_TIMESTAMP, build_floorplan
+        from plannotation.export.models import FIXED_TIMESTAMP, build_floorplan
 
         built = build_floorplan(tmp_path / "a.ifc")
         header = built.path.read_text("utf-8").partition("DATA;")[0]
@@ -381,7 +381,7 @@ class TestTheSampleModel:
 
     def test_seeded_guids_are_well_formed(self) -> None:
         """22 characters of IFC's own base64 alphabet, which the schema enforces."""
-        from planlabel.export.models import seeded_guid
+        from plannotation.export.models import seeded_guid
 
         guid = seeded_guid("floorplan", 3)
         assert re.fullmatch(r"[0-9A-Za-z_$]{22}", guid)
@@ -392,7 +392,7 @@ class TestTheSampleModel:
         With one byte too many the first character ran past ``3``, and the serializer's
         ``product-<uuid>`` id silently named a different number from its ``ifc:guid``.
         """
-        from planlabel.export.models import seeded_guid
+        from plannotation.export.models import seeded_guid
 
         for index in range(64):
             guid = seeded_guid("floorplan", index)
@@ -404,14 +404,14 @@ class TestTheSampleModel:
 
     def test_seeded_guids_differ_between_models(self) -> None:
         """Two samples must not claim the same building element."""
-        from planlabel.export.models import seeded_guid
+        from plannotation.export.models import seeded_guid
 
         assert seeded_guid("floorplan", 0) != seeded_guid("positionsplan", 0)
 
     def test_every_wall_reaches_the_drawing(self, tmp_path: Path) -> None:
         """Five walls, two doors and two windows in the model; all nine on the plan."""
-        from planlabel.export.models import build_floorplan
-        from planlabel.export.svg_render import render_view
+        from plannotation.export.models import build_floorplan
+        from plannotation.export.svg_render import render_view
 
         built = build_floorplan(tmp_path / "a.ifc")
         view = render_view(
@@ -426,8 +426,8 @@ class TestTheSampleModel:
 
     def test_the_drawing_is_at_the_scale_it_was_asked_for(self, tmp_path: Path) -> None:
         """PL-GEO-008 compares the transform with the declared scale, so they must agree."""
-        from planlabel.export.models import build_floorplan
-        from planlabel.export.svg_render import render_view
+        from plannotation.export.models import build_floorplan
+        from plannotation.export.svg_render import render_view
 
         built = build_floorplan(tmp_path / "a.ifc")
         view = render_view(
@@ -448,8 +448,8 @@ class TestTheSampleModel:
         has to give those numbers back, or the label describes a different building
         from the one it was made from.
         """
-        from planlabel.export.models import build_floorplan
-        from planlabel.export.svg_render import render_view
+        from plannotation.export.models import build_floorplan
+        from plannotation.export.svg_render import render_view
 
         built = build_floorplan(tmp_path / "a.ifc")
         view = render_view(
@@ -501,7 +501,7 @@ class TestTheSampleSets:
         Returns:
             The labelled PDFs.
         """
-        from planlabel.export.samples import build_samples
+        from plannotation.export.samples import build_samples
 
         return build_samples(root, mod_date=datetime(2024, 1, 1, tzinfo=UTC), version="0.0.0-test")
 
@@ -529,7 +529,7 @@ class TestTheSampleSets:
         Not merely "no errors": no warnings either. A sample is what a reader learns
         the format from, and a warning in it teaches that warnings are normal.
         """
-        from planlabel.validate import validate
+        from plannotation.validate import validate
 
         for labelled in self._build(tmp_path):
             report = validate(labelled)
@@ -539,7 +539,7 @@ class TestTheSampleSets:
 
     def test_every_sample_reaches_l3(self, tmp_path: Path) -> None:
         """Section 9's gate. L3 needs elements and a linked annotation on every sheet."""
-        from planlabel.validate import validate
+        from plannotation.validate import validate
 
         for labelled in self._build(tmp_path):
             assert [page.level.value for page in validate(labelled).pages] == ["L3"]
@@ -560,7 +560,7 @@ class TestTheSampleSets:
 
     def test_the_labelled_pdf_looks_the_same_as_the_plain_one(self, tmp_path: Path) -> None:
         """The project's central claim, on the project's own drawings."""
-        from planlabel.pdf.render import assert_same_appearance
+        from plannotation.pdf.render import assert_same_appearance
 
         self._build(tmp_path)
         for name in ("floorplan", "positionsplan", "section"):
@@ -597,7 +597,7 @@ class TestTheSampleSets:
 
     def test_building_one_set_by_name_builds_only_it(self, tmp_path: Path) -> None:
         """So that iterating on one drawing does not cost the other two."""
-        from planlabel.export.samples import build_samples
+        from plannotation.export.samples import build_samples
 
         written = build_samples(
             tmp_path,
@@ -610,7 +610,7 @@ class TestTheSampleSets:
 
     def test_an_unknown_sample_name_is_refused(self, tmp_path: Path) -> None:
         """And says which names there are."""
-        from planlabel.export.samples import build_samples
+        from plannotation.export.samples import build_samples
 
         with pytest.raises(KeyError, match="floorplan"):
             build_samples(
@@ -650,7 +650,7 @@ class TestLevelText:
     )
     def test_level_text(self, elevation: float, text: str) -> None:
         """Signed, two decimals, a decimal comma."""
-        from planlabel.export.ifc_svg_pdf import level_text
+        from plannotation.export.ifc_svg_pdf import level_text
 
         assert level_text(elevation) == text
 
@@ -665,7 +665,7 @@ class TestWhatTheDesignBriefAsksOfTheSamples:
         ifcopenshell = pytest.importorskip("ifcopenshell")
         from ifcopenshell.util.unit import calculate_unit_scale
 
-        from planlabel.units import length_unit_for
+        from plannotation.units import length_unit_for
 
         model = ifcopenshell.open(str(SAMPLES / name / "model.ifc"))
         stated = _sample(name)["model"]["lengthUnit"]
@@ -798,8 +798,8 @@ class TestTheInkscapeFallback:
         Args:
             monkeypatch: pytest's monkeypatch.
         """
-        from planlabel.errors import MissingExtraError
-        from planlabel.export import to_pdf
+        from plannotation.errors import MissingExtraError
+        from plannotation.export import to_pdf
 
         def missing() -> None:
             msg = "no libcairo"
@@ -838,8 +838,8 @@ class TestTheInkscapeFallback:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The fallback is asked for, never assumed."""
-        from planlabel.errors import MissingExtraError
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.errors import MissingExtraError
+        from plannotation.export.to_pdf import svg_to_pdf
 
         self._no_cairo(monkeypatch)
         self._inkscape(tmp_path, monkeypatch)
@@ -852,7 +852,7 @@ class TestTheInkscapeFallback:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Same checks, same stamp, whichever program drew the page."""
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.export.to_pdf import svg_to_pdf
 
         self._no_cairo(monkeypatch)
         self._inkscape(tmp_path, monkeypatch)
@@ -880,8 +880,8 @@ class TestTheInkscapeFallback:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Either program would do; the message says so."""
-        from planlabel.errors import MissingExtraError
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.errors import MissingExtraError
+        from plannotation.export.to_pdf import svg_to_pdf
 
         self._no_cairo(monkeypatch)
         monkeypatch.setenv("PATH", str(tmp_path))
@@ -899,7 +899,7 @@ class TestTheInkscapeFallback:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """With its exit code."""
-        from planlabel.export.to_pdf import svg_to_pdf
+        from plannotation.export.to_pdf import svg_to_pdf
 
         self._no_cairo(monkeypatch)
         self._inkscape(tmp_path, monkeypatch, exit_code=3)

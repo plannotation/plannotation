@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Check the PlanLabel fixture corpus: canonical bytes, manifests, and drawing sense.
+"""Check the Plannotation fixture corpus: canonical bytes, manifests, and drawing sense.
 
 The fixtures under ``tests/fixtures`` are what a reader copies when learning the format
 and what every other test measures itself against, so a fixture that is schema-legal
@@ -9,17 +9,17 @@ something CI catches.
 It is not a second validator
 ----------------------------
 Since Phase 3 it is not. Every rule about the **format** -- schema validity, identity
-and references, geometry, provenance -- belongs to :mod:`planlabel.validate`, and this
+and references, geometry, provenance -- belongs to :mod:`plannotation.validate`, and this
 script applies them by calling it: :func:`schema_findings` for rule 1, and
-:func:`planlabel.validate.check_page_document` and
-:func:`planlabel.validate.check_page_label` for the rest. It keeps no copy of any of
+:func:`plannotation.validate.check_page_document` and
+:func:`plannotation.validate.check_page_label` for the rest. It keeps no copy of any of
 them. That is the point: four rounds of Phase 2 were spent on defects that
 existed only because two pieces of code believed slightly different things, and the
 fixture corpus checking the format with its own arithmetic was the largest remaining
 instance of it.
 
 What is left here is everything that is about **this corpus** rather than about
-PlanLabel, and each item below says why it stays.
+Plannotation, and each item below says why it stays.
 
 The manifests and the bytes
 ---------------------------
@@ -35,7 +35,7 @@ c. every document round-trips **byte for byte** -- through the models for a vali
    translates CRLF to LF and would hide a Windows line ending completely;
 d. the manifest lists exactly the files on disk, in filename order, as many of each as
    the Phase 1 gate fixed, and every ``schemaPointer`` dereferences;
-e. :func:`planlabel.model.conformance_level` returns the level the manifest, the
+e. :func:`plannotation.model.conformance_level` returns the level the manifest, the
    filename and every index entry naming that sheet all claim.
 
 The corpus is a drawing, not only a document
@@ -120,7 +120,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
-from planlabel.model import (
+from plannotation.model import (
     Annotation,
     Element,
     LabelIndex,
@@ -135,30 +135,30 @@ from planlabel.model import (
     load_page_label,
     page_schema,
 )
-from planlabel.validate import check_page_document, check_page_label
-from planlabel.validate.geometric import (
+from plannotation.validate import check_page_document, check_page_label
+from plannotation.validate.geometric import (
     METRES_PER_MODEL_UNIT,
     MM_PER_MODEL_UNIT,
     millimetres,
 )
-from planlabel.validate.geometry import (
+from plannotation.validate.geometry import (
     apply_affine,
     bbox_centre,
     bbox_corners,
     cross,
     dot,
 )
-from planlabel.validate.geometry import (
+from plannotation.validate.geometry import (
     world_point as plane_to_world,
 )
-from planlabel.validate.schema import DocumentKind, check_schema
+from plannotation.validate.schema import DocumentKind, check_schema
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
     from pydantic import BaseModel
 
-    from planlabel.validate import Finding
+    from plannotation.validate import Finding
 
 #: Metres per value of ``model.lengthUnit``. The validator's table, not a second copy.
 METRES_PER_UNIT = METRES_PER_MODEL_UNIT
@@ -400,8 +400,8 @@ def world_point(
     """Map a paper point into model space through a viewport's plane and transform.
 
     Composition and nothing else: the two steps are
-    :func:`planlabel.validate.geometry.apply_affine` and
-    :func:`planlabel.validate.geometry.world_point`, both of which the validator uses
+    :func:`plannotation.validate.geometry.apply_affine` and
+    :func:`plannotation.validate.geometry.world_point`, both of which the validator uses
     for the same purpose.
 
     Args:
@@ -464,7 +464,7 @@ def check_shown_properties(label: PageLabel) -> list[str]:
     the element does not carry, and a printed number that contradicts the property the
     tag says it displays. Nothing in the specification requires a ``shows.property`` to
     name a property the element holds -- the schema calls it free text with two
-    examples -- so this is a statement about this corpus and not about PlanLabel.
+    examples -- so this is a statement about this corpus and not about Plannotation.
 
     Args:
         label: The page label to check.
@@ -1291,7 +1291,7 @@ def expect_model_rejects(raw: bytes, loader: Callable[[bytes], BaseModel]) -> li
         loader(raw)
     except (ValidationError, ValueError):
         return []
-    return ["is rejected by the schema but accepted by planlabel.model"]
+    return ["is rejected by the schema but accepted by plannotation.model"]
 
 
 def declared_level(filename: str) -> str | None:
@@ -1314,7 +1314,7 @@ def schema_findings(document: Any, kind: DocumentKind) -> list[str]:  # noqa: AN
     """Validate one fixture against its schema, through the validator.
 
     The rule "a document must validate against its schema" has one implementation, in
-    :func:`planlabel.validate.schema.check_schema`, and this is how the corpus reaches
+    :func:`plannotation.validate.schema.check_schema`, and this is how the corpus reaches
     it. The negative fixtures below do keep their own ``jsonschema`` validator, and
     that is not the same rule: they are checking the *manifest's* claim about which
     keyword fails and where, which needs the raw ``ValidationError`` and is a statement
@@ -1344,8 +1344,8 @@ def validator_findings(findings: list[Finding]) -> list[str]:
     corpus is a defect in the reference corpus.
 
     Args:
-        findings: What :func:`planlabel.validate.check_page_document` or
-            :func:`planlabel.validate.check_page_label` returned.
+        findings: What :func:`plannotation.validate.check_page_document` or
+            :func:`plannotation.validate.check_page_label` returned.
 
     Returns:
         One message per finding, each carrying the rule's stable code.
@@ -1387,7 +1387,7 @@ def check_valid_label(
     try:
         label = load_page_label(raw)
     except (ValidationError, ValueError) as error:
-        found.append(f"the schema accepts it but planlabel.model does not: {error}")
+        found.append(f"the schema accepts it but plannotation.model does not: {error}")
         return ([Problem(where, message) for message in found], None)
     if canonical_bytes(label) != raw:
         found.append("does not round-trip byte for byte through the models")
@@ -1518,7 +1518,7 @@ def check_valid_index(
     try:
         index = load_label_index(raw)
     except (ValidationError, ValueError) as error:
-        found.append(f"the schema accepts it but planlabel.model does not: {error}")
+        found.append(f"the schema accepts it but plannotation.model does not: {error}")
         return ([Problem(where, message) for message in found], None)
     if canonical_bytes(index) != raw:
         found.append("does not round-trip byte for byte through the models")
@@ -1847,7 +1847,7 @@ def main(argv: Sequence[str]) -> int:
         return 1
     print(
         f"{checked} fixtures pass: manifests, canonical bytes and levels here; schema, "
-        f"references, geometry and provenance through planlabel.validate; plus drawing "
+        f"references, geometry and provenance through plannotation.validate; plus drawing "
         f"sense, model identity and stated sizes"
     )
     return 0

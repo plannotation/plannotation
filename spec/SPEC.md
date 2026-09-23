@@ -1,19 +1,19 @@
 ---
-title: PlanLabel Specification
+title: Plannotation Specification
 version: "0.1"
 status: draft
-canonical: https://srtgn.github.io/planlabel/spec/0.1
+canonical: https://plannotation.github.io/spec/0.1
 ---
 
-# PlanLabel 0.1 — Specification
+# Plannotation 0.1 — Specification
 
-**Status: draft.** This document is the normative specification for PlanLabel 0.1.
+**Status: draft.** This document is the normative specification for Plannotation 0.1.
 Every section is complete. Sections marked *informative* explain or illustrate and
 impose no requirement; everything else is normative. While the version is `0.x` the
 format may still change between minor versions (8.2).
 
 The canonical location of this document is
-<https://srtgn.github.io/planlabel/spec/0.1>. The `conformsTo` value written into
+<https://plannotation.github.io/spec/0.1>. The `conformsTo` value written into
 a labelled PDF's XMP declaration is exactly that URI.
 
 The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT,
@@ -28,7 +28,7 @@ appear in all capitals.
 
 ### 1.1 What this specification defines
 
-This specification defines **PlanLabel 0.1**: a small JSON document, called a
+This specification defines **Plannotation 0.1**: a small JSON document, called a
 *label*, that states what is on one page of a 2-D construction drawing — which
 sheet the page is, which viewports it contains and how paper maps to model space,
 which elements are drawn and which annotations are placed on them — together with
@@ -70,7 +70,7 @@ its consequences are given as requirements.
    the model's. A program that needs model geometry MUST read the model.
 
 5. **Ignoring the label is conforming.** A reader that does not know about
-   PlanLabel, or that chooses not to use it, behaves exactly as it did before the
+   Plannotation, or that chooses not to use it, behaves exactly as it did before the
    label existed. It loses nothing but meaning. No part of this specification may
    be read as requiring a consumer of the document to process the label.
 
@@ -85,7 +85,7 @@ it has been asked for, not because it is unimaginable.
 
 | Excluded | Note |
 | --- | --- |
-| A new drawing file format | PlanLabel annotates documents in formats that already exist. |
+| A new drawing file format | Plannotation annotates documents in formats that already exist. |
 | Any change to how a PDF is drawn | See 1.2 (1). Content streams are out of bounds. |
 | Reconstruction of a drawing from a label | See 1.2 (3). The label is lossy by design. |
 | Reconstruction of a model from a label | See 1.2 (4). A label references a model; it does not contain one. |
@@ -199,7 +199,7 @@ level L3 is defined in terms of those links; see 4.1.
 ### 2.7 label
 
 The JSON object that describes exactly one page, conforming to the page-label
-schema `planlabel.schema.json`. A label is data. It is never executable, and a
+schema `plannotation.schema.json`. A label is data. It is never executable, and a
 reader MUST NOT treat it as though it were; see section 9.
 
 "Label" without qualification means a page label. The index of 2.8 is not a label.
@@ -208,14 +208,14 @@ reader MUST NOT treat it as though it were; see section 9.
 
 The JSON object that lists, for one document, which pages carry labels, what sheet
 each of them is, and which conformance level each label reaches. It conforms to
-`planlabel-index.schema.json`, which is deliberately self-contained so that an
+`plannotation-index.schema.json`, which is deliberately self-contained so that an
 index can be validated without also fetching the page-label schema.
 
 The index is a convenience, not a source of truth: it lets a reader see what a
 document contains without opening every page label. Where the index and a page
 label disagree, the page label is correct — the index is to the labels what the
 labels are to the page. **SWAPP's DocumentSet is the nearest concept**, though
-SWAPP's is a set of sheets and PlanLabel's is a manifest of one document's pages.
+SWAPP's is a set of sheets and Plannotation's is a manifest of one document's pages.
 
 ### 2.9 carrier
 
@@ -279,7 +279,7 @@ reads.
 
 ### 2.18 Correspondence summary (informative)
 
-| PlanLabel | SWAPP ifc-docs | IFC |
+| Plannotation | SWAPP ifc-docs | IFC |
 | --- | --- | --- |
 | index | DocumentSet (approximately) | — |
 | sheet | **Sheet** | `IfcDocumentInformation`, `Scope = "SHEET"` |
@@ -294,7 +294,7 @@ reads.
 ## 3. Coordinate conventions
 
 This section is normative in full. It says the same thing as the module docstring
-of `planlabel/units.py`, which is the conventions' home in code; the two are kept
+of `plannotation/units.py`, which is the conventions' home in code; the two are kept
 in step and neither may be changed alone.
 
 ### 3.1 Paper coordinates
@@ -768,7 +768,7 @@ A conforming writer MUST:
 
 1. produce labels valid against the page-label schema, and, where it writes one,
    an index valid against the index schema, both at the version named in
-   `planlabel`;
+   `plannotation`;
 2. serialise both in the canonical form of 3.8, with every number at three
    decimals or fewer;
 3. leave every page's appearance unchanged, and add nothing visible — 1.2 (1);
@@ -805,7 +805,7 @@ A conforming reader MUST:
    to the page. A reader MUST NOT use the parts of an invalid label that happen to
    parse, and MUST NOT repair it;
 3. **treat an unknown version as absent.** A reader that does not implement the
-   version in `planlabel` MUST treat the label as absent rather than parse it
+   version in `plannotation` MUST treat the label as absent rather than parse it
    partially;
 4. **resolve disagreement in favour of the page** — 1.2 (6);
 5. **not present inferred content as fact.** A reader that presents label content
@@ -1046,7 +1046,7 @@ supports. A reader that claims to support a carrier MUST accept any payload that
 reaches it through that carrier, and MUST NOT reject or discount a payload
 because of which carrier it came in. A reader MUST NOT require a particular
 carrier; there is no primary carrier from the payload's point of view, and a
-program that reads only sidecars is a conforming reader of PlanLabel.
+program that reads only sidecars is a conforming reader of Plannotation.
 
 Supporting no carrier at all is also conforming, by 4.3: a reader that ignores
 labels entirely loses nothing but meaning.
@@ -1115,7 +1115,7 @@ the only carrier that a labelled document cannot be separated from.
 3. MUST register every file it embeds in the document's `EmbeddedFiles` name tree
    (6.2.5);
 4. MUST write the XMP PDF Declaration of 6.3;
-5. MUST leave every page it does not label without any PlanLabel association.
+5. MUST leave every page it does not label without any Plannotation association.
 
 A writer MUST NOT associate a page label with the catalog, and MUST NOT associate
 the index with a page. The association is what says which page a label describes,
@@ -1125,17 +1125,17 @@ and 4.5 makes it the fact that outranks the label's own `page.index`.
 
 | File | Name |
 | --- | --- |
-| The label for page *n* | `planlabel-p` followed by *n* in decimal, left-padded with zeros to a minimum of four digits, followed by `.json` |
-| The index | `planlabel-index.json` |
+| The label for page *n* | `plannotation-p` followed by *n* in decimal, left-padded with zeros to a minimum of four digits, followed by `.json` |
+| The index | `plannotation-index.json` |
 
-so page 0 is `planlabel-p0000.json`, page 42 is `planlabel-p0042.json`, and page
+so page 0 is `plannotation-p0000.json`, page 42 is `plannotation-p0042.json`, and page
 12345 — a page index of four digits or more pads to nothing and keeps all its
-digits — is `planlabel-p12345.json`. The index *n* is the zero-based page index of
+digits — is `plannotation-p12345.json`. The index *n* is the zero-based page index of
 2.2, not the number printed on the sheet and not the position a viewer displays.
 
 A reader MUST parse the digits as a decimal integer and MUST NOT assume exactly
-four of them. A name matching `^planlabel-p[0-9]{4,}\.json$` or equal to
-`planlabel-index.json` is a *PlanLabel name*; every other name is foreign, and
+four of them. A name matching `^plannotation-p[0-9]{4,}\.json$` or equal to
+`plannotation-index.json` is a *Plannotation name*; every other name is foreign, and
 6.2.6 says what a writer does when one collides.
 
 The name is a claim about which page a file describes. The association of 6.2.1
@@ -1161,12 +1161,12 @@ name.
 
 `/AFRelationship` MUST be `/Data`. The payload is data about the page, not a
 source for it, not an alternative to it and not a supplement to it; and the eight
-values ISO 32000-2 defines are the only ones permitted, so a PlanLabel-specific
+values ISO 32000-2 defines are the only ones permitted, so a Plannotation-specific
 relationship name is not available and would not be wanted.
 
 `/Desc` MUST be present and non-empty. A conforming writer writes exactly
-`PlanLabel 0.1 label for page N`, with *N* the zero-based page index, for a page
-label, and exactly `PlanLabel 0.1 index` for the index. The number is zero-based
+`Plannotation 0.1 label for page N`, with *N* the zero-based page index, for a page
+label, and exactly `Plannotation 0.1 index` for the index. The number is zero-based
 so that the description agrees with the filename beside which a viewer displays
 it. `/Desc` is for a person reading an attachment pane: a reader MUST NOT derive
 any value from it, and MUST NOT use it to identify a file.
@@ -1204,7 +1204,7 @@ decoded.
 
 *Informative.* `/CheckSum` is an integrity check against accidental corruption
 and nothing more. MD5 is not a sound basis for authenticity, ISO 32000-2 fixes
-the algorithm so PlanLabel cannot improve on it, and a reader MUST NOT treat a
+the algorithm so Plannotation cannot improve on it, and a reader MUST NOT treat a
 matching `/CheckSum` as evidence that a label is genuine. Section 9 governs what
 a reader may conclude from attacker-supplied input.
 
@@ -1220,9 +1220,9 @@ viewer's attachment pane, `pdf.js`'s `getAttachments()`, `pikepdf`'s
 breaks PDF/A, which requires every embedded file to be associated. Both
 directions are therefore required:
 
-- every PlanLabel file specification referenced from an `/AF` array MUST appear in
+- every Plannotation file specification referenced from an `/AF` array MUST appear in
   the name tree;
-- every PlanLabel file specification in the name tree MUST be referenced from
+- every Plannotation file specification in the name tree MUST be referenced from
   exactly one `/AF` array.
 
 The `/AF` entry and the name-tree entry MUST be one indirect object referenced
@@ -1236,14 +1236,14 @@ attachments will have a branching tree, and a reader that reads only the root
 node will silently miss labels.
 
 **6.2.6 Name collisions.** A document MAY already contain an embedded file whose
-name is a PlanLabel name. Assigning over it would destroy a file PlanLabel never
+name is a Plannotation name. Assigning over it would destroy a file Plannotation never
 owned, and a later strip (6.2.12) would then delete a third party's data.
 
 A writer MUST NOT overwrite an existing name-tree entry or embedded file whose
-name is a PlanLabel name unless **all** of the following hold, in which case the
-file is part of a PlanLabel payload this operation is replacing:
+name is a Plannotation name unless **all** of the following hold, in which case the
+file is part of a Plannotation payload this operation is replacing:
 
-1. the document carries the PlanLabel declaration of 6.3;
+1. the document carries the Plannotation declaration of 6.3;
 2. the entry's `/AFRelationship` is `/Data`;
 3. the entry's embedded-file stream carries `/Subtype /application#2Fjson`.
 
@@ -1252,7 +1252,7 @@ colliding file. A writer MUST NOT rename its own file to avoid the collision:
 the names in 6.2.2 are how a reader finds the payload, and a payload under a
 different name is not findable.
 
-Re-labelling a document that already carries a PlanLabel payload is otherwise
+Re-labelling a document that already carries a Plannotation payload is otherwise
 unconstrained: a writer MAY replace the payload in place, and MAY instead remove
 it (6.2.12) and write a fresh one. Either way the result MUST satisfy every rule
 in this section, and MUST NOT leave a label for a page it did not label.
@@ -1337,8 +1337,8 @@ conforming writer MUST NOT:
    each of which a naive metadata round-trip will rewrite;
 4. record any trace of itself outside the payload and the declaration: not in
    `x:xmptk`, not in `pdf:Producer`, not in `/Info`, not in a custom key. After a
-   strip (6.2.12) the document must retain no evidence that PlanLabel touched it;
-5. overwrite an embedded file whose name collides with a PlanLabel name, except
+   strip (6.2.12) the document must retain no evidence that Plannotation touched it;
+5. overwrite an embedded file whose name collides with a Plannotation name, except
    as 6.2.6 permits;
 6. add, remove or change the document's encryption, or its permissions;
 7. lower the PDF header version (6.2.10);
@@ -1347,7 +1347,7 @@ conforming writer MUST NOT:
 A writer SHOULD leave the document's structural properties as it found them —
 linearisation, object-stream mode, and the compression of streams it did not
 write. None of these is visible, and none is forbidden, but each is a change a
-downstream diff will show and none of them is PlanLabel's business.
+downstream diff will show and none of them is Plannotation's business.
 
 **6.2.10 The PDF header version.** Page-level associated files are a PDF 2.0
 feature: ISO 32000-2 defines `/AF` on a page dictionary, and ISO 32000-1 does not.
@@ -1417,7 +1417,7 @@ order.
 
 1. **Page-level `/AF` first.** For each page, scan the `/AF` array for a file
    specification whose `/UF` — or `/F`, where `/UF` is absent — is a page-label
-   name. For the index, scan the catalog's `/AF` for `planlabel-index.json`.
+   name. For the index, scan the catalog's `/AF` for `plannotation-index.json`.
 2. **The name tree as a fallback.** For a page with no such entry, look up the
    page's name from 6.2.2 in the `EmbeddedFiles` name tree; likewise for the
    index.
@@ -1443,15 +1443,15 @@ Having found a candidate, a reader:
   it has found. A missing declaration is a writer's error (6.6) and not a reason
   to withhold a valid label from a user.
 
-**6.2.13 Removing a payload.** A writer MAY remove a PlanLabel payload from a
+**6.2.13 Removing a payload.** A writer MAY remove a Plannotation payload from a
 document. When it does, it MUST remove exactly:
 
-- every embedded file whose name is a PlanLabel name and which satisfies 6.2.6
+- every embedded file whose name is a Plannotation name and which satisfies 6.2.6
   (1) to (3);
 - those files' entries in every `/AF` array, deleting an array that becomes empty
   rather than leaving it empty (6.2.7);
 - those files' entries in the `EmbeddedFiles` name tree;
-- the PlanLabel declaration, and nothing else in the XMP packet (6.3.6).
+- the Plannotation declaration, and nothing else in the XMP packet (6.3.6).
 
 and MUST NOT remove anything else. In particular a foreign attachment, a foreign
 `/AF` entry and a foreign PDF Declaration MUST all survive.
@@ -1489,8 +1489,8 @@ are assigned by the writer and mean nothing.
    /Pages   4 0 R
    /AF      [ 9 0 R 14 0 R ]               % the third party's, then the index
    /Names   << /EmbeddedFiles << /Names [
-                 (planlabel-index.json) 14 0 R
-                 (planlabel-p0000.json) 12 0 R
+                 (plannotation-index.json) 14 0 R
+                 (plannotation-p0000.json) 12 0 R
                  (site-notes.txt)        9 0 R ] >> >>
    /Metadata 3 0 R                         % carries the declaration of 6.3
 >>
@@ -1507,9 +1507,9 @@ endobj
 
 12 0 obj                                   % the file specification
 << /Type            /Filespec
-   /F               (planlabel-p0000.json)
-   /UF              (planlabel-p0000.json)
-   /Desc            (PlanLabel 0.1 label for page 0)
+   /F               (plannotation-p0000.json)
+   /UF              (plannotation-p0000.json)
+   /Desc            (Plannotation 0.1 label for page 0)
    /AFRelationship  /Data
    /EF              << /F 13 0 R /UF 13 0 R >>
 >>
@@ -1539,19 +1539,19 @@ bytes. That is 6.2.4 working as specified, not an inconsistency.
 ### 6.3 The XMP PDF Declaration
 
 A PDF Declaration is an XMP mechanism, published by the PDF Association, by which
-a document states that it conforms to a specification outside ISO 32000. PlanLabel
+a document states that it conforms to a specification outside ISO 32000. Plannotation
 uses it for one purpose: so that a reader can tell, from the document's metadata
-alone, that the document claims to carry a PlanLabel 0.1 payload.
+alone, that the document claims to carry a Plannotation 0.1 payload.
 
 PDF Association, *PDF Declarations* (2019), listed in the normative references,
-defines the mechanism. This subsection specifies what PlanLabel writes into it,
+defines the mechanism. This subsection specifies what Plannotation writes into it,
 what it must leave alone, and what a reader may conclude from it.
 
-**6.3.1 The claim.** A labelled PDF MUST carry exactly one PlanLabel declaration:
+**6.3.1 The claim.** A labelled PDF MUST carry exactly one Plannotation declaration:
 one Declaration structure whose `pdfd:conformsTo` is exactly
 
 ```
-https://srtgn.github.io/planlabel/spec/0.1
+https://plannotation.github.io/spec/0.1
 ```
 
 which is the canonical URI of this specification, without a trailing slash and
@@ -1565,12 +1565,12 @@ catalog's `/Metadata` XMP packet, where it is a claim about the document as a
 whole.
 
 The PDF Declarations specification also permits a declaration in an individual
-object's `/Metadata`, scoped to that object, and the symmetry with PlanLabel's
-page-level associated files is tempting. PlanLabel 0.1 does not use it: the claim
-being made is that this document carries a PlanLabel payload, which is a fact
+object's `/Metadata`, scoped to that object, and the symmetry with Plannotation's
+page-level associated files is tempting. Plannotation 0.1 does not use it: the claim
+being made is that this document carries a Plannotation payload, which is a fact
 about the document, and a per-page declaration would multiply the bytes and the
 ways to be wrong without telling a reader anything the payload does not. A writer
-MUST NOT write a PlanLabel declaration into a page's or any other object's
+MUST NOT write a Plannotation declaration into a page's or any other object's
 `/Metadata`.
 
 **6.3.3 Namespace and structure.** The XMP namespace is
@@ -1605,7 +1605,7 @@ Each ClaimData structure carries, all OPTIONAL:
 - **`pdfd:claimReport`** — a URL to a report about the claim.
 
 There are no other properties. A writer MUST NOT invent one: a level, an issuer, a
-severity or a version has nowhere to go here, and anything PlanLabel needs to say
+severity or a version has nowhere to go here, and anything Plannotation needs to say
 beyond the claim belongs in the payload.
 
 Both arrays are serialised as `rdf:Bag`, and each member as an `rdf:li` with
@@ -1613,7 +1613,7 @@ Both arrays are serialised as `rdf:Bag`, and each member as an `rdf:li` with
 whose members are plain text rather than structures, is not a declaration; a
 validator MUST report it as an error rather than interpret it.
 
-**6.3.4 What PlanLabel writes.** A writer:
+**6.3.4 What Plannotation writes.** A writer:
 
 - MUST write `pdfd:conformsTo` with the value of 6.3.1;
 - MAY write one ClaimData structure whose `pdfd:claimBy` identifies the writing
@@ -1626,7 +1626,7 @@ validator MUST report it as an error rather than interpret it.
 - MUST omit `pdfd:claimDate` unless the date was supplied to it, and MUST NOT read
   the system clock for it (6.2.14);
 - SHOULD NOT write `pdfd:claimCredentials` or `pdfd:claimReport` at 0.1. Neither
-  has a defined meaning for PlanLabel, and a value a reader cannot interpret is
+  has a defined meaning for Plannotation, and a value a reader cannot interpret is
   worse than an absent one.
 
 **6.3.5 A complete packet.** A document that had no XMP packet at all, after
@@ -1640,11 +1640,11 @@ labelling:
    <pdfd:declarations>
     <rdf:Bag>
      <rdf:li rdf:parseType="Resource">
-      <pdfd:conformsTo>https://srtgn.github.io/planlabel/spec/0.1</pdfd:conformsTo>
+      <pdfd:conformsTo>https://plannotation.github.io/spec/0.1</pdfd:conformsTo>
       <pdfd:claimData>
        <rdf:Bag>
         <rdf:li rdf:parseType="Resource">
-         <pdfd:claimBy>PlanLabel 0.1.0</pdfd:claimBy>
+         <pdfd:claimBy>Plannotation 0.1.0</pdfd:claimBy>
         </rdf:li>
        </rdf:Bag>
       </pdfd:claimData>
@@ -1658,7 +1658,7 @@ labelling:
 ```
 
 Note that `x:xmptk` is absent. It names the toolkit that wrote the packet, and a
-document that has been stripped must carry no trace of PlanLabel (6.2.9 (4)); a
+document that has been stripped must carry no trace of Plannotation (6.2.9 (4)); a
 writer MUST NOT set it, and MUST NOT alter it where a packet already has one.
 
 Where the document already has an XMP packet, the writer adds a self-contained
@@ -1669,12 +1669,12 @@ other property. A packet belongs to whoever wrote it, and 1.2 (2) does not make
 an exception for reformatting.
 
 **6.3.6 Other declarations.** A document MAY carry declarations that have nothing
-to do with PlanLabel — accessibility claims, well-tagged PDF claims, a
+to do with Plannotation — accessibility claims, well-tagged PDF claims, a
 publisher's own. They share the one `pdfd:declarations` array.
 
 A writer MUST add its declaration to that array rather than replace it, MUST NOT
-alter another declaration, and, when removing PlanLabel's, MUST remove only the
-Declaration structure whose `pdfd:conformsTo` is PlanLabel's. It MUST remove the
+alter another declaration, and, when removing Plannotation's, MUST remove only the
+Declaration structure whose `pdfd:conformsTo` is Plannotation's. It MUST remove the
 `pdfd:declarations` property, and the `rdf:Description` that carried it, only when
 removing that structure leaves the array empty.
 
@@ -1704,7 +1704,7 @@ damage what it found: a writer that added the declaration alone would have
 silently broken the document's conformance.
 
 **6.3.8 What the declaration does and does not mean.** The declaration is a claim
-that this document carries a PlanLabel 0.1 payload. It is not a validation
+that this document carries a Plannotation 0.1 payload. It is not a validation
 result, it says nothing about the payload's conformance level, and a reader MUST
 NOT treat it as evidence that any label in the document is valid — 4.3 (1) still
 requires the reader to validate what it finds.
@@ -1718,26 +1718,26 @@ MUST still read the payload (6.2.12).
 
 ### 6.4 The SVG carrier
 
-An SVG carrier is defined in outline here and its encoding is reserved. PlanLabel
-0.1 specifies no SVG payload: a writer MUST NOT claim PlanLabel 0.1 conformance
+An SVG carrier is defined in outline here and its encoding is reserved. Plannotation
+0.1 specifies no SVG payload: a writer MUST NOT claim Plannotation 0.1 conformance
 for an SVG document, and a reader MUST NOT infer one. The constraints in this
 subsection are normative now, because they are what the encoding will have to
 satisfy and because a writer experimenting ahead of the specification should not
 break the documents it experiments on.
 
-**6.4.1 Compatibility.** The SVG documents PlanLabel cares about are produced by
+**6.4.1 Compatibility.** The SVG documents Plannotation cares about are produced by
 IfcOpenShell's serialiser, which carries IFC identity in the markup already:
 product groups take `id="product-<GlobalId>"`, IFC classes appear as `class`
 values, and view information is carried in attributes of its own.
 
 A writer MUST NOT rename, renumber or remove an existing `id` or `class` value,
 and MUST NOT alter any existing attribute. Those values are another tool's
-identifiers, other documents reference them, and PlanLabel gains nothing by
+identifiers, other documents reference them, and Plannotation gains nothing by
 owning them. Where an `id` encodes an IFC GlobalId, a writer SHOULD read
 `element.ifcGuid` from it and MUST NOT rewrite it.
 
-**6.4.2 Where PlanLabel data goes.** PlanLabel data is carried in a `<metadata>`
-element, or in attributes whose names begin `data-planlabel-`, and nowhere else.
+**6.4.2 Where Plannotation data goes.** Plannotation data is carried in a `<metadata>`
+element, or in attributes whose names begin `data-plannotation-`, and nowhere else.
 Both are inert: `<metadata>` is not rendered, and a `data-` attribute changes
 nothing about how an element is drawn, so the appearance guarantee of 1.2 (1)
 holds by construction rather than by inspection.
@@ -1754,7 +1754,7 @@ invisible on some drawings and obvious on others.
 
 **6.4.4 Reserved.** The following are not specified at 0.1 and a future version
 will settle them: the element name, namespace and content model of the
-`<metadata>` payload; the `data-planlabel-*` attribute vocabulary and which of
+`<metadata>` payload; the `data-plannotation-*` attribute vocabulary and which of
 the two mechanisms carries which part of the payload; whether a whole page label
 or per-element fragments are carried; and how an SVG document announces that it
 carries a payload, the declaration of 6.3 having no SVG equivalent.
@@ -1766,7 +1766,7 @@ SVG without an SVG payload: the GlobalId from `ifc:guid`, or from the serializer
 `id="product-<uuid>"` by 7.1.2; the class from the group's `class`; and the paper
 transform of 3.5 from the view group's `ifc:matrix3` and `ifc:plane` composed with
 every transform and viewport above it, followed by the flip of 3.3. The reference
-implementation's `planlabel from-svg` and its Bonsai operator do exactly this, and
+implementation's `plannotation from-svg` and its Bonsai operator do exactly this, and
 write nothing into the SVG.
 
 ---
@@ -1781,20 +1781,20 @@ documents that MUST NOT be modified — a signed document above all (6.2.11).
 
 | Member | Status | Value |
 | --- | --- | --- |
-| `planlabel` | REQUIRED | `"0.1"`, the format version |
+| `plannotation` | REQUIRED | `"0.1"`, the format version |
 | `index` | REQUIRED | one index document, valid against the index schema |
 | `pages` | REQUIRED | an array of page labels, each valid against the page-label schema |
 | `generator` | OPTIONAL | the program that wrote the sidecar, as in a label |
 | `extensions` | OPTIONAL | namespaced extras, as in a label; a reader ignores what it does not understand — 4.3 (6) |
 
-It is described by `planlabel-sidecar.schema.json`, published beside the
+It is described by `plannotation-sidecar.schema.json`, published beside the
 page-label and index schemas, and a reader MUST validate a sidecar against it
 before using any value in it — 4.3 (1) applies to a sidecar exactly as it applies
 to a label.
 
 The members MUST agree with each other:
 
-- `planlabel` MUST equal the `planlabel` of `index` and of every member of
+- `plannotation` MUST equal the `plannotation` of `index` and of every member of
   `pages`;
 - `pages` MUST contain exactly one page label for each entry of `index.pages`,
   matched by `page.index` against `pageIndex`, and no page label that `index.pages`
@@ -1811,12 +1811,12 @@ that is a consistency rule.
 3.8 — UTF-8 without a byte order mark, members sorted by name, two-space indent,
 every member and every array element on its own line, LF endings, one trailing
 LF, no `null` for an absent member, every number at three decimals or fewer. It
-is a public artefact like any other PlanLabel document, and the reasons in 3.8
+is a public artefact like any other Plannotation document, and the reasons in 3.8
 for making it byte-reproducible apply to it in full.
 
 **6.5.3 Naming.** For a document whose filename is `NAME.pdf`, the sidecar is
-`NAME.planlabel.json`, in the same directory. Where the document's filename has
-no extension, the sidecar is that filename with `.planlabel.json` appended.
+`NAME.plannotation.json`, in the same directory. Where the document's filename has
+no extension, the sidecar is that filename with `.plannotation.json` appended.
 
 A sidecar is never itself embedded in the document it describes: it is the copy
 that travels outside.
@@ -1837,7 +1837,7 @@ payload is unverified.
 sidecar was written for the document beside it. The payload's `index` may carry the
 hash of the *model* the labels came from, which says nothing about the PDF.
 
-PlanLabel 0.1 does not add a member for this. The binding is the naming rule of
+Plannotation 0.1 does not add a member for this. The binding is the naming rule of
 6.5.4, checked against what the payload already states about the document's pages.
 A reader pairing a sidecar with a document MUST:
 
@@ -1882,10 +1882,10 @@ array element on its own line, by 3.8.
 
 ```json
 {
-  "generator": { "name": "planlabel", "version": "0.1.0" },
-  "index": { "pages": [ … ], "planlabel": "0.1", "provenance": "authored" },
+  "generator": { "name": "plannotation", "version": "0.1.0" },
+  "index": { "pages": [ … ], "plannotation": "0.1", "provenance": "authored" },
   "pages": [ … ],
-  "planlabel": "0.1"
+  "plannotation": "0.1"
 }
 ```
 
@@ -1921,10 +1921,10 @@ A conforming **validator** MUST report: every missing or wrong file-specificatio
 or embedded-file member, including a `/Size` or `/CheckSum` that disagrees with
 the decoded bytes (6.2.3, 6.2.4); every embedded file not registered in the name
 tree and every registered file not associated (6.2.5); an `/AFRelationship` other
-than `/Data` on a PlanLabel file (6.2.3); an empty `/AF` array (6.2.7); a page
+than `/Data` on a Plannotation file (6.2.3); an empty `/AF` array (6.2.7); a page
 with more than one label, and a name-tree-only label whose `page.index`
 contradicts its filename (6.2.12); a declaration without a payload and a payload
-without a declaration (6.3.8); more than one PlanLabel declaration, or one that is
+without a declaration (6.3.8); more than one Plannotation declaration, or one that is
 not a `rdf:Bag` of structures (6.3.1, 6.3.3); and, where it is given the input
 document as well as the labelled one, every failure of the appearance guarantee
 (6.2.8) and of the removal equivalence (6.2.13).
@@ -1934,7 +1934,7 @@ appearance guarantee as satisfied. It cannot check it, and silence about a check
 that was not run reads as a pass.
 
 **6.6.2 The SVG carrier.** Reserved (6.4). There is no conforming SVG writer or
-reader at 0.1. A validator that is given an SVG document MUST report that PlanLabel
+reader at 0.1. A validator that is given an SVG document MUST report that Plannotation
 0.1 defines no SVG carrier rather than report the document as non-conforming.
 
 **6.6.3 The sidecar carrier.**
@@ -1962,14 +1962,14 @@ same.
 
 ## 7. IFC mapping
 
-PlanLabel does not model buildings. Everything it says about the building is said in
+Plannotation does not model buildings. Everything it says about the building is said in
 IFC's words — class names, GlobalIds, property-set names — and this section states the
 correspondence. It aligns with two descriptions of drawings in IFC:
 
 - **SWAPP's `ifc-docs` draft** (CC0, 2024), which structures documentation as
   *DocumentSet → Sheet → ViewPort → View → Annotation*, with annotations as
   `IfcAnnotation` aggregated by `IfcRelAggregates` and cross-referenced to the
-  products they describe by `IfcRelAssignsToProduct`. PlanLabel reuses these names
+  products they describe by `IfcRelAssignsToProduct`. Plannotation reuses these names
   where it has the same concept: its *sheet*, *viewport*, *view* and *annotation*
   (2.1–2.6) are SWAPP's, and a labelled document's *index* (2.8) plays the part of
   the document set.
@@ -1980,7 +1980,7 @@ correspondence. It aligns with two descriptions of drawings in IFC:
   drawing's annotations are `IfcAnnotation`s whose type says what they are.
 
 2.18 summarises which names correspond; this section adds the attributes. 7.1 and
-7.3 are normative; 7.2 is an informative correspondence, because PlanLabel
+7.3 are normative; 7.2 is an informative correspondence, because Plannotation
 0.1 reads and writes labels, not IFC files, and does not require a writer to have a
 model at all.
 
@@ -2003,13 +2003,13 @@ writer MAY decode it (6.4.5).
 
 **7.1.3 Units.** `model.lengthUnit` MUST name the length unit of the model's
 `IfcUnitAssignment` — `m` for the SI metre without prefix, `cm` for `CENTI`, `mm` for
-`MILLI` — and a writer MUST read it from the model rather than assume it. PlanLabel
+`MILLI` — and a writer MUST read it from the model rather than assume it. Plannotation
 0.1 names no other unit; a model in a conversion-based unit (feet, inches) cannot be
 described with a `paperToPlane`, and a writer MUST NOT write one for it.
 
 ### 7.2 Correspondence *(informative)*
 
-| PlanLabel | IFC | Notes |
+| Plannotation | IFC | Notes |
 | --- | --- | --- |
 | `sheet` | SWAPP's Sheet; `IfcDocumentInformation` with `Scope` `SHEET` | `Identification` → `sheet.id`, `Name` → `title`, `Revision` → `revision` |
 | The PDF of a sheet | `IfcDocumentReference` with the file's `Location` | The label travels in the PDF; the model need not know it exists |
@@ -2043,15 +2043,15 @@ the model, as the record of what was issued (1.2).
 
 ### 8.1 One number, three places
 
-A version of PlanLabel is one `MAJOR.MINOR` number, and it appears in exactly three
+A version of Plannotation is one `MAJOR.MINOR` number, and it appears in exactly three
 places, which always move together:
 
-1. the `planlabel` member of every label, index and sidecar (`"0.1"`);
-2. the `$id` of each schema, `https://srtgn.github.io/planlabel/schema/0.1/…`;
-3. the `conformsTo` URI of the PDF declaration, `https://srtgn.github.io/planlabel/spec/0.1`.
+1. the `plannotation` member of every label, index and sidecar (`"0.1"`);
+2. the `$id` of each schema, `https://plannotation.github.io/schema/0.1/…`;
+3. the `conformsTo` URI of the PDF declaration, `https://plannotation.github.io/spec/0.1`.
 
 A writer MUST write the same version in all three. A reader selects the schema by the
-`planlabel` member and, where the version is one it does not implement, treats the
+`plannotation` member and, where the version is one it does not implement, treats the
 label as absent (4.3 (3)); a validator reports such a label as unvalidatable rather
 than invalid (4.4).
 
@@ -2085,14 +2085,14 @@ from an archive in thirty years.
 ### 8.4 Software and extensions
 
 The version of a program that reads or writes labels — including this project's
-`planlabel` package, which follows semantic versioning of its own — is independent of
+`plannotation` package, which follows semantic versioning of its own — is independent of
 the format's, and is recorded in `generator.version`. Members under `extensions` whose
 keys begin `x-` are outside the version entirely: they may appear, change and disappear
 in any version, and a reader never requires them (4.3 (6)).
 
 ## 9. Security considerations
 
-A PlanLabel payload is attacker-supplied input whenever the document carrying it is.
+A Plannotation payload is attacker-supplied input whenever the document carrying it is.
 A drawing arrives by email, from a contractor's portal or out of an archive, and the
 program that reads it is often a long-running service. This section states what a
 reader owes its caller, and — equally important — what it cannot promise.
@@ -2157,8 +2157,8 @@ implementation MAY choose different numbers; it MUST choose some.
 
 ### 9.4 What a reader cannot promise
 
-A PlanLabel reader sits on top of a PDF library, and some inputs are consumed by that
-library before any PlanLabel code runs. A conforming reader MUST NOT claim a guarantee
+A Plannotation reader sits on top of a PDF library, and some inputs are consumed by that
+library before any Plannotation code runs. A conforming reader MUST NOT claim a guarantee
 it cannot keep. Two limits are known and are stated here rather than papered over:
 
 - **Cross-reference streams.** A cross-reference stream carries the same `/Predictor`,
@@ -2197,7 +2197,7 @@ A label describes a drawing, and a drawing describes a building. `sheet.author`,
 `sheet.checker` and `model.file` can carry personal names and internal paths. A writer
 SHOULD record only what the drawing itself prints, and a tool that publishes labelled
 drawings SHOULD offer to remove those members. This specification does not define a
-redaction mechanism; `planlabel strip` removes the payload entirely.
+redaction mechanism; `plannotation strip` removes the payload entirely.
 
 ---
 

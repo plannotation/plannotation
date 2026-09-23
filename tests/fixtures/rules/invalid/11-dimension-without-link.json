@@ -222,7 +222,7 @@
   ],
   "generator": {
     "created": "2026-05-08T16:05:00Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -236,7 +236,7 @@
     "index": 3,
     "widthMm": 841
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "authored",
   "sheet": {
     "author": "T. Bergmann",

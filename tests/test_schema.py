@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The packaged JSON Schemas are the single source of truth, so they are tested first.
 
-These tests deliberately do not import :mod:`planlabel.model`. The schema must stand
+These tests deliberately do not import :mod:`plannotation.model`. The schema must stand
 on its own for a third-party reader that has no Python at all, and testing it through
 the models would hide a schema defect behind a matching model defect.
 """
@@ -15,21 +15,21 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
-from planlabel.constants import INDEX_SCHEMA_ID, SCHEMA_ID, SCHEMA_VERSION
+from plannotation.constants import INDEX_SCHEMA_ID, SCHEMA_ID, SCHEMA_VERSION
 
-SCHEMA_FILES = ["planlabel-0.1.json", "planlabel-index-0.1.json"]
+SCHEMA_FILES = ["plannotation-0.1.json", "plannotation-index-0.1.json"]
 
 
 def load_schema(filename: str) -> dict[str, Any]:
     """Load a packaged schema through importlib.resources.
 
     Args:
-        filename: Bare filename inside the ``planlabel.schema`` package.
+        filename: Bare filename inside the ``plannotation.schema`` package.
 
     Returns:
         The parsed schema document.
     """
-    text = (resources.files("planlabel.schema") / filename).read_text(encoding="utf-8")
+    text = (resources.files("plannotation.schema") / filename).read_text(encoding="utf-8")
     parsed: dict[str, Any] = json.loads(text)
     return parsed
 
@@ -38,12 +38,12 @@ def read_schema_text(filename: str) -> str:
     """Return the raw text of a packaged schema.
 
     Args:
-        filename: Bare filename inside the ``planlabel.schema`` package.
+        filename: Bare filename inside the ``plannotation.schema`` package.
 
     Returns:
         The file's contents, decoded as UTF-8.
     """
-    return (resources.files("planlabel.schema") / filename).read_text(encoding="utf-8")
+    return (resources.files("plannotation.schema") / filename).read_text(encoding="utf-8")
 
 
 def collect_refs(node: object, found: set[str]) -> None:
@@ -105,8 +105,8 @@ class TestSchemaDocuments:
         assert not unused, f"unreferenced $defs in {filename}: {unused}"
 
     def test_version_const_matches_the_package(self, filename: str) -> None:
-        """The ``planlabel`` const and the package's SCHEMA_VERSION cannot drift apart."""
-        assert load_schema(filename)["properties"]["planlabel"]["const"] == SCHEMA_VERSION
+        """The ``plannotation`` const and the package's SCHEMA_VERSION cannot drift apart."""
+        assert load_schema(filename)["properties"]["plannotation"]["const"] == SCHEMA_VERSION
 
     def test_is_canonically_formatted(self, filename: str) -> None:
         """Two-space indent, LF endings, exactly one trailing newline, no trailing spaces."""
@@ -125,11 +125,11 @@ class TestSchemaIdentity:
 
     def test_page_schema_id(self) -> None:
         """The page schema's ``$id`` is the URL the package advertises."""
-        assert load_schema("planlabel-0.1.json")["$id"] == SCHEMA_ID
+        assert load_schema("plannotation-0.1.json")["$id"] == SCHEMA_ID
 
     def test_index_schema_id(self) -> None:
         """The index schema's ``$id`` is the URL the package advertises."""
-        assert load_schema("planlabel-index-0.1.json")["$id"] == INDEX_SCHEMA_ID
+        assert load_schema("plannotation-index-0.1.json")["$id"] == INDEX_SCHEMA_ID
 
     def test_ids_are_distinct(self) -> None:
         """Two schemas sharing an ``$id`` would break any registry that loads both."""
@@ -141,8 +141,8 @@ class TestPageSchemaShape:
 
     def test_required_top_level_keys(self) -> None:
         """The four keys the design brief makes mandatory."""
-        assert load_schema("planlabel-0.1.json")["required"] == [
-            "planlabel",
+        assert load_schema("plannotation-0.1.json")["required"] == [
+            "plannotation",
             "provenance",
             "page",
             "sheet",
@@ -150,16 +150,16 @@ class TestPageSchemaShape:
 
     def test_root_forbids_unknown_keys(self) -> None:
         """Unknown top-level keys are rejected; extras go in ``extensions``."""
-        assert load_schema("planlabel-0.1.json")["additionalProperties"] is False
+        assert load_schema("plannotation-0.1.json")["additionalProperties"] is False
 
     def test_extensions_are_namespaced(self) -> None:
         """Extension keys must be ``x-`` prefixed so they can never collide with the spec."""
-        schema = load_schema("planlabel-0.1.json")
+        schema = load_schema("plannotation-0.1.json")
         assert schema["properties"]["extensions"]["propertyNames"]["pattern"] == "^x-"
 
     def test_provenance_values(self) -> None:
         """Provenance is a closed vocabulary."""
-        assert load_schema("planlabel-0.1.json")["$defs"]["provenance"]["enum"] == [
+        assert load_schema("plannotation-0.1.json")["$defs"]["provenance"]["enum"] == [
             "authored",
             "inferred",
             "mixed",
@@ -167,12 +167,12 @@ class TestPageSchemaShape:
 
     def test_bbox_is_four_numbers(self) -> None:
         """A bbox is exactly ``[x0, y0, x1, y1]`` in paper millimetres."""
-        bbox = load_schema("planlabel-0.1.json")["$defs"]["bbox"]
+        bbox = load_schema("plannotation-0.1.json")["$defs"]["bbox"]
         assert bbox["minItems"] == bbox["maxItems"] == 4
 
     def test_paper_to_plane_is_six_numbers(self) -> None:
         """The affine is ``[a, b, c, d, e, f]``, matching the PDF matrix convention."""
-        affine = load_schema("planlabel-0.1.json")["$defs"]["viewport"]["properties"][
+        affine = load_schema("plannotation-0.1.json")["$defs"]["viewport"]["properties"][
             "paperToPlane"
         ]
         assert affine["minItems"] == affine["maxItems"] == 6
@@ -183,11 +183,11 @@ class TestIndexSchemaShape:
 
     def test_requires_pages(self) -> None:
         """An index without a page list says nothing."""
-        assert load_schema("planlabel-index-0.1.json")["required"] == ["planlabel", "pages"]
+        assert load_schema("plannotation-index-0.1.json")["required"] == ["plannotation", "pages"]
 
     def test_page_entry_required_fields(self) -> None:
         """Each entry identifies the page, the sheet and the level reached."""
-        schema = load_schema("planlabel-index-0.1.json")
+        schema = load_schema("plannotation-index-0.1.json")
         assert schema["properties"]["pages"]["items"]["required"] == [
             "pageIndex",
             "sheetId",
@@ -196,13 +196,13 @@ class TestIndexSchemaShape:
 
     def test_levels_are_the_three_conformance_levels(self) -> None:
         """Only L1, L2 and L3 exist."""
-        schema = load_schema("planlabel-index-0.1.json")
+        schema = load_schema("plannotation-index-0.1.json")
         level = schema["properties"]["pages"]["items"]["properties"]["level"]
         assert level["enum"] == ["L1", "L2", "L3"]
 
     def test_carries_the_model_hash(self) -> None:
         """The design brief requires the index to record the source model's hash."""
-        schema = load_schema("planlabel-index-0.1.json")
+        schema = load_schema("plannotation-index-0.1.json")
         sha = schema["properties"]["model"]["properties"]["sha256"]
         assert sha["pattern"] == "^[a-f0-9]{64}$"
 
@@ -213,5 +213,5 @@ class TestIndexSchemaShape:
         document deliberately carries no cross-file ``$ref``.
         """
         refs: set[str] = set()
-        collect_refs(load_schema("planlabel-index-0.1.json"), refs)
+        collect_refs(load_schema("plannotation-index-0.1.json"), refs)
         assert not refs, f"index schema should have no $refs, found {refs}"

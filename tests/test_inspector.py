@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from planlabel.cli import app
-from planlabel.constants import page_label_filename
+from plannotation.cli import app
+from plannotation.constants import page_label_filename
 
 INSPECTOR = Path(__file__).parent.parent / "inspector" / "index.html"
 SAMPLES = Path(__file__).parent.parent / "samples"
@@ -60,7 +60,7 @@ class TestTheInspectorIsOneFile:
 
 
 class TestItReadsWhatThisProjectWrites:
-    """The conventions the inspector hard-codes must match the ones PlanLabel emits."""
+    """The conventions the inspector hard-codes must match the ones Plannotation emits."""
 
     def test_it_looks_for_labels_in_the_name_tree(self) -> None:
         """It reads the EmbeddedFiles name tree.
@@ -72,10 +72,10 @@ class TestItReadsWhatThisProjectWrites:
 
     def test_its_filename_pattern_matches_the_one_we_write(self) -> None:
         """A pattern that drifted from page_label_filename would find nothing at all."""
-        assert r"/^planlabel-p(\d+)\.json$/" in html(), (
+        assert r"/^plannotation-p(\d+)\.json$/" in html(), (
             "the inspector's filename pattern has changed shape"
         )
-        compiled = re.compile(r"^planlabel-p(\d+)\.json$")
+        compiled = re.compile(r"^plannotation-p(\d+)\.json$")
         for index in (0, 7, 1234):
             assert compiled.match(page_label_filename(index))
 
@@ -154,7 +154,7 @@ class TestTheInspectCommand:
         plain.write_bytes(fx.build_drawing_set())
         result = self._run(str(plain))
         assert result.exit_code == 0
-        assert "no PlanLabel labels" in result.stdout
+        assert "no Plannotation labels" in result.stdout
 
     def test_an_unreadable_document_exits_two(self, tmp_path: Path) -> None:
         """Two is "could not read this", which is not the same as "nothing in it"."""

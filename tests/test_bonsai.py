@@ -22,12 +22,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 
-from planlabel.validate import validate
+from plannotation.validate import validate
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-ADDON = Path(__file__).parent.parent / "bonsai_ext" / "planlabel_bonsai.py"
+ADDON = Path(__file__).parent.parent / "bonsai_ext" / "plannotation_bonsai.py"
 SAMPLES = Path(__file__).parent.parent / "samples"
 
 
@@ -98,7 +98,7 @@ def addon(monkeypatch: pytest.MonkeyPatch) -> Iterator[types.ModuleType]:
     bpy.registered = registered  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "bpy", bpy)
     monkeypatch.setitem(sys.modules, "bonsai", None)
-    spec = importlib.util.spec_from_file_location("planlabel_bonsai", ADDON)
+    spec = importlib.util.spec_from_file_location("plannotation_bonsai", ADDON)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -138,7 +138,7 @@ class TestWhatBlenderReads:
             and any(isinstance(t, ast.Name) and t.id == "bl_info" for t in node.targets)
         )
         info = ast.literal_eval(assignment.value)
-        assert info["name"] == "PlanLabel for Bonsai"
+        assert info["name"] == "Plannotation for Bonsai"
         assert info["blender"] >= (4, 2, 0)
         assert info["category"] == "Import-Export"
 
@@ -162,8 +162,8 @@ class TestRegistration:
         bpy = sys.modules["bpy"]
         addon.register()
         assert [cls.bl_idname for cls in bpy.registered] == [  # type: ignore[attr-defined]
-            "planlabel.attach_to_sheet",
-            "planlabel.create_sheets_and_attach",
+            "plannotation.attach_to_sheet",
+            "plannotation.create_sheets_and_attach",
         ]
         assert FakeMenu.entries == [addon.menu_entry]
         addon.unregister()
@@ -172,7 +172,7 @@ class TestRegistration:
 
     def test_properties_are_declared_as_annotations(self, addon: types.ModuleType) -> None:
         """Evaluated, so Blender sees property definitions."""
-        annotations = addon.PLANLABEL_OT_attach_to_sheet.__annotations__
+        annotations = addon.PLANNOTATION_OT_attach_to_sheet.__annotations__
         assert set(annotations) == {"svg_path", "pdf_path", "out_path", "sheet_id", "title"}
         assert all(value[0] == "StringProperty" for value in annotations.values())
 
@@ -256,7 +256,7 @@ class TestExecute:
         Returns:
             The operator.
         """
-        operator = addon.PLANLABEL_OT_attach_to_sheet()
+        operator = addon.PLANNOTATION_OT_attach_to_sheet()
         for name in ("svg_path", "pdf_path", "out_path", "sheet_id", "title"):
             setattr(operator, name, values.get(name, ""))
         return operator
@@ -276,13 +276,13 @@ class TestExecute:
         assert operator.execute(None) == {"CANCELLED"}
         assert "all needed" in operator.reports[0][1]
 
-    def test_a_planlabel_error_is_reported(
+    def test_a_plannotation_error_is_reported(
         self, addon: types.ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """A file that is not an SVG ends the run with the reason."""
         fake_bonsai(monkeypatch, object(), None)
         (tmp_path / "s.svg").write_text("<html/>", encoding="utf-8")
-        import planlabel.svg.label as label_module
+        import plannotation.svg.label as label_module
 
         monkeypatch.setattr(
             label_module,
@@ -302,7 +302,7 @@ class TestExecute:
 
     def test_create_sheets_needs_bonsai(self, addon: types.ModuleType) -> None:
         """Without Bonsai's operator there is nothing to run first."""
-        operator = addon.PLANLABEL_OT_create_sheets_and_attach()
+        operator = addon.PLANNOTATION_OT_create_sheets_and_attach()
         assert operator.execute(None) == {"CANCELLED"}
         assert "not available" in operator.reports[0][1]
 

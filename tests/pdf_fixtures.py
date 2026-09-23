@@ -4,7 +4,7 @@
 Nothing here is committed as a binary and nothing here reads the clock, the locale or
 the network. Every builder returns bytes, and building the same fixture twice -- in
 one process or in two -- produces the same bytes, which is what lets
-``tests/test_pdf.py`` assert that :func:`planlabel.pdf.embed.attach` is reproducible
+``tests/test_pdf.py`` assert that :func:`plannotation.pdf.embed.attach` is reproducible
 without ever committing a golden hash.
 
 Why pikepdf and not cairosvg
@@ -33,7 +33,7 @@ catch one specific way a carrier can go wrong; they are not decoration.
   unless ``fix_metadata_version=False``, so its survival is a real test.
 * **A pre-existing foreign PDF Declaration** in the same packet, naming another
   specification. Removing it, or re-serialising the packet around it, would be
-  exactly the sin :func:`planlabel.pdf.embed.strip` promises not to commit.
+  exactly the sin :func:`plannotation.pdf.embed.strip` promises not to commit.
 * **A foreign document-level attachment** in the name tree *and* in the catalog's
   ``/AF``, and **a foreign page-level attachment** already on page 0's ``/AF``. The
   second is the only thing that catches a writer which assigns ``page.AF`` instead of
@@ -54,8 +54,8 @@ from typing import TYPE_CHECKING, Final
 import pikepdf
 from pikepdf import Array, Dictionary, Name, Object, Pdf, String
 
-from planlabel.constants import page_label_filename
-from planlabel.model import (
+from plannotation.constants import page_label_filename
+from plannotation.model import (
     Annotation,
     Element,
     Generator,
@@ -73,7 +73,7 @@ from planlabel.model import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from planlabel.model import Rotation
+    from plannotation.model import Rotation
 
 __all__ = [
     "A3_HEIGHT_MM",
@@ -136,7 +136,7 @@ _FIXED_XMP_DATE: Final = "2024-01-01T00:00:00Z"
 #: XMP. It must survive attach and strip untouched.
 FOREIGN_SPEC_URI: Final = "https://example.invalid/some-other-spec/2.0"
 
-#: The two attachments the fixture already carries before PlanLabel sees it.
+#: The two attachments the fixture already carries before Plannotation sees it.
 FOREIGN_DOC_FILENAME: Final = "site-notes.txt"
 FOREIGN_PAGE_FILENAME: Final = "page0-source.txt"
 _FOREIGN_DOC_BYTES: Final = b"Third-party site notes. Must survive labelling.\n"
@@ -494,7 +494,7 @@ def _schedule_content(width: float, height: float) -> bytes:
 #:
 #: Two things in it are traps on purpose. ``pdf:PDFVersion`` is rewritten by pikepdf's
 #: ``save`` unless ``fix_metadata_version=False``. The second ``rdf:Description`` is a
-#: PDF Declaration made by another producer: PlanLabel's own declaration is spliced in
+#: PDF Declaration made by another producer: Plannotation's own declaration is spliced in
 #: beside it, and stripping must restore this packet byte for byte.
 XMP_PACKET: Final = (
     '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n'
@@ -861,7 +861,7 @@ def build_bare() -> bytes:
     """Build a one-page document with no metadata, no attachments and no annotations.
 
     Returns:
-        The document's bytes. It exists so that the tests can watch PlanLabel create
+        The document's bytes. It exists so that the tests can watch Plannotation create
         an XMP packet where there was none and then take it away again, which is a
         different code path from splicing into an existing packet.
     """
@@ -1243,12 +1243,12 @@ def build_filtered_label(
 
 
 def build_aliased_attachment(
-    *, key: str = "planlabel-p0000.json", filename: str = FOREIGN_DOC_FILENAME
+    *, key: str = "plannotation-p0000.json", filename: str = FOREIGN_DOC_FILENAME
 ) -> bytes:
     """Build a document where one file specification is filed under two names.
 
     A name tree maps names to objects, and nothing stops two names mapping to the same
-    object. One of them here is a name PlanLabel owns and the other is not, and the
+    object. One of them here is a name Plannotation owns and the other is not, and the
     specification's own ``/UF`` and ``/F`` are the foreign one -- so the file is somebody
     else's, and only its key looks like ours.
 
@@ -1468,7 +1468,9 @@ def signature_digest(data: bytes) -> str:
 _GUID: Final = "14t7YOs$QNL7Hfom5OO5uF"
 
 #: The tool the fixture labels record as their writer.
-_GENERATOR: Final = Generator(name="planlabel-tests", version="0.1", created="2024-01-01T00:00:00Z")
+_GENERATOR: Final = Generator(
+    name="plannotation-tests", version="0.1", created="2024-01-01T00:00:00Z"
+)
 
 
 def page_label(
@@ -1551,7 +1553,7 @@ def page_label(
         else None
     )
     return PageLabel(
-        planlabel="0.1",
+        plannotation="0.1",
         generator=_GENERATOR,
         provenance=Provenance.AUTHORED,
         # The viewport carries a paperToPlane, and SPEC 3.5 requires a label that does
@@ -1603,7 +1605,7 @@ def drawing_set_labels() -> list[PageLabel]:
 
 
 def build_many_attachments(count: int) -> bytes:
-    """Build a document carrying many foreign attachments and no PlanLabel data.
+    """Build a document carrying many foreign attachments and no Plannotation data.
 
     The number of attachments is the document's to choose, so anything a reader or a
     writer does once per attachment must be linear in it. This fixture is how a test
@@ -1621,7 +1623,7 @@ def build_many_attachments(count: int) -> bytes:
             spec = pikepdf.AttachedFileSpec(
                 pdf,
                 b"x",
-                description="A third party's file, which PlanLabel must leave alone",
+                description="A third party's file, which Plannotation must leave alone",
                 filename=name,
                 mime_type="application/octet-stream",
                 creation_date=FIXED_PDF_DATE,

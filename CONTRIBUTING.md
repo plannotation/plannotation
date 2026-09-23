@@ -1,6 +1,6 @@
-# Contributing to PlanLabel
+# Contributing to Plannotation
 
-Thanks for your interest. PlanLabel is a specification first and an implementation
+Thanks for your interest. Plannotation is a specification first and an implementation
 second, so the bar for changes that touch the on-disk format is deliberately high.
 
 By contributing you agree that your contribution is licensed under the
@@ -10,7 +10,7 @@ By contributing you agree that your contribution is licensed under the
 
 ```bash
 uv sync --all-extras          # create the environment from uv.lock
-uv run planlabel --version    # smoke test
+uv run plannotation --version    # smoke test
 make check                    # format, lint, type-check, test
 ```
 
@@ -20,7 +20,7 @@ make check                    # format, lint, type-check, test
 | --- | --- |
 | Format | `ruff format --check .` |
 | Lint | `ruff check .` |
-| Types | `mypy --strict planlabel` |
+| Types | `mypy --strict plannotation` |
 | Tests | `pytest -q` |
 
 Install the hooks so you find problems before CI does:
@@ -36,7 +36,7 @@ of them will be rejected regardless of how good the rest of it is.
 
 ### 1. The PDF is the leading document; the label is auxiliary
 
-PlanLabel never alters how a drawing looks or prints. Concretely: **never** modify
+Plannotation never alters how a drawing looks or prints. Concretely: **never** modify
 page content streams, **never** add visible marks, **never** delete third-party
 attachments or metadata. The appearance-guarantee test rasterises every page before
 and after and asserts the pixel arrays are *identical* — not merely similar.
@@ -95,8 +95,8 @@ never touch the network and never depend on wall-clock time.
 
 ## Changing the schema
 
-`planlabel/schema/planlabel-0.1.json` is the single source of truth. The pydantic
-models in `planlabel/model.py` follow the schema, not the other way round.
+`plannotation/schema/plannotation-0.1.json` is the single source of truth. The pydantic
+models in `plannotation/model.py` follow the schema, not the other way round.
 
 A schema change needs, in the same pull request:
 
@@ -128,7 +128,7 @@ anything normative is reflected in `spec/SPEC.md`.
 ## Reporting a security issue
 
 Please do not open a public issue. Use
-[private vulnerability reporting](https://github.com/srtgn/planlabel/security/advisories/new).
+[private vulnerability reporting](https://github.com/plannotation/plannotation/security/advisories/new).
 
 Note the threat model in `spec/SPEC.md`: labels are **data, never executable**, and
 a conforming reader is required to validate a label against the schema before

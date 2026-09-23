@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# PlanLabel developer entry points. Written for GNU make 3.81 (the version Apple
+# Plannotation developer entry points. Written for GNU make 3.81 (the version Apple
 # ships), so: no .ONESHELL, no $(file ...), no .RECIPEPREFIX, no undefine.
 
 SHELL := /bin/sh
@@ -8,8 +8,8 @@ SHELL := /bin/sh
 UV             ?= uv
 PYTHON_VERSION ?= 3.12
 RUN            := $(UV) run --frozen
-PKG            := planlabel
-MCP_PKG        := planlabel_mcp
+PKG            := plannotation
+MCP_PKG        := plannotation_mcp
 COV_MIN_CORE   ?= 85
 COV_MIN_INFER  ?= 70
 SAMPLES_DIR    ?= samples
@@ -36,7 +36,7 @@ endif
         build clean distclean version
 
 help: ## Show this help
-	@printf 'PlanLabel targets:\n\n'
+	@printf 'Plannotation targets:\n\n'
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | sort \
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -82,9 +82,9 @@ check: fmt-check lint typecheck test fixtures ## The gate: format, lint, types, 
 cov: ## Tests with the two coverage thresholds of the design brief section 15
 	$(RUN) coverage erase
 	$(RUN) pytest -q --cov=$(PKG) --cov=$(MCP_PKG) --cov-report=term-missing --cov-report=xml
-	@printf '\ncore (>= $(COV_MIN_CORE)%%, planlabel excluding infer/):\n'
+	@printf '\ncore (>= $(COV_MIN_CORE)%%, plannotation excluding infer/):\n'
 	$(RUN) coverage report --fail-under=$(COV_MIN_CORE) --omit='$(PKG)/infer/*'
-	@printf '\ninference (>= $(COV_MIN_INFER)%%, planlabel/infer only):\n'
+	@printf '\ninference (>= $(COV_MIN_INFER)%%, plannotation/infer only):\n'
 	$(RUN) coverage report --fail-under=$(COV_MIN_INFER) --include='$(PKG)/infer/*'
 
 licenses: ## Audit dependency licences against the policy; rewrite THIRD_PARTY_LICENSES.md
@@ -93,12 +93,12 @@ licenses: ## Audit dependency licences against the policy; rewrite THIRD_PARTY_L
 # Needs the svg and ifc extras, which `make install` provides. The output is
 # reproducible: rebuilding writes byte-identical files.
 samples: ## Build the three reference sample sets
-	$(RUN) planlabel samples build --out $(SAMPLES_DIR)
+	$(RUN) plannotation samples build --out $(SAMPLES_DIR)
 
 samples-check: samples ## Build the samples and validate every one of them
 	@for name in floorplan positionsplan section; do \
 	  printf '%-16s' "$$name"; \
-	  $(RUN) planlabel validate $(SAMPLES_DIR)/$$name/sheet.labelled.pdf >/dev/null \
+	  $(RUN) plannotation validate $(SAMPLES_DIR)/$$name/sheet.labelled.pdf >/dev/null \
 	    && echo "valid" || exit 1; \
 	done
 
@@ -106,21 +106,21 @@ samples-check: samples ## Build the samples and validate every one of them
 # environment or in .env (git-ignored), and only for questions whose response is not
 # already in bench/cache/; a repeated run is free. CI never runs it.
 bench: samples ## Run the labelled-vs-plain benchmark and update the README table
-	$(RUN) planlabel-bench questions
-	$(RUN) planlabel-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N)
-	$(RUN) planlabel-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N)
-	$(RUN) planlabel-bench report --model $(BENCH_MODEL)
-	$(RUN) planlabel-bench readme --model $(BENCH_MODEL)
+	$(RUN) plannotation-bench questions
+	$(RUN) plannotation-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N)
+	$(RUN) plannotation-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N)
+	$(RUN) plannotation-bench report --model $(BENCH_MODEL)
+	$(RUN) plannotation-bench readme --model $(BENCH_MODEL)
 
 bench-dry: samples ## Say how many benchmark questions would reach the API; ask none
-	$(RUN) planlabel-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
-	$(RUN) planlabel-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
+	$(RUN) plannotation-bench run --condition plain    --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
+	$(RUN) plannotation-bench run --condition labelled --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 
-# The schema version is read from planlabel.SCHEMA_VERSION rather than repeated
+# The schema version is read from plannotation.SCHEMA_VERSION rather than repeated
 # here, so the published URL layout cannot drift from the one constant that
 # defines it.
 docs: ## Stage spec/, schema/ and README into site/ for GitHub Pages
-	@V=`$(RUN) python -c 'import planlabel; print(planlabel.SCHEMA_VERSION)'`; \
+	@V=`$(RUN) python -c 'import plannotation; print(plannotation.SCHEMA_VERSION)'`; \
 	 mkdir -p "site/schema/$$V" site/spec; \
 	 cp -f $(PKG)/schema/*.json "site/schema/$$V/" 2>/dev/null || true; \
 	 cp -f spec/SPEC.md site/spec/; \
@@ -148,7 +148,7 @@ build: ## Build wheels and sdists for both distributions
 	$(UV) build --all-packages --out-dir dist
 
 version: ## Print the version the CLI reports (the Phase 0 gate)
-	$(RUN) planlabel --version
+	$(RUN) plannotation --version
 
 clean: ## Remove build and test artefacts
 	rm -rf dist build site .coverage coverage.xml htmlcov .pytest_cache .ruff_cache .mypy_cache

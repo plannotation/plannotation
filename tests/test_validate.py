@@ -29,10 +29,10 @@ import pytest
 from typer.testing import CliRunner
 
 import tests.pdf_fixtures as fx
-from planlabel.cli import app
-from planlabel.model import PageLabel, canonical_json, load_page_label
-from planlabel.pdf import embed
-from planlabel.validate import (
+from plannotation.cli import app
+from plannotation.model import PageLabel, canonical_json, load_page_label
+from plannotation.pdf import embed
+from plannotation.validate import (
     Report,
     Severity,
     check_page_label,
@@ -45,7 +45,7 @@ from planlabel.validate import (
 if TYPE_CHECKING:
     from click.testing import Result
 
-    from planlabel.validate import Finding
+    from plannotation.validate import Finding
 
 RULES_ROOT = Path(__file__).parent / "fixtures" / "rules"
 LABELS_ROOT = Path(__file__).parent / "fixtures" / "labels"
@@ -292,7 +292,7 @@ def normalise(text: str) -> str:
     Returns:
         The report with the run-specific parts replaced by stable placeholders.
     """
-    text = re.sub(r"planlabel \d+\.\d+\.\d+[^\s,]*", "planlabel <version>", text)
+    text = re.sub(r"plannotation \d+\.\d+\.\d+[^\s,]*", "plannotation <version>", text)
     return re.sub(r"`[^`]*tests/fixtures/[^`]*`", "`<path>`", text)
 
 
@@ -464,7 +464,7 @@ class TestTheModelCrossCheck:
             The parsed label.
         """
         document = {
-            "planlabel": "0.1",
+            "plannotation": "0.1",
             "provenance": "authored",
             "page": {"index": 0, "widthMm": 420, "heightMm": 297},
             "sheet": {"id": "A-101"},
@@ -485,7 +485,7 @@ class TestTheModelCrossCheck:
         Returns:
             The findings.
         """
-        from planlabel.validate.ifc import check_against_model, open_model
+        from plannotation.validate.ifc import check_against_model, open_model
 
         return check_against_model(
             self._label_naming(guid, ifc_class), open_model(model_path), source="label"
@@ -576,13 +576,13 @@ class TestTheVeraPdfPassThrough:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """VeraPDF is a Java wrapper: on PATH is not the same as usable."""
-        from planlabel.validate import verapdf as module
+        from plannotation.validate import verapdf as module
 
         fake = tmp_path / "verapdf"
         fake.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
         fake.chmod(0o755)
         monkeypatch.setenv("PATH", str(tmp_path))
-        monkeypatch.delenv("PLANLABEL_VERAPDF", raising=False)
+        monkeypatch.delenv("PLANNOTATION_VERAPDF", raising=False)
         module.find_verapdf.cache_clear()
         try:
             assert module.find_verapdf() is None
@@ -591,7 +591,7 @@ class TestTheVeraPdfPassThrough:
 
     def test_a_report_with_no_failures_parses(self) -> None:
         """The parser reads veraPDF's own JSON, so it is pinned by a sample."""
-        from planlabel.validate.verapdf import parse_verapdf_report
+        from plannotation.validate.verapdf import parse_verapdf_report
 
         # The parser walks for the object carrying isCompliant rather than indexing a
         # fixed path, because veraPDF has moved these keys between releases.
@@ -617,7 +617,7 @@ class TestTheVeraPdfPassThrough:
 
     def test_a_report_naming_a_failed_rule_parses(self) -> None:
         """A failure must name the clause, or the report cannot be acted on."""
-        from planlabel.validate.verapdf import parse_verapdf_report
+        from plannotation.validate.verapdf import parse_verapdf_report
 
         sample = json.dumps(
             {
@@ -643,8 +643,8 @@ class TestTheVeraPdfPassThrough:
 
     def test_output_that_is_not_json_is_named_as_such(self) -> None:
         """A Java stack trace from a missing JRE is not a verdict."""
-        from planlabel.errors import ExternalToolError
-        from planlabel.validate.verapdf import parse_verapdf_report
+        from plannotation.errors import ExternalToolError
+        from plannotation.validate.verapdf import parse_verapdf_report
 
         with pytest.raises(ExternalToolError, match="did not produce JSON"):
             parse_verapdf_report("Error: Unable to locate a Java Runtime.")
@@ -652,7 +652,7 @@ class TestTheVeraPdfPassThrough:
     @pytest.mark.external
     def test_verapdf_runs_when_installed(self) -> None:
         """Skipped everywhere veraPDF is absent, which is every CI runner here."""
-        from planlabel.validate.verapdf import find_verapdf
+        from plannotation.validate.verapdf import find_verapdf
 
         if find_verapdf() is None:
             pytest.skip("veraPDF is not installed")
@@ -737,17 +737,17 @@ class TestWhatCouldBeRemeasured:
 
     def test_a_label_with_no_dimensions_has_nothing_to_remeasure(self) -> None:
         """The commonest case, and the one most easily mistaken for success."""
-        from planlabel.validate.ifc import remeasurable
+        from plannotation.validate.ifc import remeasurable
 
         label = load_page_label((RULES_ROOT / "valid" / "01-referential-clean.json").read_text())
         assert remeasurable(label) >= 0
 
     def test_a_dimension_naming_two_guid_bearing_elements_is_remeasurable(self) -> None:
         """Two elements, both with a GlobalId, is what the model can be asked about."""
-        from planlabel.validate.ifc import remeasurable
+        from plannotation.validate.ifc import remeasurable
 
         document = {
-            "planlabel": "0.1",
+            "plannotation": "0.1",
             "provenance": "authored",
             "page": {"index": 0, "widthMm": 420, "heightMm": 297},
             "sheet": {"id": "A-101"},
@@ -794,7 +794,7 @@ class TestTheReportSurvivesExtremes:
         """
         return json.dumps(
             {
-                "planlabel": "0.1",
+                "plannotation": "0.1",
                 "provenance": "authored",
                 "page": {"index": 0, "widthMm": 420, "heightMm": 297},
                 "sheet": {"id": "A-101"},
@@ -903,7 +903,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
             The parsed label.
         """
         document = {
-            "planlabel": "0.1",
+            "plannotation": "0.1",
             "provenance": "authored",
             "page": {"index": 0, "widthMm": 420, "heightMm": 297},
             "sheet": {"id": "A-101"},
@@ -945,7 +945,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         Returns:
             The findings.
         """
-        from planlabel.validate.ifc import check_against_model, open_model
+        from plannotation.validate.ifc import check_against_model, open_model
 
         path, first, second = self._two_walls(tmp_path)
         return check_against_model(
@@ -954,7 +954,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
 
     def test_the_model_is_measured_at_all(self, tmp_path: Path) -> None:
         """The fixture has to be a real measurement or the rest proves nothing."""
-        from planlabel.validate.ifc import open_model
+        from plannotation.validate.ifc import open_model
 
         path, first, second = self._two_walls(tmp_path)
         model = open_model(path)

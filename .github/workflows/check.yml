@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# PlanLabel continuous integration.
+# Plannotation continuous integration.
 #
 # Runs exactly the `make check` a developer runs locally:
 #   ruff format --check  ->  ruff check  ->  mypy --strict  ->  pytest -q
@@ -9,7 +9,7 @@
 # No secrets are used and none are needed.
 #
 # External CLIs are deliberately NOT installed. veraPDF, Inkscape and
-# tesseract/ocrmypdf are GPL tools that PlanLabel only ever shells out to when
+# tesseract/ocrmypdf are GPL tools that Plannotation only ever shells out to when
 # they happen to be on PATH. Every test that can use one must probe PATH and skip
 # when it is absent. CI is the reference environment in which they are absent,
 # which is what keeps that rule honest.
@@ -107,7 +107,7 @@ jobs:
         run: make check
 
       - name: Phase 0 gate - the CLI reports its version
-        run: uv run --no-sync planlabel --version
+        run: uv run --no-sync plannotation --version
 
       - name: Licence policy holds
         # The hardest constraint in the project: no AGPL, no PyMuPDF, and no

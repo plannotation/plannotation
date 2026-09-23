@@ -466,7 +466,7 @@
   },
   "generator": {
     "created": "2026-03-19T16:45:10Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -481,7 +481,7 @@
     "rotation": 0,
     "widthMm": 1189
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "mixed",
   "sheet": {
     "author": "K. Brandt",

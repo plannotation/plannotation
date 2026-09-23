@@ -1,4 +1,4 @@
-# PlanLabel validation report: 23-dimension-contradicts-scale.json
+# Plannotation validation report: 23-dimension-contradicts-scale.json
 
 **PASS** -- 0 error(s), 1 warning(s); exit code 0.
 
@@ -26,4 +26,4 @@
 
 ---
 
-Validated by planlabel <version>, PlanLabel schema 0.1.
+Validated by plannotation <version>, Plannotation schema 0.1.

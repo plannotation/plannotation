@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import pytest
 from jsonschema import Draft202012Validator
 
-from planlabel.model import (
+from plannotation.model import (
     canonical_json,
     conformance_level,
     index_schema,

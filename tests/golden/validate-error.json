@@ -32,7 +32,7 @@
       "implemented": true,
       "level": "L3",
       "pageIndex": 3,
-      "planlabel": "0.1",
+      "plannotation": "0.1",
       "sheetId": "ARC-201"
     }
   ],
@@ -40,7 +40,7 @@
   "source": "tests/fixtures/rules/invalid/13-bbox-reversed.json",
   "strict": false,
   "validator": {
-    "name": "planlabel",
+    "name": "plannotation",
     "schema": "0.1",
     "version": "0.1.0.dev0"
   }

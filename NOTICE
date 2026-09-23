@@ -1,8 +1,8 @@
-PlanLabel
-Copyright 2026 The PlanLabel Authors
+Plannotation
+Copyright 2026 The Plannotation Authors
 
-This product includes software developed by The PlanLabel Authors
-(https://github.com/srtgn/planlabel).
+This product includes software developed by The Plannotation Authors
+(https://github.com/plannotation/plannotation).
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
@@ -19,7 +19,7 @@ specific language governing permissions and limitations under the License.
 Third-party components
 --------------------------------------------------------------------------------
 
-PlanLabel depends on, but does not include or modify, the following third-party
+Plannotation depends on, but does not include or modify, the following third-party
 packages. Each remains under its own licence; see THIRD_PARTY_LICENSES.md for the
 current audited list.
 
@@ -31,20 +31,20 @@ only, consistent with the project's licence policy:
 
 Strong-copyleft tools are invoked, when present, only as external command-line
 programs over a process boundary. They are never linked or imported, and they are
-always optional -- PlanLabel degrades gracefully when they are absent:
+always optional -- Plannotation degrades gracefully when they are absent:
 
   * veraPDF   -- GPL-3.0 / MPL-2.0 dual-licensed (optional external CLI)
   * Inkscape  -- GPL-3.0 (optional external CLI)
   * ocrmypdf / tesseract -- GPL-3.0 / Apache-2.0 (optional external CLI)
 
-PlanLabel deliberately does NOT depend on PyMuPDF (AGPL-3.0) or any other
+Plannotation deliberately does NOT depend on PyMuPDF (AGPL-3.0) or any other
 AGPL-licensed component.
 
 --------------------------------------------------------------------------------
 Normative references
 --------------------------------------------------------------------------------
 
-The PlanLabel specification builds on, and credits, the following prior work. No
+The Plannotation specification builds on, and credits, the following prior work. No
 text from these sources is reproduced in this repository.
 
   * ISO 32000-2 (PDF 2.0) -- Associated Files and the /AF mechanism.

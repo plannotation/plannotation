@@ -21,17 +21,24 @@ from pathlib import Path
 import pytest
 
 import tests.pdf_fixtures as fx
-from planlabel.errors import CarrierError, LabelMismatchError
-from planlabel.model import PageLabel, canonical_json
-from planlabel.svg import SheetSource, attach_from_svg, carrier, derive_label, parse_svg, read_svg
-from planlabel.svg.carrier import (
+from plannotation.errors import CarrierError, LabelMismatchError
+from plannotation.model import PageLabel, canonical_json
+from plannotation.svg import (
+    SheetSource,
+    attach_from_svg,
+    carrier,
+    derive_label,
+    parse_svg,
+    read_svg,
+)
+from plannotation.svg.carrier import (
     compose,
     guid_from_uuid,
     parse_transform,
     uuid_from_guid,
 )
-from planlabel.svg.label import paper_to_plane
-from planlabel.validate import validate
+from plannotation.svg.label import paper_to_plane
+from plannotation.validate import validate
 
 SAMPLES = Path(__file__).parent.parent / "samples"
 NAMES = ("floorplan", "positionsplan", "section")
@@ -627,7 +634,7 @@ def test_bounding_box_of_a_circle_is_close() -> None:
 # The command line
 # ---------------------------------------------------------------------------
 class TestFromSvgCommand:
-    """``planlabel from-svg``: the same path, outside any authoring tool."""
+    """``plannotation from-svg``: the same path, outside any authoring tool."""
 
     @staticmethod
     def _files(tmp_path: Path) -> tuple[Path, Path]:
@@ -650,7 +657,7 @@ class TestFromSvgCommand:
         """Without a model, ``--unit`` says what the model plane is measured in."""
         from typer.testing import CliRunner
 
-        from planlabel.cli import app
+        from plannotation.cli import app
 
         page, pdf = self._files(tmp_path)
         out = tmp_path / "out.pdf"
@@ -681,7 +688,7 @@ class TestFromSvgCommand:
         """Exit 1, with the reason."""
         from typer.testing import CliRunner
 
-        from planlabel.cli import app
+        from plannotation.cli import app
 
         page, pdf = self._files(tmp_path)
         page.write_bytes(svg(view(product()), root='width="210mm" height="297mm"'))
@@ -700,7 +707,7 @@ class TestFromSvgCommand:
         pytest.importorskip("ifcopenshell")
         from typer.testing import CliRunner
 
-        from planlabel.cli import app
+        from plannotation.cli import app
 
         out = tmp_path / "out.pdf"
         result = CliRunner().invoke(
@@ -735,37 +742,37 @@ def read_pdf_labels(path: Path) -> dict[int, PageLabel]:
     Returns:
         Its labels by page.
     """
-    from planlabel.pdf import embed
+    from plannotation.pdf import embed
 
     return dict(embed.read(path).pages)
 
 
 class TestModelSource:
-    """Units and marks from the model, and the units PlanLabel can name."""
+    """Units and marks from the model, and the units Plannotation can name."""
 
     @pytest.mark.parametrize(("scale", "name"), [(1.0, "m"), (0.01, "cm"), (0.001, "mm")])
     def test_metric_units_are_named(self, scale: float, name: str) -> None:
         """The three a label can state."""
-        from planlabel.units import length_unit_for
+        from plannotation.units import length_unit_for
 
         assert length_unit_for(scale) == name
 
     def test_feet_are_refused(self) -> None:
-        """PlanLabel 0.1 has no word for them."""
-        from planlabel.units import length_unit_for
+        """Plannotation 0.1 has no word for them."""
+        from plannotation.units import length_unit_for
 
         with pytest.raises(ValueError, match="metres, centimetres or millimetres"):
             length_unit_for(0.3048)
 
     def test_without_the_extra_the_message_names_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """``pip install 'planlabel[ifc]'`` is the fix."""
+        """``pip install 'plannotation[ifc]'`` is the fix."""
         import importlib
 
-        from planlabel.svg.label import source_from_ifc
+        from plannotation.svg.label import source_from_ifc
 
         def missing(name: str) -> object:
             raise ImportError(name)
 
         monkeypatch.setattr(importlib, "import_module", missing)
-        with pytest.raises(CarrierError, match=r"planlabel\[ifc\]"):
+        with pytest.raises(CarrierError, match=r"plannotation\[ifc\]"):
             source_from_ifc(Path("model.ifc"), sheet_id="A-101")

@@ -1,26 +1,26 @@
 # Revit adapter — design note
 
 **Status: design only.** This project ships no Revit add-in. This note is for someone
-who wants authored PlanLabel output from Revit: which API calls give each part of a
+who wants authored Plannotation output from Revit: which API calls give each part of a
 label, what the paper-to-model arithmetic has to be, and the smallest prototype that
 would work. API names are from the Revit 2022–2025 API; check them against the version
 you build for, and note that several of the calls below arrived in 2022.
 
 ## The shape of it
 
-Revit stays the leading tool and never learns PlanLabel. An add-in (or a pyRevit
+Revit stays the leading tool and never learns Plannotation. An add-in (or a pyRevit
 script) collects, for each sheet, what a label needs and writes it as a JSON label
-beside the PDF Revit exported; PlanLabel's CLI attaches and validates it:
+beside the PDF Revit exported; Plannotation's CLI attaches and validates it:
 
 ```text
 Revit  ──Document.Export(PDFExportOptions)──▶  A-101.pdf
-  └────collect sheet, viewports, elements──▶  A-101.planlabel.json
-planlabel attach A-101.pdf A-101.planlabel.json -o A-101.labelled.pdf
-planlabel validate A-101.labelled.pdf
+  └────collect sheet, viewports, elements──▶  A-101.plannotation.json
+plannotation attach A-101.pdf A-101.plannotation.json -o A-101.labelled.pdf
+plannotation validate A-101.labelled.pdf
 ```
 
 Keeping the Revit side free of Python dependencies is the point: the add-in writes
-plain JSON, and everything PlanLabel guarantees about the PDF is guaranteed by the
+plain JSON, and everything Plannotation guarantees about the PDF is guaranteed by the
 library that is tested for it.
 
 ## Where each part of a label comes from
@@ -35,7 +35,7 @@ library that is tested for it.
 | `viewport.plane` | `View.Origin`, `View.RightDirection`, `View.UpDirection`; for a plan, the level's elevation plus the view range cut plane (`PlanViewRange.GetOffset(PlanViewPlane.CutPlane)`) |
 | `viewport.paperToPlane` | See the next section; `View.CropBox` and `Viewport.GetBoxCenter()` |
 | `elements[]` | `new FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType()` |
-| `element.ifcGuid` | The `IfcGUID` parameter (`BuiltInParameter.IFC_GUID`) when the IFC exporter stored it; otherwise `ExportUtils.GetExportId(doc, element.Id)`, a `Guid` encoded to 22 characters exactly as `planlabel.svg.carrier.guid_from_uuid` does |
+| `element.ifcGuid` | The `IfcGUID` parameter (`BuiltInParameter.IFC_GUID`) when the IFC exporter stored it; otherwise `ExportUtils.GetExportId(doc, element.Id)`, a `Guid` encoded to 22 characters exactly as `plannotation.svg.carrier.guid_from_uuid` does |
 | `element.ifcClass` | The IFC exporter's class for the element: the `IfcExportAs` parameter if set, else its category mapping |
 | `element.paperBBox`, `paperOutlines` | `Element.get_Geometry(new Options { View = view })`, edges projected to the view and then to paper; `Element.get_BoundingBox(view)` is the cheap, conservative fallback |
 | `element.tag` | The `Mark` parameter (`BuiltInParameter.ALL_MODEL_MARK`), which the IFC exporter writes to `Tag` |
@@ -95,13 +95,13 @@ through the inverse must land on its bubble within 0.5 mm.
 ## A prototype
 
 A pyRevit script is the smallest thing that works. pyRevit is GPL-3.0; that is fine,
-since it is a tool someone runs, not a dependency of PlanLabel.
+since it is a tool someone runs, not a dependency of Plannotation.
 
 1. For each selected `ViewSheet`: export the PDF with `Document.Export`.
 2. Build the label as a Python dict following the table above, with
    `provenance: "authored"` at the top level, and `json.dump` it with sorted keys.
-3. Run `planlabel attach` and `planlabel validate` on the result with
-   `subprocess.run`, using a CPython that has `planlabel` installed.
+3. Run `plannotation attach` and `plannotation validate` on the result with
+   `subprocess.run`, using a CPython that has `plannotation` installed.
 
 What it cannot do: rotated viewports and split crops without the 2022 transforms;
 dependent views (a view placed on several sheets is several viewports); linked models,

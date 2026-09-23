@@ -1,7 +1,7 @@
 {
   "pages": [
     {
-      "file": "planlabel-p0000.json",
+      "file": "plannotation-p0000.json",
       "level": "L1",
       "pageIndex": 0,
       "revision": "B",
@@ -9,7 +9,7 @@
       "title": "Lageplan Bauteil A"
     },
     {
-      "file": "planlabel-p0001.json",
+      "file": "plannotation-p0001.json",
       "level": "L2",
       "pageIndex": 1,
       "revision": "B",
@@ -17,7 +17,7 @@
       "title": "Lüftung 1. Obergeschoss"
     },
     {
-      "file": "planlabel-p0002.json",
+      "file": "plannotation-p0002.json",
       "level": "L2",
       "pageIndex": 2,
       "revision": "C",
@@ -25,7 +25,7 @@
       "title": "Grundriss Erdgeschoss"
     },
     {
-      "file": "planlabel-p0003.json",
+      "file": "plannotation-p0003.json",
       "level": "L2",
       "pageIndex": "3",
       "revision": "C",
@@ -33,7 +33,7 @@
       "title": "Positionsplan Decke über EG"
     },
     {
-      "file": "planlabel-p0004.json",
+      "file": "plannotation-p0004.json",
       "level": "L3",
       "pageIndex": 4,
       "revision": "D",
@@ -41,7 +41,7 @@
       "title": "Schalplan Decke über EG"
     },
     {
-      "file": "planlabel-p0005.json",
+      "file": "plannotation-p0005.json",
       "level": "L2",
       "pageIndex": 5,
       "revision": "A",
@@ -49,7 +49,7 @@
       "title": "Schnitt C-C Treppenhaus"
     },
     {
-      "file": "planlabel-p0006.json",
+      "file": "plannotation-p0006.json",
       "level": "L3",
       "pageIndex": 6,
       "revision": "C",
@@ -57,7 +57,7 @@
       "title": "Schnitt B-B"
     },
     {
-      "file": "planlabel-p0008.json",
+      "file": "plannotation-p0008.json",
       "level": "L3",
       "pageIndex": 8,
       "revision": "A",
@@ -65,7 +65,7 @@
       "title": "Bewehrungsplan Decke über EG"
     },
     {
-      "file": "planlabel-p0011.json",
+      "file": "plannotation-p0011.json",
       "level": "L3",
       "pageIndex": 11,
       "revision": "B",
@@ -73,6 +73,6 @@
       "title": "Details Gründung"
     }
   ],
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "mixed"
 }

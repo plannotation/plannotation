@@ -18,7 +18,7 @@ The five gate items of the design brief's section 7
 3. **Reader compatibility.** ``pikepdf.open().attachments`` finds every file. pdf.js's
    ``getAttachments()`` belongs to Phase 5, where the inspector arrives, and is
    deliberately not faked here; what *is* asserted is the structural fact that decides
-   it, namely that every file PlanLabel writes is registered in the ``EmbeddedFiles``
+   it, namely that every file Plannotation writes is registered in the ``EmbeddedFiles``
    name tree and not only in an ``/AF`` array.
 4. **veraPDF.** Run when it is installed and runnable, skipped otherwise, and never a
    reason for CI to fail. Detection runs ``verapdf --version``, because the CLI is a
@@ -64,14 +64,14 @@ from jsonschema import Draft202012Validator
 from pikepdf import Array, Dictionary, Name
 from typer.testing import CliRunner
 
-from planlabel import cli
-from planlabel.constants import (
+from plannotation import cli
+from plannotation.constants import (
     INDEX_FILENAME,
     SCHEMA_VERSION,
     SPEC_URI,
     page_label_filename,
 )
-from planlabel.errors import (
+from plannotation.errors import (
     AppearanceChangedError,
     AttachmentConflictError,
     CarrierError,
@@ -83,8 +83,8 @@ from planlabel.errors import (
     RenderError,
     SignedPdfError,
 )
-from planlabel.model import canonical_bytes, canonical_json, sidecar_schema
-from planlabel.pdf import embed, render
+from plannotation.model import canonical_bytes, canonical_json, sidecar_schema
+from plannotation.pdf import embed, render
 from tests import pdf_fixtures as fx
 
 if TYPE_CHECKING:
@@ -92,12 +92,12 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from pikepdf import Object, Pdf
 
-    from planlabel.model import LabelIndex, PageLabel
+    from plannotation.model import LabelIndex, PageLabel
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-#: The timestamp every call to :func:`planlabel.pdf.embed.attach` here injects. Nothing
+#: The timestamp every call to :func:`plannotation.pdf.embed.attach` here injects. Nothing
 #: in this module may read the clock, or the determinism tests would be testing it.
 MOD_DATE: Final = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
@@ -153,14 +153,14 @@ CLOCK_TICK: Final = 1.1
 FOREIGN_DECLARATION: Final = f"<pdfd:conformsTo>{fx.FOREIGN_SPEC_URI}</pdfd:conformsTo>".encode()
 
 #: Environment variables the veraPDF integration honours.
-VERAPDF_BINARY_ENV: Final = "PLANLABEL_VERAPDF"
-REQUIRE_EXTERNAL_ENV: Final = "PLANLABEL_REQUIRE_EXTERNAL"
+VERAPDF_BINARY_ENV: Final = "PLANNOTATION_VERAPDF"
+REQUIRE_EXTERNAL_ENV: Final = "PLANNOTATION_REQUIRE_EXTERNAL"
 
 #: How long veraPDF may take before the test gives up on it, in seconds.
 VERAPDF_TIMEOUT: Final = 300.0
 
 #: The three files a fully labelled two-page document carries.
-LABEL_FILENAMES: Final = ("planlabel-p0000.json", "planlabel-p0001.json", INDEX_FILENAME)
+LABEL_FILENAMES: Final = ("plannotation-p0000.json", "plannotation-p0001.json", INDEX_FILENAME)
 
 #: Every file a labelled copy of the fixture carries, sorted as the name tree lists them.
 ALL_FILENAMES: Final = sorted([*LABEL_FILENAMES, fx.FOREIGN_DOC_FILENAME, fx.FOREIGN_PAGE_FILENAME])
@@ -250,7 +250,7 @@ def af_filenames(owner: Object) -> list[str]:
     Returns:
         The ``/UF`` of each entry, in order, with ``"<deleted>"`` for an entry whose
         file specification no longer resolves. Order matters: a foreign entry must keep
-        its place and PlanLabel's must be appended after it.
+        its place and Plannotation's must be appended after it.
     """
     entries = owner.get(Name.AF)
     if entries is None:
@@ -914,13 +914,13 @@ class TestReaderCompatibility:
     pdf.js's ``getAttachments()`` reads the ``EmbeddedFiles`` name tree and nothing
     else. Exercising it belongs to Phase 5, where the inspector arrives, and it is not
     faked here. What these tests assert instead is the structural fact that decides it:
-    every file PlanLabel writes is in the name tree as well as in an ``/AF`` array. A
+    every file Plannotation writes is in the name tree as well as in an ``/AF`` array. A
     file reachable only through ``/AF`` is invisible to pdf.js, to pikepdf's own
     ``attachments`` mapping and to Acrobat's attachment pane.
     """
 
     def test_pikepdf_sees_every_file(self, labelled: Path) -> None:
-        """``pikepdf.open().attachments`` lists all three PlanLabel files."""
+        """``pikepdf.open().attachments`` lists all three Plannotation files."""
         with pikepdf.open(labelled) as pdf:
             found = attachment_names(pdf)
         for name in LABEL_FILENAMES:
@@ -951,7 +951,7 @@ class TestReaderCompatibility:
         with pikepdf.open(labelled) as pdf:
             for page_index in range(2):
                 spec = pdf.attachments[page_label_filename(page_index)].obj
-                assert str(spec[Name.Desc]) == f"PlanLabel 0.1 label for page {page_index}"
+                assert str(spec[Name.Desc]) == f"Plannotation 0.1 label for page {page_index}"
 
 
 # ===========================================================================
@@ -963,8 +963,8 @@ class TestAssociatedFiles:
     def test_the_name_tree_and_the_af_arrays_are_both_populated(self, labelled: Path) -> None:
         """Neither registration implies the other, so both are made explicitly."""
         with pikepdf.open(labelled) as pdf:
-            assert af_filenames(pdf.pages[0].obj)[-1] == "planlabel-p0000.json"
-            assert af_filenames(pdf.pages[1].obj) == ["planlabel-p0001.json"]
+            assert af_filenames(pdf.pages[0].obj)[-1] == "plannotation-p0000.json"
+            assert af_filenames(pdf.pages[1].obj) == ["plannotation-p0001.json"]
             assert af_filenames(pdf.Root)[-1] == INDEX_FILENAME
             for name in LABEL_FILENAMES:
                 assert name in pdf.attachments
@@ -972,7 +972,7 @@ class TestAssociatedFiles:
     def test_one_indirect_object_serves_both(self, labelled: Path) -> None:
         """The ``/AF`` entry and the name-tree entry are one object, not a copy."""
         with pikepdf.open(labelled) as pdf:
-            page_spec = pdf.attachments["planlabel-p0000.json"].obj
+            page_spec = pdf.attachments["plannotation-p0000.json"].obj
             associated = [entry.objgen for entry in pdf.pages[0].obj[Name.AF]]
             assert page_spec.objgen in associated
             index_spec = pdf.attachments[INDEX_FILENAME].obj
@@ -1041,7 +1041,7 @@ class TestAssociatedFiles:
         target = tmp_path / "packed.pdf"
         label(drawing_set, target, labels, index)
         with pikepdf.open(target) as pdf:
-            stream = pdf.attachments["planlabel-p0000.json"].obj[Name.EF][Name.F]
+            stream = pdf.attachments["plannotation-p0000.json"].obj[Name.EF][Name.F]
             raw = bytes(stream.read_raw_bytes())
             decoded = bytes(stream.read_bytes())
         assert len(raw) < len(decoded)
@@ -1080,7 +1080,7 @@ class TestAssociatedFiles:
         with pikepdf.open(broken) as pdf:
             problems = associated_file_problems(pdf)
         assert problems == [
-            "name-tree entry 'planlabel-p0001.json' is not referenced from any /AF array"
+            "name-tree entry 'plannotation-p0001.json' is not referenced from any /AF array"
         ]
 
 
@@ -1157,7 +1157,7 @@ class TestNothingElseIsTouched:
             assert af_filenames(pdf.Root) == [fx.FOREIGN_DOC_FILENAME, INDEX_FILENAME]
             assert af_filenames(pdf.pages[0].obj) == [
                 fx.FOREIGN_PAGE_FILENAME,
-                "planlabel-p0000.json",
+                "plannotation-p0000.json",
             ]
 
     def test_the_pdf_version_is_not_bumped(self, drawing_set: Path, labelled: Path) -> None:
@@ -1235,9 +1235,9 @@ class TestStrip:
         The fixture itself contains the word nowhere, which is what makes searching the
         whole file for it an honest test rather than a coincidence.
         """
-        assert b"planlabel" not in drawing_set.read_bytes().lower()
+        assert b"plannotation" not in drawing_set.read_bytes().lower()
         data = stripped.read_bytes()
-        assert b"planlabel" not in data.lower()
+        assert b"plannotation" not in data.lower()
         assert SPEC_URI.encode() not in data
 
     def test_the_associations_are_restored_exactly(self, drawing_set: Path, stripped: Path) -> None:
@@ -1263,7 +1263,7 @@ class TestStrip:
         assert FOREIGN_DECLARATION in packet
 
     def test_the_declaration_is_gone(self, stripped: Path) -> None:
-        """No conformance claim to the PlanLabel specification is left behind."""
+        """No conformance claim to the Plannotation specification is left behind."""
         with pikepdf.open(stripped) as pdf:
             assert embed.has_declaration(pdf) is False
 
@@ -1299,20 +1299,20 @@ class TestStrip:
         with pikepdf.open(clean) as pdf:
             assert Name.Metadata not in pdf.Root
 
-    def test_only_planlabel_filenames_are_owned(self) -> None:
-        """Strip removes only what PlanLabel writes, and it knows what it writes."""
-        assert embed.is_planlabel_filename("planlabel-p0000.json") is True
-        assert embed.is_planlabel_filename(INDEX_FILENAME) is True
-        assert embed.is_planlabel_filename("planlabel-p12.json") is False
-        assert embed.is_planlabel_filename("factur-x.xml") is False
-        assert embed.is_planlabel_filename(fx.FOREIGN_DOC_FILENAME) is False
+    def test_only_plannotation_filenames_are_owned(self) -> None:
+        """Strip removes only what Plannotation writes, and it knows what it writes."""
+        assert embed.is_plannotation_filename("plannotation-p0000.json") is True
+        assert embed.is_plannotation_filename(INDEX_FILENAME) is True
+        assert embed.is_plannotation_filename("plannotation-p12.json") is False
+        assert embed.is_plannotation_filename("factur-x.xml") is False
+        assert embed.is_plannotation_filename(fx.FOREIGN_DOC_FILENAME) is False
 
     def test_strip_leaves_no_empty_name_tree_behind(self, tmp_path: Path) -> None:
         """A catalog that had no ``/Names`` must not have one afterwards.
 
         An emptied ``EmbeddedFiles`` name tree is residue of exactly the kind this
         module removes everywhere else: the emptied ``/AF`` key goes, and so does an XMP
-        packet PlanLabel itself created.
+        packet Plannotation itself created.
         """
         source = write_bytes(tmp_path / "bare.pdf", fx.build_bare())
         with pikepdf.open(source) as pdf:
@@ -1376,7 +1376,7 @@ class TestTheDeclarationComposes:
         The fixture already carries a PDF Declaration naming another specification.
         Adding a second ``pdfd:declarations`` property beside it -- which is what a
         writer that always splices a whole ``rdf:Description`` does -- makes the packet
-        invalid XMP, and a reader that took the first Bag would never see PlanLabel's
+        invalid XMP, and a reader that took the first Bag would never see Plannotation's
         claim at all.
         """
         bag = declarations_bag(labelled)
@@ -1439,7 +1439,7 @@ class TestTheDeclarationComposes:
         """A declarations property that is not an array is refused, not worked around.
 
         Section 6.3.3 makes the declarations an ``rdf:Bag``. A packet where it is not
-        one is malformed before PlanLabel arrives, and repairing another producer's
+        one is malformed before Plannotation arrives, and repairing another producer's
         metadata is not this writer's business -- nor is writing a second property
         beside it, which is what a writer that treats "no array" as "no declarations"
         would do.
@@ -1484,7 +1484,7 @@ class TestNothingIsWrittenIntoAComment:
     """A comment and a CDATA section hold text, not markup, and no XMP reader sees them.
 
     Scanning the packet's bytes for a splice point without masking them first put
-    PlanLabel's claim inside somebody else's comment -- and :func:`attach` then reported
+    Plannotation's claim inside somebody else's comment -- and :func:`attach` then reported
     that it had written a declaration, and :func:`has_declaration` agreed, for a
     document that declared nothing at all.
     """
@@ -1618,7 +1618,7 @@ class TestNothingIsWrittenIntoAComment:
 class TestAttachRefuses:
     """A wrong label is worse than no label, so the carrier refuses rather than guesses."""
 
-    def test_a_pre_existing_planlabel_attachment_is_not_overwritten(
+    def test_a_pre_existing_plannotation_attachment_is_not_overwritten(
         self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
     ) -> None:
         """Assigning into the attachments mapping replaces silently; refuse instead."""
@@ -1646,17 +1646,17 @@ class TestAttachRefuses:
         with pytest.raises(AttachmentConflictError, match="already attached"):
             label(labelled, tmp_path / "twice.pdf", labels, index)
 
-    def test_a_foreign_file_whose_uf_is_a_planlabel_name_is_refused(
+    def test_a_foreign_file_whose_uf_is_a_plannotation_name_is_refused(
         self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
     ) -> None:
-        """An existing attachment with a PlanLabel filename must stop the write."""
+        """An existing attachment with a Plannotation filename must stop the write."""
         source = tmp_path / "disguised.pdf"
         with pikepdf.open(drawing_set) as pdf:
             spec = pikepdf.AttachedFileSpec(
                 pdf,
                 b'{"not": "ours"}\n',
                 description="Somebody else's file, under our name",
-                filename="planlabel-p0000.json",
+                filename="plannotation-p0000.json",
                 mime_type="application/json",
                 creation_date=fx.FIXED_PDF_DATE,
                 mod_date=fx.FIXED_PDF_DATE,
@@ -1672,7 +1672,7 @@ class TestAttachRefuses:
             outcome = "refused"
         assert outcome == "refused", (
             "attach() accepted a document already carrying a file specification whose "
-            "/UF is 'planlabel-p0000.json', and the label it then wrote cannot be read "
+            "/UF is 'plannotation-p0000.json', and the label it then wrote cannot be read "
             "back"
         )
 
@@ -1683,23 +1683,23 @@ class TestAttachRefuses:
 
         A tool that rebuilds the ``EmbeddedFiles`` name tree without our keys leaves the
         label files alive on the ``/AF`` arrays, which is a document
-        :func:`planlabel.pdf.embed.read` reads perfectly well. Labelling it again must
-        refuse, not append a second ``planlabel-p0000.json`` to the same page.
+        :func:`plannotation.pdf.embed.read` reads perfectly well. Labelling it again must
+        refuse, not append a second ``plannotation-p0000.json`` to the same page.
         """
         target = tmp_path / "af-only.pdf"
         with pikepdf.open(labelled) as pdf:
             tree = pdf.Root[Name.Names][Name.EmbeddedFiles][Name.Names]
             kept: list[Object] = []
             for position in range(0, len(tree), 2):
-                if not embed.is_planlabel_filename(str(tree[position])):
+                if not embed.is_plannotation_filename(str(tree[position])):
                     kept.extend([tree[position], tree[position + 1]])
             pdf.Root[Name.Names][Name.EmbeddedFiles][Name.Names] = Array(kept)
             embed.save_labelled(pdf, target)
         with pikepdf.open(target) as pdf:
-            assert not any(embed.is_planlabel_filename(name) for name in pdf.attachments)
+            assert not any(embed.is_plannotation_filename(name) for name in pdf.attachments)
             assert af_filenames(pdf.pages[0].obj) == [
                 fx.FOREIGN_PAGE_FILENAME,
-                "planlabel-p0000.json",
+                "plannotation-p0000.json",
             ]
         assert sorted(embed.read(target).pages) == [0, 1]
 
@@ -1713,7 +1713,7 @@ class TestAttachRefuses:
             with pikepdf.open(twice) as pdf:
                 outcome = f"accepted, and page 0's /AF now names {af_filenames(pdf.pages[0].obj)}"
         assert outcome == "refused", (
-            "attach() accepted a document whose PlanLabel files are reachable from /AF "
+            "attach() accepted a document whose Plannotation files are reachable from /AF "
             f"but not from the name tree: {outcome}"
         )
 
@@ -1912,7 +1912,7 @@ class TestSignatures:
     def test_a_signed_document_can_still_be_stripped(
         self, signed_document: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
     ) -> None:
-        """Taking PlanLabel's files back out must always be possible."""
+        """Taking Plannotation's files back out must always be possible."""
         target = tmp_path / "broken-signature.pdf"
         label(signed_document, target, labels, index, break_signature=True)
         report = embed.strip(target, tmp_path / "clean.pdf")
@@ -1994,7 +1994,7 @@ class TestDeterminism:
         anything is pinned. This one crosses a process boundary *and* a second
         boundary, with a different hash seed and a different time zone -- verified to
         fail when ``deterministic_id`` is taken out of
-        :func:`planlabel.pdf.embed.save_labelled`, which the immediate comparison did
+        :func:`plannotation.pdf.embed.save_labelled`, which the immediate comparison did
         not.
         """
         here = tmp_path / "here.pdf"
@@ -2004,7 +2004,7 @@ class TestDeterminism:
             tmp_path,
             "from datetime import UTC, datetime\n"
             "from tests.pdf_fixtures import build_drawing_set, drawing_set_labels\n"
-            "from planlabel.pdf.embed import attach, build_index\n"
+            "from plannotation.pdf.embed import attach, build_index\n"
             "target = Path(sys.argv[1])\n"
             "source = target.with_name('source.pdf')\n"
             "source.write_bytes(build_drawing_set())\n"
@@ -2113,7 +2113,7 @@ class TestReadPaths:
             tree = pdf.Root[Name.Names][Name.EmbeddedFiles][Name.Names]
             kept: list[Object] = []
             for position in range(0, len(tree), 2):
-                if not embed.is_planlabel_filename(str(tree[position])):
+                if not embed.is_plannotation_filename(str(tree[position])):
                     kept.extend([tree[position], tree[position + 1]])
             pdf.Root[Name.Names][Name.EmbeddedFiles][Name.Names] = Array(kept)
             embed.save_labelled(pdf, target)
@@ -2151,7 +2151,7 @@ class TestReadPaths:
         """
         target = tmp_path / "dangling.pdf"
         with pikepdf.open(labelled) as pdf:
-            del pdf.attachments["planlabel-p0000.json"]
+            del pdf.attachments["plannotation-p0000.json"]
             embed.save_labelled(pdf, target)
         found = embed.read(target)
         assert sorted(found.pages) == [1]
@@ -2160,7 +2160,7 @@ class TestReadPaths:
     def test_an_invalid_label_is_an_error_by_default(self, labelled: Path, tmp_path: Path) -> None:
         """A person running a tool wants to be told that a label is broken."""
         target = corrupt_page_label(labelled, tmp_path)
-        with pytest.raises(InvalidLabelError, match="is not a valid PlanLabel page document"):
+        with pytest.raises(InvalidLabelError, match="is not a valid Plannotation page document"):
             embed.read(target)
 
     def test_an_invalid_label_reads_as_absent_when_asked(
@@ -2180,14 +2180,14 @@ class TestReadPaths:
             spec = pikepdf.AttachedFileSpec(
                 pdf,
                 b"{}\n",
-                description="PlanLabel 0.1 label for page 9",
-                filename="planlabel-p0009.json",
+                description="Plannotation 0.1 label for page 9",
+                filename="plannotation-p0009.json",
                 mime_type="application/json",
                 creation_date=fx.FIXED_PDF_DATE,
                 mod_date=fx.FIXED_PDF_DATE,
             )
-            pdf.attachments["planlabel-p0009.json"] = spec
-            pdf.attachments["planlabel-p0009.json"].obj[Name.AFRelationship] = Name.Data
+            pdf.attachments["plannotation-p0009.json"] = spec
+            pdf.attachments["plannotation-p0009.json"].obj[Name.AFRelationship] = Name.Data
             embed.save_labelled(pdf, target)
         found = embed.read(target)
         assert sorted(found.pages) == [0, 1]
@@ -2222,8 +2222,8 @@ def corrupt_page_label(labelled: Path, tmp_path: Path) -> Path:
     """
     target = tmp_path / "corrupt.pdf"
     with pikepdf.open(labelled) as pdf:
-        spec = pdf.attachments["planlabel-p0001.json"].obj
-        spec[Name.EF][Name.F].write(b'{"planlabel": "0.1", "page": 3}\n')
+        spec = pdf.attachments["plannotation-p0001.json"].obj
+        spec[Name.EF][Name.F].write(b'{"plannotation": "0.1", "page": 3}\n')
         embed.save_labelled(pdf, target)
     return target
 
@@ -2269,7 +2269,7 @@ class TestBoundedReading:
             embed.read(target)
 
     def test_carrier_report_is_bounded_as_well(self, tmp_path: Path) -> None:
-        """``planlabel read`` goes through the report, so the bound must be there too."""
+        """``plannotation read`` goes through the report, so the bound must be there too."""
         source = write_bytes(tmp_path / "bomb-report.pdf", fx.build_label_bomb())
         with pytest.raises(InvalidLabelError, match="decompression bomb"):
             embed.carrier_report(source)
@@ -2373,13 +2373,13 @@ def peak_rss_reading(tmp_path: Path, source: Path, *, max_label_bytes: int) -> t
 import resource
 from pathlib import Path
 
-from planlabel.errors import PlanLabelError
-from planlabel.pdf import embed
+from plannotation.errors import PlannotationError
+from plannotation.pdf import embed
 
 try:
     embed.read(Path({str(source)!r}), max_label_bytes={max_label_bytes})
     outcome = "accepted"
-except PlanLabelError as exc:
+except PlannotationError as exc:
     outcome = type(exc).__name__
 except Exception as exc:  # noqa: BLE001
     outcome = "raised " + type(exc).__name__
@@ -2652,7 +2652,7 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
     The row length was computed from ``/Columns``, ``/Colors`` and
     ``/BitsPerComponent`` and then allocated. A 1,317-byte document with ``/Columns
     2000000000`` cost 1,662 MB; a slightly larger one raised :class:`MemoryError`, which
-    is not a :class:`~planlabel.errors.PlanLabelError`, so ``strict=False`` did not
+    is not a :class:`~plannotation.errors.PlannotationError`, so ``strict=False`` did not
     deliver the absence section 4.3 (2) promises and the CLI printed a traceback.
     """
 
@@ -2744,7 +2744,7 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
         spent = peak - reader_baseline_rss
         assert outcome == "InvalidLabelError", (
             f"reading a document with an absurd /Columns ended in {outcome!r}; a "
-            "MemoryError is not a PlanLabelError, so it reaches a caller as a traceback "
+            "MemoryError is not a PlannotationError, so it reaches a caller as a traceback "
             "and never as the absence section 4.3 (2) promises"
         )
         assert spent < RSS_ALLOWANCE, (
@@ -2920,7 +2920,7 @@ class TestTheMetadataPacketIsBounded:
         self, metadata_bomb: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Describing a document is not writing to it, so it is reported and not refused."""
-        with caplog.at_level(logging.WARNING, logger="planlabel.pdf.embed"):
+        with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
             report = embed.carrier_report(metadata_bomb)
         assert report.declaration is False
         assert any("XMP metadata will not be read" in record.message for record in caplog.records)
@@ -2961,9 +2961,9 @@ class TestTheMetadataPacketIsBounded:
     ) -> None:
         """Every path that saves refuses a packet it cannot see, and there are two.
 
-        :func:`planlabel.pdf.embed.attach` and :func:`planlabel.pdf.embed.strip` are the
+        :func:`plannotation.pdf.embed.attach` and :func:`plannotation.pdf.embed.strip` are the
         only two functions in the module that call
-        :func:`planlabel.pdf.embed.save_labelled`, and the asymmetry between them was the
+        :func:`plannotation.pdf.embed.save_labelled`, and the asymmetry between them was the
         defect: one refused, the other saved.
         """
         page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
@@ -3005,7 +3005,7 @@ class TestTheMetadataPacketIsBounded:
 class TestRefusalAndRemovalAgree:
     """What :func:`attach` refuses to write over, :func:`strip` must be able to remove.
 
-    The refusal tells the user to run ``planlabel strip``. When the two disagreed, that
+    The refusal tells the user to run ``plannotation strip``. When the two disagreed, that
     advice was false and the document could be neither labelled nor repaired: attach
     matched a file specification's ``/UF`` and ``/F``, and strip matched only the
     name-tree key it was filed under.
@@ -3013,7 +3013,7 @@ class TestRefusalAndRemovalAgree:
 
     @staticmethod
     def occupied(source: Path, target: Path, *, key: str, uf: str, under_af: bool) -> Path:
-        """Write a copy of a document carrying one foreign file under a PlanLabel name.
+        """Write a copy of a document carrying one foreign file under a Plannotation name.
 
         Args:
             source: The document to copy.
@@ -3044,10 +3044,10 @@ class TestRefusalAndRemovalAgree:
     @pytest.mark.parametrize(
         ("key", "uf", "registration"),
         [
-            ("planlabel-p0000.json", "planlabel-p0000.json", "name tree"),
-            ("some-other-key.json", "planlabel-p0000.json", "name tree"),
-            ("some-other-key.json", "planlabel-p0000.json", "name tree and /AF"),
-            ("planlabel-index.json", "planlabel-index.json", "name tree and /AF"),
+            ("plannotation-p0000.json", "plannotation-p0000.json", "name tree"),
+            ("some-other-key.json", "plannotation-p0000.json", "name tree"),
+            ("some-other-key.json", "plannotation-p0000.json", "name tree and /AF"),
+            ("plannotation-index.json", "plannotation-index.json", "name tree and /AF"),
         ],
     )
     def test_strip_makes_a_document_attach_refuses_acceptable(
@@ -3068,7 +3068,7 @@ class TestRefusalAndRemovalAgree:
             uf=uf,
             under_af=registration.endswith("/AF"),
         )
-        with pytest.raises(AttachmentConflictError, match="planlabel strip"):
+        with pytest.raises(AttachmentConflictError, match="plannotation strip"):
             label(occupied, tmp_path / "refused.pdf", labels, index)
 
         cleaned = tmp_path / "cleaned.pdf"
@@ -3109,7 +3109,7 @@ class TestRefusalAndRemovalAgree:
     def test_a_foreign_attachment_under_a_foreign_name_still_survives(
         self, labelled: Path, tmp_path: Path
     ) -> None:
-        """Widening what strip removes must not widen it past PlanLabel's own names."""
+        """Widening what strip removes must not widen it past Plannotation's own names."""
         cleaned = tmp_path / "cleaned.pdf"
         embed.strip(labelled, cleaned)
         with pikepdf.open(cleaned) as pdf:
@@ -3118,11 +3118,11 @@ class TestRefusalAndRemovalAgree:
             )
 
 
-class TestWhichNamesPlanLabelOwns:
-    """Exactly ``planlabel-index.json`` and ``planlabel-pNNNN.json``, and nothing near them.
+class TestWhichNamesPlannotationOwns:
+    """Exactly ``plannotation-index.json`` and ``plannotation-pNNNN.json``, and nothing near them.
 
-    The predicate decides two things at once: what :func:`planlabel.pdf.embed.attach`
-    refuses to label over, and what :func:`planlabel.pdf.embed.strip` deletes. A name
+    The predicate decides two things at once: what :func:`plannotation.pdf.embed.attach`
+    refuses to label over, and what :func:`plannotation.pdf.embed.strip` deletes. A name
     wrongly matched is therefore both a document that cannot be labelled and somebody
     else's file removed from it.
     """
@@ -3130,34 +3130,34 @@ class TestWhichNamesPlanLabelOwns:
     @pytest.mark.parametrize(
         "name",
         [
-            "planlabel-p0000.json\n",
-            "planlabel-p0000.json\r\n",
-            "planlabel-p0000.json ",
-            " planlabel-p0000.json",
-            "planlabel-p0000.JSON",
-            "planlabel-p000.json",
-            "planlabel-p00000.json",
-            "planlabel-p0000.json.bak",
+            "plannotation-p0000.json\n",
+            "plannotation-p0000.json\r\n",
+            "plannotation-p0000.json ",
+            " plannotation-p0000.json",
+            "plannotation-p0000.JSON",
+            "plannotation-p000.json",
+            "plannotation-p00000.json",
+            "plannotation-p0000.json.bak",
             "рlanlabel-p0000.json",  # noqa: RUF001 - a Cyrillic er is the point
-            "planlabel-index.json\n",
+            "plannotation-index.json\n",
         ],
     )
     def test_a_name_that_is_not_ours_is_not_ours(self, name: str) -> None:
         r"""``$`` also matches before a trailing newline; ``\Z`` does not.
 
-        ``re.match(r"^planlabel-p\d{4}\.json$", "planlabel-p0000.json\n")`` succeeds,
+        ``re.match(r"^plannotation-p\d{4}\.json$", "plannotation-p0000.json\n")`` succeeds,
         which is a Python rule and not an anchoring rule -- the Rust engine pydantic
         validates with has no such behaviour, and section 3 of the specification already
         notes the difference. The first entry here is the one that mattered: a document
-        may register an attachment under a name ending in a newline, and PlanLabel both
+        may register an attachment under a name ending in a newline, and Plannotation both
         refused to label such a document and deleted that attachment from it.
         """
-        assert embed.is_planlabel_filename(name) is False
+        assert embed.is_plannotation_filename(name) is False
 
-    @pytest.mark.parametrize("name", ["planlabel-p0000.json", "planlabel-p9999.json"])
+    @pytest.mark.parametrize("name", ["plannotation-p0000.json", "plannotation-p9999.json"])
     def test_the_names_that_are_ours_still_are(self, name: str) -> None:
         """Narrowing a predicate must not narrow it past what it has to match."""
-        assert embed.is_planlabel_filename(name) is True
+        assert embed.is_plannotation_filename(name) is True
 
     def test_no_pattern_in_the_module_anchors_with_a_dollar(self) -> None:
         """The audit, mechanised, so the next pattern cannot reintroduce it.
@@ -3176,7 +3176,7 @@ class TestWhichNamesPlanLabelOwns:
 
 
 class TestStripNeverDestroysAFileItShares:
-    """One ``/Filespec``, two name-tree keys, and only one of them PlanLabel's.
+    """One ``/Filespec``, two name-tree keys, and only one of them Plannotation's.
 
     ``del pdf.attachments[key]`` removes the key **and** replaces the specification with
     a null object. Where the object was shared, the other producer's bytes went with it
@@ -3205,7 +3205,7 @@ class TestStripNeverDestroysAFileItShares:
             assert len(filespec_objects(pdf)) == 1
 
     def test_the_foreign_file_and_its_bytes_survive(self, aliased: Path, tmp_path: Path) -> None:
-        """The whole promise of :func:`planlabel.pdf.embed.strip`, under aliasing."""
+        """The whole promise of :func:`plannotation.pdf.embed.strip`, under aliasing."""
         cleaned = tmp_path / "cleaned.pdf"
         report = embed.strip(aliased, cleaned)
         assert report.filenames == (page_label_filename(0),)
@@ -3223,7 +3223,7 @@ class TestStripNeverDestroysAFileItShares:
             assert associated_file_problems(pdf) == []
 
     def test_a_file_whose_every_key_is_ours_is_still_destroyed(self, tmp_path: Path) -> None:
-        """Narrowing what strip deletes must not narrow it past PlanLabel's own files."""
+        """Narrowing what strip deletes must not narrow it past Plannotation's own files."""
         source = write_bytes(
             tmp_path / "both-ours.pdf",
             fx.build_aliased_attachment(key=INDEX_FILENAME, filename=page_label_filename(0)),
@@ -3238,7 +3238,7 @@ class TestStripNeverDestroysAFileItShares:
     def test_the_document_can_then_be_labelled(self, aliased: Path, tmp_path: Path) -> None:
         """The parity of the refusal and the removal, under aliasing too."""
         page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        with pytest.raises(AttachmentConflictError, match="planlabel strip"):
+        with pytest.raises(AttachmentConflictError, match="plannotation strip"):
             label(aliased, tmp_path / "refused.pdf", page_labels, None)
         cleaned = tmp_path / "cleaned.pdf"
         embed.strip(aliased, cleaned)
@@ -3254,15 +3254,15 @@ class TestSidecar:
     """The third carrier: the same payload, in a file that touches no PDF."""
 
     def test_it_is_written_beside_the_document(self, labelled: Path, tmp_path: Path) -> None:
-        """``X.pdf`` gets ``X.planlabel.json``."""
+        """``X.pdf`` gets ``X.plannotation.json``."""
         copy = write_bytes(tmp_path / "TWP-101.pdf", labelled.read_bytes())
         written = embed.write_sidecar(copy)
-        assert written == tmp_path / "TWP-101.planlabel.json"
+        assert written == tmp_path / "TWP-101.plannotation.json"
         assert written.exists()
 
     def test_it_validates_against_the_packaged_schema(self, labelled: Path, tmp_path: Path) -> None:
         """A public artefact consumers parse must have a schema, and must satisfy it."""
-        written = embed.write_sidecar(labelled, tmp_path / "out.planlabel.json")
+        written = embed.write_sidecar(labelled, tmp_path / "out.plannotation.json")
         document = json.loads(written.read_text("utf-8"))
         errors = sorted(
             Draft202012Validator(sidecar_schema()).iter_errors(document),
@@ -3274,7 +3274,7 @@ class TestSidecar:
         self, labelled: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
     ) -> None:
         """Reading the sidecar gives back the same labels and the same index."""
-        written = embed.write_sidecar(labelled, tmp_path / "out.planlabel.json")
+        written = embed.write_sidecar(labelled, tmp_path / "out.plannotation.json")
         found = embed.read(written)
         assert sorted(found.pages) == [0, 1]
         for page_index, original in enumerate(labels):
@@ -3363,7 +3363,7 @@ class TestSidecar:
         self, drawing_set: Path, tmp_path: Path
     ) -> None:
         """An empty sidecar would be a worse answer than an error."""
-        with pytest.raises(LabelNotFoundError, match="carries no PlanLabel data"):
+        with pytest.raises(LabelNotFoundError, match="carries no Plannotation data"):
             embed.write_sidecar(drawing_set, tmp_path / "out.json")
 
     def test_the_bytes_are_canonical_and_stable(self, labelled: Path, tmp_path: Path) -> None:
@@ -3376,7 +3376,7 @@ class TestSidecar:
     def test_the_sidecar_path_helper_agrees(self) -> None:
         """``sidecar_path`` is what the CLI prints and what the writer defaults to."""
         assert embed.sidecar_path(Path("drawings/TWP-101.pdf")) == Path(
-            "drawings/TWP-101.planlabel.json"
+            "drawings/TWP-101.plannotation.json"
         )
 
 
@@ -3413,7 +3413,7 @@ class TestPdfAConformance:
     ) -> None:
         """Loudly, and on the report, so a caller can act on it rather than read logs."""
         source = write_bytes(tmp_path / f"pdfa{part}.pdf", fx.build_pdfa(part))
-        with caplog.at_level(logging.WARNING, logger="planlabel.pdf.embed"):
+        with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
             report = label_one_page(source, tmp_path / f"pdfa{part}-labelled.pdf")
         assert report.pdfa_part == part
         assert report.pdfa_extension_schema_missing is True
@@ -3425,7 +3425,7 @@ class TestPdfAConformance:
     ) -> None:
         """Part 4 dropped extension schemas, so there is nothing to warn about."""
         source = write_bytes(tmp_path / "pdfa4.pdf", fx.build_pdfa(4))
-        with caplog.at_level(logging.WARNING, logger="planlabel.pdf.embed"):
+        with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
             report = label_one_page(source, tmp_path / "pdfa4-labelled.pdf")
         assert report.pdfa_part == 4
         assert report.pdfa_extension_schema_missing is False
@@ -3438,7 +3438,7 @@ class TestPdfAConformance:
         source = write_bytes(
             tmp_path / "pdfa3ext.pdf", fx.build_pdfa(3, with_extension_schema=True)
         )
-        with caplog.at_level(logging.WARNING, logger="planlabel.pdf.embed"):
+        with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
             report = label_one_page(source, tmp_path / "pdfa3ext-labelled.pdf")
         assert report.pdfa_part == 3
         assert report.pdfa_extension_schema_missing is False
@@ -3478,7 +3478,7 @@ class TestDamagedDocuments:
 # The command line, which is where these errors reach a person
 # ===========================================================================
 def run_cli(*arguments: str) -> Result:
-    """Invoke the ``planlabel`` command in process.
+    """Invoke the ``plannotation`` command in process.
 
     Args:
         *arguments: The command line, without the program name.
@@ -3503,7 +3503,7 @@ class TestCommandLine:
         index_file.write_text(
             canonical_json(embed.build_index(labels, with_filenames=False)), encoding="utf-8"
         )
-        out = tmp_path / "out.planlabel.json"
+        out = tmp_path / "out.plannotation.json"
         result = run_cli(
             "sidecar",
             str(signed_document),
@@ -3871,13 +3871,13 @@ class TestParsingIsBoundedToo:
         Returns:
             The document's bytes.
         """
-        payload = b'{"planlabel":"0.1","x":' + b"[" * depth + b"]" * depth + b"}"
+        payload = b'{"plannotation":"0.1","x":' + b"[" * depth + b"]" * depth + b"}"
         return fx.build_filtered_label(payload)
 
     def test_a_label_that_nests_too_deeply_is_refused_and_not_a_recursion_error(
         self, tmp_path: Path
     ) -> None:
-        """RecursionError is not a PlanLabelError, so unconverted it escapes read()."""
+        """RecursionError is not a PlannotationError, so unconverted it escapes read()."""
         source = write_bytes(tmp_path / "deep.pdf", self._deeply_nested())
         with pytest.raises(InvalidLabelError, match="nests too deeply"):
             embed.read(source)
@@ -3906,7 +3906,7 @@ class TestParsingIsBoundedToo:
             The document's bytes.
         """
         document = {
-            "planlabel": SCHEMA_VERSION,
+            "plannotation": SCHEMA_VERSION,
             "provenance": "authored",
             "page": {"index": 0, "widthMm": 420, "heightMm": 297},
             "sheet": {"id": "A-101"},

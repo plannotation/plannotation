@@ -1,22 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
-# Workspace root. This file is both the `planlabel` distribution and the uv
-# workspace root; `planlabel_mcp/` is the one member. One uv.lock covers both.
+# Workspace root. This file is both the `plannotation` distribution and the uv
+# workspace root; `plannotation_mcp/` is the one member. One uv.lock covers both.
 
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 # ---------------------------------------------------------------------------
-# Distribution: planlabel
+# Distribution: plannotation
 # ---------------------------------------------------------------------------
 [project]
-name = "planlabel"
-dynamic = ["version"]                      # single-sourced from planlabel/__init__.py
+name = "plannotation"
+dynamic = ["version"]                      # single-sourced from plannotation/__init__.py
 description = "An open drawing-semantics sidecar for 2D construction drawings: write, read, validate and inspect machine-readable labels on PDF pages."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
-authors = [{ name = "The PlanLabel Authors" }]
+authors = [{ name = "The Plannotation Authors" }]
 keywords = ["pdf", "ifc", "bim", "aec", "construction", "drawings", "openbim", "mcp"]
 # Upper bound is not a preference: ifcopenshell declares >=3.10,<3.15, and it is
 # the project's real interpreter ceiling.
@@ -36,7 +36,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 
-# Every runtime dependency here is permissive. Installing `planlabel` with no
+# Every runtime dependency here is permissive. Installing `plannotation` with no
 # extras pulls a closure with zero copyleft; see THIRD_PARTY_LICENSES.md.
 dependencies = [
   "typer>=0.15",         # MIT
@@ -60,43 +60,43 @@ dependencies = [
 # installs anywhere and then fails at import with
 #   OSError: no library called "cairo-2" was found
 # on any machine without libcairo2 / `brew install cairo`. Keeping it out of the
-# core dependencies is what stops `planlabel read` crashing on a bare machine.
+# core dependencies is what stops `plannotation read` crashing on a bare machine.
 svg = ["cairosvg>=2.7.1"]              # LGPL-3.0-or-later, unmodified dependency
 # ifcopenshell publishes no sdist, only wheels, and pulls shapely, which vendors
 # GEOS (LGPL-2.1) as a prebuilt library. A 42 MB wheel unpacking to ~179 MB.
 ifc = ["ifcopenshell>=0.8.4"]          # LGPL-3.0-or-later, unmodified dependency
 bench = ["anthropic>=1.0"]             # MIT, benchmark only; tests never call the API
-all = ["planlabel[svg,ifc,bench]"]
+all = ["plannotation[svg,ifc,bench]"]
 
 [project.scripts]
-planlabel = "planlabel.cli:app"
-planlabel-bench = "planlabel.bench.cli:app"
+plannotation = "plannotation.cli:app"
+plannotation-bench = "plannotation.bench.cli:app"
 
 [project.urls]
-Homepage = "https://srtgn.github.io/planlabel/"
-Documentation = "https://srtgn.github.io/planlabel/"
-Specification = "https://srtgn.github.io/planlabel/spec/0.1"
-Schema = "https://srtgn.github.io/planlabel/schema/0.1/planlabel.schema.json"
-Source = "https://github.com/srtgn/planlabel"
-Issues = "https://github.com/srtgn/planlabel/issues"
-Changelog = "https://github.com/srtgn/planlabel/blob/main/CHANGELOG.md"
+Homepage = "https://plannotation.github.io/"
+Documentation = "https://plannotation.github.io/"
+Specification = "https://plannotation.github.io/spec/0.1"
+Schema = "https://plannotation.github.io/schema/0.1/plannotation.schema.json"
+Source = "https://github.com/plannotation/plannotation"
+Issues = "https://github.com/plannotation/plannotation/issues"
+Changelog = "https://github.com/plannotation/plannotation/blob/main/CHANGELOG.md"
 
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
 [tool.hatch.version]
-path = "planlabel/__init__.py"
+path = "plannotation/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-# Ships every non-Python file under planlabel/ too, which is how
-# planlabel/schema/*.json reaches users as package data from Phase 1.
-packages = ["planlabel"]
+# Ships every non-Python file under plannotation/ too, which is how
+# plannotation/schema/*.json reaches users as package data from Phase 1.
+packages = ["plannotation"]
 
 [tool.hatch.build.targets.sdist]
 # Leading slashes anchor at the project root; without them hatchling globs
 # recursively and drags the member distribution's files into the core sdist.
 include = [
-  "/planlabel",
+  "/plannotation",
   "/spec",
   "/tests",
   "/README.md",
@@ -109,10 +109,10 @@ include = [
 # uv workspace
 # ---------------------------------------------------------------------------
 [tool.uv.workspace]
-members = ["planlabel_mcp"]
+members = ["plannotation_mcp"]
 
 [tool.uv.sources]
-planlabel-mcp = { workspace = true }
+plannotation-mcp = { workspace = true }
 
 [tool.uv]
 # Pin the uv range from one place. Without it a future uv could bump the lockfile
@@ -128,7 +128,7 @@ default-groups = ["dev"]
 # apt/brew libcairo step. Local development gets them via `make install`, which
 # syncs --all-extras; Phase 4 is when CI starts needing them too.
 dev = [
-  "planlabel-mcp",
+  "plannotation-mcp",
   "ruff>=0.8",
   "mypy>=1.13",
   "pytest>=8.3",
@@ -143,7 +143,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["planlabel", "planlabel_mcp", "tests"]
+src = ["plannotation", "plannotation_mcp", "tests"]
 extend-exclude = ["inspector", "samples", "bench/results", "tests/fixtures/realworld"]
 
 [tool.ruff.lint]
@@ -230,7 +230,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 runtime-evaluated-decorators = ["pydantic.validate_call"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["planlabel", "planlabel_mcp"]
+known-first-party = ["plannotation", "plannotation_mcp"]
 required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.per-file-ignores]
@@ -240,9 +240,9 @@ required-imports = ["from __future__ import annotations"]
 # Typer expresses a flag as a boolean parameter, and a link description is a lookup
 # over the five link kinds the format defines -- one return each, which reads better
 # than nesting them five deep.
-"planlabel/cli.py" = ["FBT001", "FBT002", "PLR0911"]
-"planlabel/bench/cli.py" = ["FBT001", "FBT002"]
-"planlabel_mcp/planlabel_mcp/server.py" = ["FBT001", "FBT002"]
+"plannotation/cli.py" = ["FBT001", "FBT002", "PLR0911"]
+"plannotation/bench/cli.py" = ["FBT001", "FBT002"]
+"plannotation_mcp/plannotation_mcp/server.py" = ["FBT001", "FBT002"]
 "tests/**" = [
   "S101",     # assert is the point
   "PLR2004",  # magic values are fine in expectations
@@ -274,8 +274,8 @@ line-ending = "lf"
 # interpreter floor itself is unaffected.
 python_version = "3.12"
 strict = true
-files = ["planlabel", "planlabel_mcp/planlabel_mcp", "tests"]
-mypy_path = "planlabel_mcp"
+files = ["plannotation", "plannotation_mcp/plannotation_mcp", "tests"]
+mypy_path = "plannotation_mcp"
 warn_unreachable = true
 pretty = true
 enable_error_code = [
@@ -296,10 +296,10 @@ module = ["cairosvg.*", "pypdfium2.*", "svgelements.*"]
 ignore_missing_imports = true
 
 # Those three now produce Any. This makes it an error to let one leak into a
-# PlanLabel signature -- the public API must stay typed -- while leaving internal
+# Plannotation signature -- the public API must stay typed -- while leaving internal
 # use of them unrestricted.
 [[tool.mypy.overrides]]
-module = ["planlabel.*", "planlabel_mcp.*"]
+module = ["plannotation.*", "plannotation_mcp.*"]
 disallow_any_unimported = true
 
 # ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["planlabel", "planlabel_mcp"]
+source = ["plannotation", "plannotation_mcp"]
 omit = ["*/__main__.py"]
 
 [tool.coverage.report]

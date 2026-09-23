@@ -15,8 +15,8 @@ from typing import Any
 import pytest
 from pydantic import JsonValue, ValidationError
 
-from planlabel.constants import SCHEMA_VERSION
-from planlabel.model import (
+from plannotation.constants import SCHEMA_VERSION
+from plannotation.model import (
     ConformanceLevel,
     Element,
     PageLabel,
@@ -44,7 +44,7 @@ def label(**extra: JsonValue) -> dict[str, Any]:
         A dictionary ready to be serialised or loaded.
     """
     return {
-        "planlabel": SCHEMA_VERSION,
+        "plannotation": SCHEMA_VERSION,
         "provenance": "authored",
         "page": dict(PAGE),
         "sheet": dict(SHEET),
@@ -208,7 +208,7 @@ class TestSchemaFidelity:
         """Python's json accepts these by default; JSON itself does not."""
         with pytest.raises(ValueError, match=r"(?i)nan|infinit|valid"):
             load_page_label(
-                '{"planlabel":"0.1","provenance":"authored","sheet":{"id":"A"},'
+                '{"plannotation":"0.1","provenance":"authored","sheet":{"id":"A"},'
                 '"page":{"index":0,"widthMm":' + token + ',"heightMm":297}}'
             )
 
@@ -348,13 +348,13 @@ class TestPackagedSchemas:
 
     def test_page_schema_loads(self) -> None:
         """Available from an installed wheel, with no filesystem assumptions."""
-        assert page_schema()["properties"]["planlabel"]["const"] == SCHEMA_VERSION
+        assert page_schema()["properties"]["plannotation"]["const"] == SCHEMA_VERSION
 
     def test_index_schema_loads(self) -> None:
         """The document-level index schema ships alongside the page schema."""
-        assert index_schema()["properties"]["planlabel"]["const"] == SCHEMA_VERSION
+        assert index_schema()["properties"]["plannotation"]["const"] == SCHEMA_VERSION
 
     def test_a_mutated_schema_does_not_poison_the_next_caller(self) -> None:
         """Jsonschema resolvers mutate what they are given, so each caller gets a copy."""
-        page_schema()["properties"]["planlabel"]["const"] = "tampered"
-        assert page_schema()["properties"]["planlabel"]["const"] == SCHEMA_VERSION
+        page_schema()["properties"]["plannotation"]["const"] = "tampered"
+        assert page_schema()["properties"]["plannotation"]["const"] == SCHEMA_VERSION

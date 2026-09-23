@@ -1,7 +1,7 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
   "codes": "Each invalid case records the validator's stable rule code; `rule` is the human name.",
-  "description": "Fixtures for the rules a PlanLabel 0.1 validator applies beyond the schema. Every document here -- valid and invalid alike -- is schema-valid against planlabel/schema/planlabel-0.1.json with zero errors: that is the point of the corpus, which describes documents that pass the schema and are still wrong. For the schema's own negative cases see tests/fixtures/labels/. Every file under valid/ is expected to produce no finding at all. Every file under invalid/ is expected to produce exactly one finding, of the stated severity, for the stated rule, at reportPath. reportPath is written in python-jsonschema json_path syntax and pointer is the same location as an RFC 6901 JSON Pointer, which is the form SPEC 4.4 (2) requires. The path names the smallest member whose value is wrong; where a rule constrains a relation among several members it names the smallest member that holds them all, and where the member that is wrong is one that is absent it names the object that should have carried it. For a uniqueness violation it names the later of the colliding occurrences, in the order viewports, elements, annotations. rule is a stable slug; several fixtures may share one, because one rule applied to two subjects is still one rule and must have one implementation. severity is error for a violation of a MUST and warning for a violation of a SHOULD or for a finding that rests on a tolerance or a heuristic, per SPEC 4.4. level is the conformance level SPEC 4.1 requires the validator to report, which it MUST do whether or not it also reports errors. documentPageCount, where present, is the page count of the document the label belongs to, which the target.pdfPage rule needs and a lone page label cannot carry. buildsThroughModel is false for the fixtures planlabel.model refuses at load time; those were written as JSON directly and a validator must reach their rule without going through the models.",
+  "description": "Fixtures for the rules a Plannotation 0.1 validator applies beyond the schema. Every document here -- valid and invalid alike -- is schema-valid against plannotation/schema/plannotation-0.1.json with zero errors: that is the point of the corpus, which describes documents that pass the schema and are still wrong. For the schema's own negative cases see tests/fixtures/labels/. Every file under valid/ is expected to produce no finding at all. Every file under invalid/ is expected to produce exactly one finding, of the stated severity, for the stated rule, at reportPath. reportPath is written in python-jsonschema json_path syntax and pointer is the same location as an RFC 6901 JSON Pointer, which is the form SPEC 4.4 (2) requires. The path names the smallest member whose value is wrong; where a rule constrains a relation among several members it names the smallest member that holds them all, and where the member that is wrong is one that is absent it names the object that should have carried it. For a uniqueness violation it names the later of the colliding occurrences, in the order viewports, elements, annotations. rule is a stable slug; several fixtures may share one, because one rule applied to two subjects is still one rule and must have one implementation. severity is error for a violation of a MUST and warning for a violation of a SHOULD or for a finding that rests on a tolerance or a heuristic, per SPEC 4.4. level is the conformance level SPEC 4.1 requires the validator to report, which it MUST do whether or not it also reports errors. documentPageCount, where present, is the page count of the document the label belongs to, which the target.pdfPage rule needs and a lone page label cannot carry. buildsThroughModel is false for the fixtures plannotation.model refuses at load time; those were written as JSON directly and a validator must reach their rule without going through the models.",
   "invalid": [
     {
       "alsoReports": [
@@ -14,7 +14,7 @@
       "family": "referential",
       "file": "invalid/01-duplicate-local-id.json",
       "level": "L3",
-      "note": "planlabel.model refuses this document at load time, so a validator that reaches this rule only by calling load_page_label will report one finding saying the schema accepts the document and the model does not, at the document root, rather than this rule at reportPath. reportPath records where the rule's own finding belongs; which of the two a run produces is a fact about the validator's architecture, and is worth asserting either way.",
+      "note": "plannotation.model refuses this document at load time, so a validator that reaches this rule only by calling load_page_label will report one finding saying the schema accepts the document and the model does not, at the document root, rather than this rule at reportPath. reportPath records where the rule's own finding belongs; which of the two a run produces is a fact about the validator's architecture, and is worth asserting either way.",
       "pointer": "/annotations/8/id",
       "reportPath": "$.annotations[8].id",
       "rule": "referential.local-id-unique",
@@ -391,11 +391,11 @@
       "buildsThroughModel": false,
       "code": "PL-PRV-001",
       "derivedFrom": "valid/08-provenance-inferred-clean.json",
-      "description": "The west wall says it was reconstructed and does not say how sure the reconstruction is. The schema cannot express the dependency, so the document is schema-valid. planlabel.model refuses it at load time, in Element's own validator, so a validator that reaches this rule only through the models will see an exception and not a finding: this rule has to be checked against the parsed JSON. The path is the object, because the member that is wrong is the one that is absent.",
+      "description": "The west wall says it was reconstructed and does not say how sure the reconstruction is. The schema cannot express the dependency, so the document is schema-valid. plannotation.model refuses it at load time, in Element's own validator, so a validator that reaches this rule only through the models will see an exception and not a finding: this rule has to be checked against the parsed JSON. The path is the object, because the member that is wrong is the one that is absent.",
       "family": "provenance",
       "file": "invalid/26-inferred-without-confidence.json",
       "level": "L3",
-      "note": "planlabel.model refuses this document at load time, so a validator that reaches this rule only by calling load_page_label will report one finding saying the schema accepts the document and the model does not, at the document root, rather than this rule at reportPath. reportPath records where the rule's own finding belongs; which of the two a run produces is a fact about the validator's architecture, and is worth asserting either way.",
+      "note": "plannotation.model refuses this document at load time, so a validator that reaches this rule only by calling load_page_label will report one finding saying the schema accepts the document and the model does not, at the document root, rather than this rule at reportPath. reportPath records where the rule's own finding belongs; which of the two a run produces is a fact about the validator's architecture, and is worth asserting either way.",
       "pointer": "/elements/1",
       "reportPath": "$.elements[1]",
       "rule": "provenance.inferred-carries-confidence",
@@ -407,7 +407,7 @@
       "buildsThroughModel": true,
       "code": "PL-PRV-001",
       "derivedFrom": "valid/08-provenance-inferred-clean.json",
-      "description": "The same rule as the case before it, reached by inheritance rather than by declaration: the tag says nothing about its provenance and the label says inferred, so 4.6.3 makes the tag inferred and 4.6.5 then wants a confidence. This one does load through planlabel.model, whose item rule only fires on an explicit 'inferred' -- so it is the case that shows what a validator built on the models can and cannot see by itself.",
+      "description": "The same rule as the case before it, reached by inheritance rather than by declaration: the tag says nothing about its provenance and the label says inferred, so 4.6.3 makes the tag inferred and 4.6.5 then wants a confidence. This one does load through plannotation.model, whose item rule only fires on an explicit 'inferred' -- so it is the case that shows what a validator built on the models can and cannot see by itself.",
       "family": "provenance",
       "file": "invalid/27-inherited-inferred-without-confidence.json",
       "level": "L3",
@@ -464,7 +464,7 @@
       "violates": "SPEC 4.6.2: a writer SHOULD NOT put mixed on an element or an annotation, because nothing in the format could say which of its members came from which source. A SHOULD NOT is a warning under SPEC 4.4, and 4.6.2 is explicit that this is advice and not a prohibition -- a conforming reader MUST accept the value and treat the object as containing inferred content."
     }
   ],
-  "schema": "planlabel/schema/planlabel-0.1.json",
+  "schema": "plannotation/schema/plannotation-0.1.json",
   "valid": [
     {
       "covers": [

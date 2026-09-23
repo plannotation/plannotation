@@ -1,4 +1,4 @@
-# PlanLabel validation report: 13-bbox-reversed.json
+# Plannotation validation report: 13-bbox-reversed.json
 
 **FAIL** -- 1 error(s), 0 warning(s); exit code 1.
 
@@ -26,4 +26,4 @@
 
 ---
 
-Validated by planlabel <version>, PlanLabel schema 0.1.
+Validated by plannotation <version>, Plannotation schema 0.1.

@@ -138,7 +138,7 @@
   ],
   "generator": {
     "created": "2026-05-06T11:02:41Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -152,7 +152,7 @@
     "index": 1,
     "widthMm": 841
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "mixed",
   "sheet": {
     "author": "T. Keller",

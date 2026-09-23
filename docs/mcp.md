@@ -1,13 +1,13 @@
 # The MCP server
 
-`planlabel-mcp` lets an MCP host -- Claude Desktop, ChatGPT, Copilot, or anything else
+`plannotation-mcp` lets an MCP host -- Claude Desktop, ChatGPT, Copilot, or anything else
 that speaks the Model Context Protocol -- ask what is on a construction drawing and get
 answers read from the drawing's label rather than guessed from its pixels.
 
 ## Run it
 
 ```bash
-uvx planlabel-mcp --root ~/Drawings
+uvx plannotation-mcp --root ~/Drawings
 ```
 
 Over stdio by default. Add `--http` for streamable HTTP.
@@ -20,9 +20,9 @@ Add this to `claude_desktop_config.json` (on macOS,
 ```json
 {
   "mcpServers": {
-    "planlabel": {
+    "plannotation": {
       "command": "uvx",
-      "args": ["planlabel-mcp", "--root", "/Users/you/Drawings"]
+      "args": ["plannotation-mcp", "--root", "/Users/you/Drawings"]
     }
   }
 }
@@ -46,9 +46,9 @@ Restart Claude Desktop, and the tools appear.
 
 | URI | Content |
 | --- | --- |
-| `planlabel://schema/page` | The page-label JSON Schema. |
-| `planlabel://spec` | Where the specification is published. |
-| `planlabel://index` | Every labelled sheet under the root. |
+| `plannotation://schema/page` | The page-label JSON Schema. |
+| `plannotation://spec` | Where the specification is published. |
+| `plannotation://index` | Every labelled sheet under the root. |
 
 ## Safety
 
@@ -57,7 +57,7 @@ with `--allow-write`. A host can be talked into writing a file by a prompt hidde
 drawing it is reading; the safe default is that it cannot.
 
 ```bash
-uvx planlabel-mcp --root ~/Drawings --allow-write
+uvx plannotation-mcp --root ~/Drawings --allow-write
 ```
 
 **Confined to a root.** Every path a tool receives is resolved -- symlinks included --

@@ -16,7 +16,7 @@ adapter has two jobs, and the second decides the label's provenance:
    and always exact.
 2. **Identity** — which entity is which IFC element. This comes from one of:
    - **Xdata** written by whatever links the DWG to a model, under a registered
-     application name such as `PLANLABEL`: `(1001 "PLANLABEL") (1000 "IfcWall")
+     application name such as `PLANNOTATION`: `(1001 "PLANNOTATION") (1000 "IfcWall")
      (1000 "<GlobalId>")`. Identity from here is `authored`.
    - **AutoCAD Architecture / MEP objects**, whose object type maps to an IFC class
      (a wall object to `IfcWall`), and whose IFC export stores a GUID. Also `authored`.
@@ -52,7 +52,7 @@ For a viewport, a model point `P` (WCS) goes to paper in three steps:
 3. **Paper space to the page.** Paper-space units are usually millimetres
    (`Layout.PlotPaperUnits`). The layout's origin is placed at the printable area's
    lower-left corner plus `Layout.PlotOrigin`, with the paper margins
-   (`Layout.PlotPaperMargins`) taken off and `PlotCentered` honoured. PlanLabel's paper
+   (`Layout.PlotPaperMargins`) taken off and `PlotCentered` honoured. Plannotation's paper
    origin is the page's lower-left, so that offset is added.
 
 Every step is affine, so `paperToPlane` is the inverse of their composition, expressed
@@ -72,10 +72,10 @@ asking.
    `layout.viewports()`, with `vp.dxf.center`, `width`, `height`,
    `view_center_point`, `view_height`, `view_direction_vector`, `view_target_point`
    and `view_twist_angle`. The scale is `vp.dxf.height / vp.dxf.view_height`.
-2. Model-space entities carry `entity.dxf.handle` and `entity.get_xdata("PLANLABEL")`.
-3. Write one label per layout, then `planlabel attach` it to the PDF AutoCAD plotted.
+2. Model-space entities carry `entity.dxf.handle` and `entity.get_xdata("PLANNOTATION")`.
+3. Write one label per layout, then `plannotation attach` it to the PDF AutoCAD plotted.
 
 What it cannot do: identity when nothing put it into the DWG (then everything is
-`inferred`, and `planlabel infer` on the PDF may do as well); external references,
+`inferred`, and `plannotation infer` on the PDF may do as well); external references,
 whose entities need the xref's insertion transform; paper-space dimensions that
 measure model space through a viewport, which need the transform applied in reverse.

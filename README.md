@@ -1,12 +1,12 @@
-# PlanLabel
+# Plannotation
 
-[![check](https://github.com/srtgn/planlabel/actions/workflows/check.yml/badge.svg)](https://github.com/srtgn/planlabel/actions/workflows/check.yml)
+[![check](https://github.com/plannotation/plannotation/actions/workflows/check.yml/badge.svg)](https://github.com/plannotation/plannotation/actions/workflows/check.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
 **An open drawing-semantics sidecar for 2D construction drawings.**
 
-A PDF drawing is a picture as far as a machine is concerned. PlanLabel attaches a small
+A PDF drawing is a picture as far as a machine is concerned. Plannotation attaches a small
 JSON *label* to every drawing page that says what is actually on it: which sheet it
 is, which viewports it holds and how their paper maps to model coordinates, which
 elements are drawn — IFC class, GlobalId, mark, outline on the paper — and which
@@ -24,7 +24,7 @@ that authored the drawing.
 Drawings are still how buildings are issued, checked, priced and built, and they
 leave the model as PDFs that have forgotten everything the model knew. A contractor's
 software, a checking engineer's script or a language model reading the sheet has to
-reconstruct from pixels what the architect's tool knew exactly. PlanLabel keeps that
+reconstruct from pixels what the architect's tool knew exactly. Plannotation keeps that
 knowledge with the page, in an open format, as an attachment the page does not
 depend on.
 
@@ -32,16 +32,16 @@ depend on.
 
 | Surface | Command or package | What it is |
 | --- | --- | --- |
-| **Library + CLI** | `planlabel` | Attach, read, strip, validate, inspect and export labels. |
-| **MCP server** | `planlabel-mcp` | Serves labelled drawings to Claude Desktop and other MCP hosts, read-only unless told otherwise. |
-| **Inference** | `planlabel infer` | Reconstructs labels for legacy PDFs, marked `inferred` with a confidence. |
-| **Authoring tools** | `planlabel from-svg`, the Bonsai add-on | Labels the PDF an IfcOpenShell-based tool rendered, from the SVG it drew. |
+| **Library + CLI** | `plannotation` | Attach, read, strip, validate, inspect and export labels. |
+| **MCP server** | `plannotation-mcp` | Serves labelled drawings to Claude Desktop and other MCP hosts, read-only unless told otherwise. |
+| **Inference** | `plannotation infer` | Reconstructs labels for legacy PDFs, marked `inferred` with a confidence. |
+| **Authoring tools** | `plannotation from-svg`, the Bonsai add-on | Labels the PDF an IfcOpenShell-based tool rendered, from the SVG it drew. |
 
 ## 60-second demo
 
 ```bash
-uvx --from 'planlabel[all]' planlabel samples build
-uvx planlabel inspect samples/positionsplan/sheet.labelled.pdf
+uvx --from 'plannotation[all]' plannotation samples build
+uvx plannotation inspect samples/positionsplan/sheet.labelled.pdf
 ```
 
 The first command builds three IFC models and draws them — a floor plan, a structural
@@ -56,9 +56,9 @@ From a clone, before the package is on PyPI:
 
 ```bash
 uv sync --all-extras
-uv run planlabel samples build
-uv run planlabel inspect samples/positionsplan/sheet.labelled.pdf
-uv run planlabel validate samples/positionsplan/sheet.labelled.pdf
+uv run plannotation samples build
+uv run plannotation inspect samples/positionsplan/sheet.labelled.pdf
+uv run plannotation validate samples/positionsplan/sheet.labelled.pdf
 ```
 
 ## Why a label helps
@@ -74,7 +74,7 @@ uv run planlabel validate samples/positionsplan/sheet.labelled.pdf
 ## Who did half of this already
 
 <!-- PRIOR-ART:START -->
-PlanLabel invents as little as it can. Each piece below solved part of the problem;
+Plannotation invents as little as it can. Each piece below solved part of the problem;
 the label is the part none of them covers — what a construction drawing shows, in
 IFC's words, travelling with the issued page.
 
@@ -105,9 +105,9 @@ IFC's words, travelling with the issued page.
 ## Install
 
 ```bash
-pip install planlabel            # library and CLI
-pip install 'planlabel[all]'     # plus the exporter (ifc, svg) and the benchmark (bench)
-pip install planlabel-mcp        # the MCP server
+pip install plannotation            # library and CLI
+pip install 'plannotation[all]'     # plus the exporter (ifc, svg) and the benchmark (bench)
+pip install plannotation-mcp        # the MCP server
 ```
 
 Requires Python 3.11 or newer. See [CONTRIBUTING.md](CONTRIBUTING.md) to set up a
@@ -118,7 +118,7 @@ development environment.
 | | |
 | --- | --- |
 | [`spec/SPEC.md`](spec/SPEC.md) | The normative specification. |
-| [`planlabel/schema/`](planlabel/schema/) | The JSON Schema — single source of truth. |
+| [`plannotation/schema/`](plannotation/schema/) | The JSON Schema — single source of truth. |
 | [`docs/`](docs/) | The inspector, MCP server, inference, benchmark and Bonsai guides, and design notes for Revit, AutoCAD and Tekla adapters. |
 | [`samples/`](samples/) | What the three generated sample sheets contain. |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed, release by release. |
@@ -129,7 +129,7 @@ Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Dependencies are restricted to MIT, BSD, Apache and MPL, with LGPL permitted only as
 an unmodified dependency and GPL only as an optional external command-line tool.
-PlanLabel does not depend on any AGPL component. The policy, and the reasoning behind
+Plannotation does not depend on any AGPL component. The policy, and the reasoning behind
 it, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Contributions are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) and the

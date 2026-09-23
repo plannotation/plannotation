@@ -23,7 +23,7 @@ rather than by the next reviewer.
 The seven invariants (asserted for every generated document)
 ------------------------------------------------------------
 I1. Nothing escapes ``read``, ``carrier_report``, ``attach`` or ``strip`` that is not a
-    :class:`~planlabel.errors.PlanLabelError`. :class:`MemoryError`,
+    :class:`~plannotation.errors.PlannotationError`. :class:`MemoryError`,
     :class:`RecursionError` and a raw ``pikepdf.PdfError`` are each failures: the first
     two say the bound was not applied, and the third says a caller has to catch a C++
     library's exception hierarchy to use this package.
@@ -34,26 +34,26 @@ II. No one document raises peak resident memory by more than
     how the last three defects survived review.
 III. No single operation takes longer than :data:`OPERATION_TIME_BUDGET`, because a
     bound on bytes is not a bound on time.
-IV. ``read(strict=False)`` never raises :class:`~planlabel.errors.InvalidLabelError`.
+IV. ``read(strict=False)`` never raises :class:`~plannotation.errors.InvalidLabelError`.
     Section 4.3 (2) says a label a reader will not accept is a label that is absent, and
     absence is a return value.
 V.  ``attach`` and ``strip`` either complete or refuse. A refusal leaves no output file
     at all; a completion leaves one the PDF library can open, no larger than the input
     plus what was written into it.
-VI. ``strip`` never destroys or alters foreign material: every attachment PlanLabel does
+VI. ``strip`` never destroys or alters foreign material: every attachment Plannotation does
     not own survives with its bytes, its associations are not dropped, and a packet with
-    no PlanLabel declaration in it comes back byte for byte.
+    no Plannotation declaration in it comes back byte for byte.
 VII. A document ``attach`` labelled really declares what it reports declaring -- the
     claim is in the packet, outside every comment and CDATA section, and inside the RDF
     -- and stripping it again restores the packet exactly. This one is here because the
-    other six did not reach it: reverting the defect that spliced PlanLabel's claim into
+    other six did not reach it: reverting the defect that spliced Plannotation's claim into
     another producer's comment broke none of them, and the document announced a
     conformance no XMP reader would ever see.
 
 Two properties this harness has to have, and had to be taught
 -------------------------------------------------------------
 It must not ask the module under test what the answers are. The first version used
-:func:`planlabel.pdf.embed.is_planlabel_filename` to decide which attachments were
+:func:`plannotation.pdf.embed.is_plannotation_filename` to decide which attachments were
 another producer's, so when the module was reverted to a predicate that matched a name
 ending in a newline, the harness agreed with it and watched somebody's file be deleted
 without noticing. :func:`owns` and :func:`visible` are written out here for that reason.
@@ -89,10 +89,10 @@ from typing import TYPE_CHECKING, Final, cast
 import pikepdf
 import pytest
 
-from planlabel.constants import INDEX_FILENAME, SPEC_URI, page_label_filename
-from planlabel.errors import InvalidLabelError, PlanLabelError
-from planlabel.model import canonical_bytes
-from planlabel.pdf import embed
+from plannotation.constants import INDEX_FILENAME, SPEC_URI, page_label_filename
+from plannotation.errors import InvalidLabelError, PlannotationError
+from plannotation.model import canonical_bytes
+from plannotation.pdf import embed
 from tests import pdf_fixtures as fx
 
 if TYPE_CHECKING:
@@ -165,7 +165,7 @@ SWEEP_TIME_BUDGET: Final = 30.0
 #: It still catches the 66 KB input that produced 67 MB.
 OUTPUT_GROWTH_ALLOWANCE: Final = embed._MAX_XMP_BYTES + 256 * 1024
 
-#: The timestamp every :func:`planlabel.pdf.embed.attach` here injects.
+#: The timestamp every :func:`plannotation.pdf.embed.attach` here injects.
 MOD_DATE: Final = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 
@@ -178,29 +178,29 @@ _CONTENT: Final = b"0.5 w 56.7 56.7 481.9 728.5 re S\n"
 #: A4 portrait in points, which is what the labels below claim.
 _MEDIA_BOX: Final = "[0 0 595.2756 841.8898]"
 
-#: The name PlanLabel owns, and a name it does not.
+#: The name Plannotation owns, and a name it does not.
 _OWNED_NAME: Final = page_label_filename(0)
 _FOREIGN_NAME: Final = "site-notes.txt"
 
 #: A page label that agrees with the page above, so that a well-formed document really is
-#: one and :func:`planlabel.pdf.embed.attach` has something it can write.
+#: one and :func:`plannotation.pdf.embed.attach` has something it can write.
 LABEL: Final = fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)
 LABEL_BYTES: Final = canonical_bytes(LABEL)
 
 
-#: The names PlanLabel owns, spelled out here rather than asked of the module.
+#: The names Plannotation owns, spelled out here rather than asked of the module.
 #:
 #: ``re.fullmatch`` and not ``re.match`` with ``$``: Python's ``$`` also matches before a
 #: trailing newline, which is the defect one of these documents exists to catch. A
-#: harness that asked :func:`planlabel.pdf.embed.is_planlabel_filename` which files are
-#: PlanLabel's would agree with the module about a name ending in a newline and would
+#: harness that asked :func:`plannotation.pdf.embed.is_plannotation_filename` which files are
+#: Plannotation's would agree with the module about a name ending in a newline and would
 #: watch it delete somebody else's file without noticing -- measured: with this predicate
 #: taken from the module, reverting that defect broke no invariant at all.
-_PAGE_LABEL_NAME: Final = re.compile(r"planlabel-p\d{4}\.json")
+_PAGE_LABEL_NAME: Final = re.compile(r"plannotation-p\d{4}\.json")
 
 
 def owns(name: str) -> bool:
-    """Report whether a filename is one PlanLabel owns.
+    """Report whether a filename is one Plannotation owns.
 
     Args:
         name: A name-tree key, or a specification's ``/UF`` or ``/F``.
@@ -400,8 +400,8 @@ class Case:
     Attributes:
         name: A stable identifier, used as the filename and in every message.
         data: The document's bytes.
-        owned: Whether the document already carries a file PlanLabel owns, which decides
-            whether :func:`planlabel.pdf.embed.attach` can get as far as writing.
+        owned: Whether the document already carries a file Plannotation owns, which decides
+            whether :func:`plannotation.pdf.embed.attach` can get as far as writing.
     """
 
     name: str
@@ -849,11 +849,11 @@ def _packets() -> dict[str, bytes]:
 
 
 def _packet_cases() -> Iterator[Case]:
-    """Build a document per XMP packet, with no PlanLabel file to refuse over.
+    """Build a document per XMP packet, with no Plannotation file to refuse over.
 
     Yields:
-        The cases. These carry a foreign attachment rather than one of PlanLabel's, so
-        that :func:`planlabel.pdf.embed.attach` reaches the splice rather than stopping
+        The cases. These carry a foreign attachment rather than one of Plannotation's, so
+        that :func:`plannotation.pdf.embed.attach` reaches the splice rather than stopping
         at the conflict check -- which is where the packet actually matters.
     """
     for name, packet in _packets().items():
@@ -872,7 +872,7 @@ def _packet_cases() -> Iterator[Case]:
 
 #: File specifications missing what the format requires, or holding the wrong type.
 FILESPECS: Final = (
-    ("no-ef", "<< /Type /Filespec /F (planlabel-p0000.json) /UF (planlabel-p0000.json) >>"),
+    ("no-ef", "<< /Type /Filespec /F (plannotation-p0000.json) /UF (plannotation-p0000.json) >>"),
     ("ef-not-a-dictionary", f"<< /Type /Filespec /UF ({_OWNED_NAME}) /EF [ 6 0 R ] >>"),
     ("ef-f-not-a-stream", f"<< /Type /Filespec /UF ({_OWNED_NAME}) /EF << /F << >> >> >>"),
     ("ef-f-a-number", f"<< /Type /Filespec /UF ({_OWNED_NAME}) /EF << /F 42 >> >>"),
@@ -924,8 +924,8 @@ AF_SHAPES: Final = (
     "[ 5 0 R 5 0 R ]",
     "[ 3 0 R ]",
     "[ 42 ]",
-    "[ (planlabel-p0000.json) ]",
-    "[ /planlabel-p0000.json ]",
+    "[ (plannotation-p0000.json) ]",
+    "[ /plannotation-p0000.json ]",
     "[]",
     "5 0 R",
     "<< /F 5 0 R >>",
@@ -960,15 +960,15 @@ TREES: Final = (
     ("newline", name_tree((_OWNED_NAME + r"\n", "5 0 R"))),
     ("trailing-space", name_tree((_OWNED_NAME + " ", "5 0 R"))),
     ("leading-space", name_tree((" " + _OWNED_NAME, "5 0 R"))),
-    ("uppercase", name_tree(("PLANLABEL-P0000.JSON", "5 0 R"))),
+    ("uppercase", name_tree(("PLANNOTATION-P0000.JSON", "5 0 R"))),
     ("look-alike", name_tree(("plan\\154abel-p0000.json", "5 0 R"))),
     ("cyrillic", name_tree(("\\320\\260lanlabel-p0000.json", "5 0 R"))),
-    ("five-digits", name_tree(("planlabel-p00000.json", "5 0 R"))),
-    ("three-digits", name_tree(("planlabel-p000.json", "5 0 R"))),
-    ("odd-length", "<< /EmbeddedFiles << /Names [(planlabel-p0000.json)] >> >>"),
+    ("five-digits", name_tree(("plannotation-p00000.json", "5 0 R"))),
+    ("three-digits", name_tree(("plannotation-p000.json", "5 0 R"))),
+    ("odd-length", "<< /EmbeddedFiles << /Names [(plannotation-p0000.json)] >> >>"),
     ("names-not-an-array", "<< /EmbeddedFiles << /Names 5 0 R >> >>"),
-    ("key-not-a-string", "<< /EmbeddedFiles << /Names [/planlabel-p0000.json 5 0 R] >> >>"),
-    ("value-null", "<< /EmbeddedFiles << /Names [(planlabel-p0000.json) null] >> >>"),
+    ("key-not-a-string", "<< /EmbeddedFiles << /Names [/plannotation-p0000.json 5 0 R] >> >>"),
+    ("value-null", "<< /EmbeddedFiles << /Names [(plannotation-p0000.json) null] >> >>"),
     ("embeddedfiles-not-a-dictionary", "<< /EmbeddedFiles [ 5 0 R ] >>"),
     ("names-not-a-dictionary", "[ 5 0 R ]"),
     ("empty-tree", "<< /EmbeddedFiles << /Names [] >> >>"),
@@ -982,18 +982,18 @@ def _name_tree_cases() -> Iterator[Case]:
     """Build a document per name-tree shape.
 
     Yields:
-        The cases. The tree decides what :func:`planlabel.pdf.embed.strip` deletes, so a
-        key that merely looks like one of PlanLabel's is another producer's file about to
+        The cases. The tree decides what :func:`plannotation.pdf.embed.strip` deletes, so a
+        key that merely looks like one of Plannotation's is another producer's file about to
         be removed -- and a key that maps to a file specification some other key also maps
         to is another producer's file about to be destroyed.
     """
     kid = (
-        "<< /Limits [(planlabel-p0000.json) (planlabel-p0000.json)] "
+        "<< /Limits [(plannotation-p0000.json) (plannotation-p0000.json)] "
         f"/Names [({_OWNED_NAME}) 5 0 R] >>"
     ).encode()
     # The same trees again, each filing another producer's file -- one whose own /UF and
     # /F are foreign -- under the key in question. This is where a key that merely looks
-    # like one of PlanLabel's costs somebody their attachment, and it is the only shape
+    # like one of Plannotation's costs somebody their attachment, and it is the only shape
     # in which the difference between `$` and `\Z` is visible from outside.
     for name, tree in TREES:
         yield Case(
@@ -1002,8 +1002,8 @@ def _name_tree_cases() -> Iterator[Case]:
         )
     for name, tree in TREES:
         # The two "aliased-foreign" trees file another producer's file -- its own /UF and
-        # /F are foreign -- under one of PlanLabel's names as well. That file is not
-        # PlanLabel's to destroy, only to unregister, and destroying it is what took its
+        # /F are foreign -- under one of Plannotation's names as well. That file is not
+        # Plannotation's to destroy, only to unregister, and destroying it is what took its
         # bytes away and left its other key dangling.
         spec = filespec(_FOREIGN_NAME) if "aliased-foreign" in name else None
         yield Case(f"tree-{name}", hostile(names=tree, spec=spec, extra=(kid,)))
@@ -1159,13 +1159,13 @@ _FOREIGN_EXTRA: Final = (
 
 
 def _foreign_material_cases() -> Iterator[Case]:
-    """Build documents carrying somebody else's file beside PlanLabel's.
+    """Build documents carrying somebody else's file beside Plannotation's.
 
     Yields:
-        The cases. Every promise :func:`planlabel.pdf.embed.strip` makes is about these
+        The cases. Every promise :func:`plannotation.pdf.embed.strip` makes is about these
         documents: a file registered only in an ``/AF`` array, one registered only in the
         name tree, one registered in both, and one that shares its specification with a
-        key of PlanLabel's.
+        key of Plannotation's.
     """
     both = name_tree((_OWNED_NAME, "5 0 R"), (_FOREIGN_NAME, "8 0 R"))
     yield Case(
@@ -1277,19 +1277,19 @@ class Probe:
         case: The document.
         size: Its size on disk, which bounds what an output may be.
         attempts: One entry per operation, in the order they ran.
-        foreign_before: Attachments PlanLabel does not own, before stripping, as
+        foreign_before: Attachments Plannotation does not own, before stripping, as
             ``key -> stored bytes``. None when the document could not be opened at all.
         foreign_after: The same, read back out of the stripped copy.
-        associations_before: How many ``/AF`` entries name a file PlanLabel does not own.
+        associations_before: How many ``/AF`` entries name a file Plannotation does not own.
         associations_after: The same, afterwards.
         packet_before: The catalog's XMP packet, decoded, or None when there is none, it
             is too large to decode here, or the document will not open.
         packet_after: The same, afterwards.
-        declaration_removed: What :func:`planlabel.pdf.embed.strip` reported removing, or
+        declaration_removed: What :func:`plannotation.pdf.embed.strip` reported removing, or
             None when it refused.
         peak_growth: How much this document raised the process's peak resident memory,
             in bytes.
-        labelled_packet: The XMP packet of the copy :func:`planlabel.pdf.embed.attach`
+        labelled_packet: The XMP packet of the copy :func:`plannotation.pdf.embed.attach`
             wrote, or None where it wrote none or the packet could not be read here.
         round_tripped_packet: The packet of that copy after it has been stripped again.
     """
@@ -1398,7 +1398,7 @@ def _stored_bytes(spec: pikepdf.Object) -> bytes:
 
 
 def foreign_files(path: Path) -> dict[str, bytes] | None:
-    """Inventory every attachment PlanLabel does not own.
+    """Inventory every attachment Plannotation does not own.
 
     Args:
         path: The document.
@@ -1406,7 +1406,7 @@ def foreign_files(path: Path) -> dict[str, bytes] | None:
     Returns:
         Each such name-tree key mapped to its stored bytes, or None when the document
         cannot be opened or walked. The predicate is the module's own, so a file
-        PlanLabel does own is excluded here exactly as it is excluded from the promise.
+        Plannotation does own is excluded here exactly as it is excluded from the promise.
     """
     try:
         with pikepdf.open(path) as pdf:
@@ -1447,11 +1447,11 @@ def is_foreign(spec: object, keys: Sequence[str]) -> bool:
         keys: Every name-tree key that maps to this same object, which may be none.
 
     Returns:
-        True when the file is not PlanLabel's. It is PlanLabel's when it says so itself
-        -- either of its two filenames is one PlanLabel owns -- or when the only names
-        the document files it under are PlanLabel's. A file registered under one of
-        PlanLabel's names *and* one of somebody else's is another producer's file that
-        was also filed under our name: unregistering our key is PlanLabel's to do and
+        True when the file is not Plannotation's. It is Plannotation's when it says so itself
+        -- either of its two filenames is one Plannotation owns -- or when the only names
+        the document files it under are Plannotation's. A file registered under one of
+        Plannotation's names *and* one of somebody else's is another producer's file that
+        was also filed under our name: unregistering our key is Plannotation's to do and
         destroying the file is not. A file the name tree does not list at all has no
         name but its own.
     """
@@ -1479,7 +1479,7 @@ def registrations(pdf: pikepdf.Pdf) -> dict[tuple[int, int], list[str]]:
 
 
 def foreign_associations(path: Path) -> int | None:
-    """Count the ``/AF`` entries that name a file PlanLabel does not own.
+    """Count the ``/AF`` entries that name a file Plannotation does not own.
 
     Args:
         path: The document.
@@ -1801,8 +1801,8 @@ class TestTheCorpus:
 class TestTheInvariants:
     """Six properties that must hold for every document the generators produce."""
 
-    def test_i1_nothing_escapes_that_is_not_a_planlabel_error(self, corpus: Sweep) -> None:
-        """One exception root, or a caller cannot write ``except PlanLabelError``.
+    def test_i1_nothing_escapes_that_is_not_a_plannotation_error(self, corpus: Sweep) -> None:
+        """One exception root, or a caller cannot write ``except PlannotationError``.
 
         A :class:`MemoryError` says the bound was applied after the allocation; a
         :class:`RecursionError` says a structure walked itself; a raw ``pikepdf.PdfError``
@@ -1813,10 +1813,10 @@ class TestTheInvariants:
             describe(found, attempt)
             for found in corpus.probes
             for attempt in found.attempts
-            if attempt.error is not None and not isinstance(attempt.error, PlanLabelError)
+            if attempt.error is not None and not isinstance(attempt.error, PlannotationError)
         ]
         assert offenders == [], (
-            f"{len(offenders)} operation(s) raised something other than a PlanLabelError:\n"
+            f"{len(offenders)} operation(s) raised something other than a PlannotationError:\n"
             + "\n".join(offenders[:20])
         )
 
@@ -1879,8 +1879,8 @@ class TestTheInvariants:
 
         A document can still be damaged in ways that are not about a label at all -- a
         catalog that is not a dictionary, an ``/AF`` that is not an array -- and those are
-        a :class:`~planlabel.errors.CarrierError` either way. What must never happen is an
-        :class:`~planlabel.errors.InvalidLabelError` from a reader that was asked to be
+        a :class:`~plannotation.errors.CarrierError` either way. What must never happen is an
+        :class:`~plannotation.errors.InvalidLabelError` from a reader that was asked to be
         lenient.
         """
         offenders = [
@@ -1943,9 +1943,9 @@ class TestTheInvariants:
         )
 
     def test_i6_strip_keeps_every_foreign_attachment_and_its_bytes(self, corpus: Sweep) -> None:
-        """A file PlanLabel does not own is not PlanLabel's to remove or to damage.
+        """A file Plannotation does not own is not Plannotation's to remove or to damage.
 
-        One ``/Filespec`` filed under two name-tree keys, one of them PlanLabel's, had its
+        One ``/Filespec`` filed under two name-tree keys, one of them Plannotation's, had its
         stream destroyed with the key -- so another producer's bytes went with it.
         """
         offenders: list[str] = []
@@ -2034,7 +2034,7 @@ class TestTheInvariants:
 class TestALabelledDocumentSaysSo:
     """Invariant VII, which the six above do not reach.
 
-    Reverting the defect that spliced PlanLabel's claim into another producer's XML
+    Reverting the defect that spliced Plannotation's claim into another producer's XML
     comment broke none of the first six invariants: the write completed, nothing grew,
     nothing foreign was lost, and the document announced a conformance no XMP reader
     would ever see. An invariant that only watches for exceptions and bytes cannot see a

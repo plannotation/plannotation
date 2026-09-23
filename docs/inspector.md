@@ -12,16 +12,16 @@ make samples                       # build something to look at
 open inspector/index.html          # then choose samples/floorplan/sheet.labelled.pdf
 ```
 
-For a terminal, `planlabel inspect` prints the same information as tables:
+For a terminal, `plannotation inspect` prints the same information as tables:
 
 ```bash
-planlabel inspect samples/floorplan/sheet.labelled.pdf
-planlabel inspect samples/floorplan/sheet.labelled.pdf --json | jq .pages
+plannotation inspect samples/floorplan/sheet.labelled.pdf
+plannotation inspect samples/floorplan/sheet.labelled.pdf --json | jq .pages
 ```
 
 ## What it reads
 
-A page label travels as an attachment named `planlabel-pNNNN.json`. The inspector finds
+A page label travels as an attachment named `plannotation-pNNNN.json`. The inspector finds
 it through pdf.js's `getAttachments()`, which exposes the document's `EmbeddedFiles`
 name tree — which is why the carrier registers every label there as well as on the
 page's own `/AF` (SPEC 6.2). A label that will not parse is treated as absent, as
@@ -33,7 +33,7 @@ is pixels with y down. One function does that flip, so nothing else has to remem
 ## Manual check
 
 The automated tests establish that the file is self-contained and that the conventions
-it hard-codes still match what PlanLabel writes. They cannot establish that it looks
+it hard-codes still match what Plannotation writes. They cannot establish that it looks
 right, so that part is checked by hand against the samples:
 
 1. `make samples`

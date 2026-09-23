@@ -1,7 +1,7 @@
 # The benchmark
 
 How much better does a model answer questions about a drawing when the page label is
-available? `planlabel-bench` measures it on the sample sheets.
+available? `plannotation-bench` measures it on the sample sheets.
 
 ```bash
 make samples                       # the drawings the questions are about
@@ -29,7 +29,7 @@ through structured output, and the answer is scored against the key.
 ## The questions
 
 `bench/questions.jsonl` is merged from each `samples/<name>/groundtruth.jsonl` by
-`planlabel-bench questions`, and committed. Every answer is taken from the IFC model
+`plannotation-bench questions`, and committed. Every answer is taken from the IFC model
 the sheet was exported from, never from reading the drawing, so the key cannot share a
 mistake with the thing it grades.
 
@@ -67,10 +67,10 @@ The parsing is deliberately narrow, so a wrong answer cannot be argued into a ri
 
 ```bash
 cp .env.example .env               # then put your key in it
-uv run planlabel-bench run --condition plain    --model claude-opus-5 --n 100
-uv run planlabel-bench run --condition labelled --model claude-opus-5 --n 100
-uv run planlabel-bench report --model claude-opus-5
-uv run planlabel-bench readme --model claude-opus-5
+uv run plannotation-bench run --condition plain    --model claude-opus-5 --n 100
+uv run plannotation-bench run --condition labelled --model claude-opus-5 --n 100
+uv run plannotation-bench report --model claude-opus-5
+uv run plannotation-bench readme --model claude-opus-5
 ```
 
 - **Credentials.** `ANTHROPIC_API_KEY` from the environment, else from `.env`, which is
@@ -99,10 +99,10 @@ uv run planlabel-bench readme --model claude-opus-5
 | `bench/results/<date>-<model>.md` | yes | The report: accuracy per category under each condition, the difference, cost and latency, and every answer. |
 | `bench/cache/` | no | The raw responses. |
 
-`planlabel-bench readme` writes the summary table into the top-level README, between the
+`plannotation-bench readme` writes the summary table into the top-level README, between the
 `BENCHMARK:START` and `BENCHMARK:END` markers.
 
-Costs are estimated from list prices in `planlabel/bench/pricing.py`; a model not in
+Costs are estimated from list prices in `plannotation/bench/pricing.py`; a model not in
 that table is reported without a cost rather than with a guessed one.
 
 ## Reading the result

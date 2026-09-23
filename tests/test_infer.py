@@ -20,8 +20,8 @@ from typing import Any
 
 import pytest
 
-from planlabel.infer.match_ifc import normalise_mark
-from planlabel.infer.patterns import (
+from plannotation.infer.match_ifc import normalise_mark
+from plannotation.infer.patterns import (
     GRID_AXIS,
     REVISION,
     SCALE,
@@ -152,9 +152,9 @@ class TestTheGate:
         Returns:
             ``[expected, found, correct]`` for each category.
         """
-        from planlabel.infer import infer_labels
-        from planlabel.infer.evaluate import score
-        from planlabel.model import load_page_label
+        from plannotation.infer import infer_labels
+        from plannotation.infer.evaluate import score
+        from plannotation.model import load_page_label
 
         totals: dict[str, list[int]] = {}
         for name in NAMES:
@@ -194,7 +194,7 @@ class TestTheGate:
         Reading it as this sheet's own number named the wrong drawing, on the floor
         plan, and that is the defect this guards.
         """
-        from planlabel.infer import infer_labels
+        from plannotation.infer import infer_labels
 
         [inferred], _ = infer_labels(SAMPLES / "floorplan" / "sheet.pdf")
         assert inferred.sheet.sheet_id == "ARC-101"
@@ -214,14 +214,14 @@ class TestWhatInferenceWrites:
         Returns:
             The inferred label.
         """
-        from planlabel.infer import infer_labels
+        from plannotation.infer import infer_labels
 
         [label], _ = infer_labels(SAMPLES / name / "sheet.pdf")
         return label
 
     def test_the_label_is_inferred(self) -> None:
         """Top-level provenance, and it must not claim to be authored."""
-        from planlabel.model import Provenance
+        from plannotation.model import Provenance
 
         assert self._label().provenance is Provenance.INFERRED
 
@@ -283,8 +283,8 @@ class TestWhatInferenceWrites:
     @pytest.mark.parametrize("name", NAMES)
     def test_what_it_writes_validates_clean(self, name: str, tmp_path: Path) -> None:
         """An inferred label must still satisfy every rule the validator checks."""
-        from planlabel.infer import infer_document
-        from planlabel.validate import validate
+        from plannotation.infer import infer_document
+        from plannotation.validate import validate
 
         out = tmp_path / "inferred.pdf"
         infer_document(SAMPLES / name / "sheet.pdf", out, mod_date=datetime(2024, 1, 1, tzinfo=UTC))
@@ -292,7 +292,7 @@ class TestWhatInferenceWrites:
 
     def test_it_never_modifies_its_input(self, tmp_path: Path) -> None:
         """Design brief section 12. A tool that edits the only copy is untriable."""
-        from planlabel.infer import infer_document
+        from plannotation.infer import infer_document
 
         source = SAMPLES / "floorplan" / "sheet.pdf"
         before = source.read_bytes()
@@ -301,7 +301,7 @@ class TestWhatInferenceWrites:
 
     def test_it_refuses_to_write_over_its_input(self, tmp_path: Path) -> None:
         """The same promise, enforced rather than hoped for."""
-        from planlabel.infer import infer_document
+        from plannotation.infer import infer_document
 
         copy = tmp_path / "sheet.pdf"
         copy.write_bytes((SAMPLES / "floorplan" / "sheet.pdf").read_bytes())
@@ -317,8 +317,8 @@ class TestMatchingToTheModel:
     @pytest.mark.parametrize("name", NAMES)
     def test_every_mark_recovers_its_global_id(self, name: str) -> None:
         """Checked against the authored label, which the exporter wrote from the model."""
-        from planlabel.infer import infer_labels
-        from planlabel.model import load_page_label
+        from plannotation.infer import infer_labels
+        from plannotation.model import load_page_label
 
         authored = load_page_label((SAMPLES / name / "labels.json").read_text("utf-8"))
         truth = {
@@ -333,7 +333,7 @@ class TestMatchingToTheModel:
 
     def test_a_match_stays_inferred(self) -> None:
         """SPEC 4.6.6: however confident, reconstructed data is never promoted to authored."""
-        from planlabel.infer import infer_labels
+        from plannotation.infer import infer_labels
 
         [inferred], _ = infer_labels(
             SAMPLES / "floorplan" / "sheet.pdf", ifc_model=SAMPLES / "floorplan" / "model.ifc"
@@ -348,7 +348,7 @@ class TestMatchingToTheModel:
 )
 def test_real_world_drawings_do_not_crash_it() -> None:
     """Design brief section 12: no crash on real drawings, which are never committed."""
-    from planlabel.infer import infer_labels
+    from plannotation.infer import infer_labels
 
     documents = sorted((Path(__file__).parent / "fixtures" / "realworld").glob("*.pdf"))
     if not documents:

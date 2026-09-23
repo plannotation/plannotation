@@ -1,16 +1,16 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
-  "description": "Fixtures for the PlanLabel 0.1 page-label schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided.",
+  "description": "Fixtures for the Plannotation 0.1 page-label schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided.",
   "invalid": [
     {
       "derivedFrom": "valid/01-minimal-l1.json",
       "description": "Minimal label announcing version 0.2, which no 0.1 reader may accept.",
-      "errorPath": "$.planlabel",
-      "file": "invalid/01-wrong-planlabel-const.json",
+      "errorPath": "$.plannotation",
+      "file": "invalid/01-wrong-plannotation-const.json",
       "keyword": "const",
-      "schemaPointer": "#/properties/planlabel/const",
-      "validatorSchemaPath": "#/properties/planlabel/const",
-      "violates": "properties.planlabel.const — the version token must be exactly \"0.1\""
+      "schemaPointer": "#/properties/plannotation/const",
+      "validatorSchemaPath": "#/properties/plannotation/const",
+      "violates": "properties.plannotation.const — the version token must be exactly \"0.1\""
     },
     {
       "derivedFrom": "valid/11-l2-section-rotated-270.json",
@@ -20,7 +20,7 @@
       "keyword": "required",
       "schemaPointer": "#/required",
       "validatorSchemaPath": "#/required",
-      "violates": "required — the top-level object must carry planlabel, provenance, page and sheet"
+      "violates": "required — the top-level object must carry plannotation, provenance, page and sheet"
     },
     {
       "derivedFrom": "valid/04-l3-schalplan-multi-viewport.json",
@@ -123,7 +123,7 @@
       "violates": "properties.sheet.drawingType.enum — drawingType is a closed vocabulary"
     }
   ],
-  "schema": "planlabel/schema/planlabel-0.1.json",
+  "schema": "plannotation/schema/plannotation-0.1.json",
   "valid": [
     {
       "covers": [

@@ -1,7 +1,7 @@
 {
   "generator": {
     "created": "2026-02-11T08:30:00Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "page": {
@@ -10,7 +10,7 @@
     "rotation": 90,
     "widthMm": 0
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "authored",
   "sheet": {
     "author": "S. Weiss",

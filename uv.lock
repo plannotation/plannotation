@@ -9,8 +9,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "planlabel",
-    "planlabel-mcp",
+    "plannotation",
+    "plannotation-mcp",
 ]
 
 [[package]]
@@ -1437,7 +1437,7 @@ wheels = [
 ]
 
 [[package]]
-name = "planlabel"
+name = "plannotation"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
@@ -1471,7 +1471,7 @@ svg = [
 [package.dev-dependencies]
 dev = [
     { name = "mypy" },
-    { name = "planlabel-mcp" },
+    { name = "plannotation-mcp" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -1502,7 +1502,7 @@ provides-extras = ["all", "bench", "ifc", "svg"]
 [package.metadata.requires-dev]
 dev = [
     { name = "mypy", specifier = ">=1.13" },
-    { name = "planlabel-mcp", editable = "planlabel_mcp" },
+    { name = "plannotation-mcp", editable = "plannotation_mcp" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.0" },
@@ -1511,17 +1511,17 @@ dev = [
 ]
 
 [[package]]
-name = "planlabel-mcp"
-source = { editable = "planlabel_mcp" }
+name = "plannotation-mcp"
+source = { editable = "plannotation_mcp" }
 dependencies = [
     { name = "mcp" },
-    { name = "planlabel" },
+    { name = "plannotation" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "mcp", specifier = ">=1.3" },
-    { name = "planlabel", editable = "." },
+    { name = "plannotation", editable = "." },
 ]
 
 [[package]]

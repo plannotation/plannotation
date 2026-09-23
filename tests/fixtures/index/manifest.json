@@ -1,6 +1,6 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
-  "description": "Fixtures for the PlanLabel 0.1 document-level index schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided -- the index schema carries no $ref, so the two agree. Every index here describes the page labels in tests/fixtures/labels: each entry's sheetId, title, revision and pageIndex are copied from that sheet's label fixture, its level is the level conformance_level() computes for that label, and its file is the attachment name page_label_filename() produces for that page index.",
+  "description": "Fixtures for the Plannotation 0.1 document-level index schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided -- the index schema carries no $ref, so the two agree. Every index here describes the page labels in tests/fixtures/labels: each entry's sheetId, title, revision and pageIndex are copied from that sheet's label fixture, its level is the level conformance_level() computes for that label, and its file is the attachment name page_label_filename() produces for that page index.",
   "invalid": [
     {
       "derivedFrom": "valid/02-architecture-package-full.json",
@@ -33,13 +33,13 @@
       "violates": "properties.pages.items.required -- every page entry carries pageIndex, sheetId and level"
     }
   ],
-  "schema": "planlabel/schema/planlabel-index-0.1.json",
+  "schema": "plannotation/schema/plannotation-index-0.1.json",
   "valid": [
     {
       "covers": [
         "minimal document",
         "required top-level keys only",
-        "planlabel const",
+        "plannotation const",
         "page entry with required members only",
         "level L1",
         "describes labels/valid/01-minimal-l1.json (sheet A-101, page 0)"

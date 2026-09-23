@@ -1,10 +1,10 @@
-# PlanLabel benchmark
+# Plannotation benchmark
 
 The question it answers: *how much better does a model understand a drawing when the
 page label is available?* See [`docs/benchmark.md`](../docs/benchmark.md) for the method.
 
 - `questions.jsonl` — merged from each `samples/*/groundtruth.jsonl` by
-  `planlabel-bench questions`, so every answer is derived from the source model rather
+  `plannotation-bench questions`, so every answer is derived from the source model rather
   than hand-written.
 - `results/` — the run logs (`<model>-<condition>.jsonl`) and the reports
   (`<date>-<model>.md`). The table in the top-level `README.md` is written from them.

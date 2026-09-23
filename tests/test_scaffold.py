@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import planlabel
-from planlabel.cli import app
-from planlabel.constants import (
+import plannotation
+from plannotation.cli import app
+from plannotation.constants import (
     BASE_URL,
     INDEX_SCHEMA_ID,
     SCHEMA_ID,
@@ -25,24 +25,24 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 #: Every subpackage and module that must import cleanly from an empty scaffold.
 CORE_MODULES = [
-    "planlabel",
-    "planlabel.cli",
-    "planlabel.constants",
-    "planlabel.model",
-    "planlabel.units",
-    "planlabel.schema",
-    "planlabel.pdf",
-    "planlabel.pdf.embed",
-    "planlabel.pdf.extract",
-    "planlabel.pdf.render",
-    "planlabel.svg",
-    "planlabel.svg.carrier",
-    "planlabel.validate",
-    "planlabel.export",
-    "planlabel.export.ifc_svg_pdf",
-    "planlabel.infer",
-    "planlabel_mcp",
-    "planlabel_mcp.server",
+    "plannotation",
+    "plannotation.cli",
+    "plannotation.constants",
+    "plannotation.model",
+    "plannotation.units",
+    "plannotation.schema",
+    "plannotation.pdf",
+    "plannotation.pdf.embed",
+    "plannotation.pdf.extract",
+    "plannotation.pdf.render",
+    "plannotation.svg",
+    "plannotation.svg.carrier",
+    "plannotation.validate",
+    "plannotation.export",
+    "plannotation.export.ifc_svg_pdf",
+    "plannotation.infer",
+    "plannotation_mcp",
+    "plannotation_mcp.server",
 ]
 
 
@@ -54,14 +54,14 @@ def test_module_imports(module_name: str) -> None:
 
 def test_version_is_pep440() -> None:
     """The package version is a PEP 440 string."""
-    assert re.fullmatch(r"\d+\.\d+\.\d+(\.(dev|a|b|rc)\d+)?", planlabel.__version__)
+    assert re.fullmatch(r"\d+\.\d+\.\d+(\.(dev|a|b|rc)\d+)?", plannotation.__version__)
 
 
 def test_cli_version_flag() -> None:
-    """``planlabel --version`` exits zero and reports the version. Phase 0 gate."""
+    """``plannotation --version`` exits zero and reports the version. Phase 0 gate."""
     result = CliRunner().invoke(app, ["--version"])
     assert result.exit_code == 0, result.output
-    assert planlabel.__version__ in result.output
+    assert plannotation.__version__ in result.output
     assert SCHEMA_VERSION in result.output
 
 
@@ -73,7 +73,7 @@ def test_cli_short_version_flag() -> None:
 def test_cli_no_args_shows_help() -> None:
     """Invoked bare, the CLI shows help rather than doing nothing."""
     result = CliRunner().invoke(app, [])
-    assert "planlabel" in result.output.lower()
+    assert "plannotation" in result.output.lower()
 
 
 class TestConstants:
@@ -94,7 +94,11 @@ class TestConstants:
 
     @pytest.mark.parametrize(
         ("page_index", "expected"),
-        [(0, "planlabel-p0000.json"), (7, "planlabel-p0007.json"), (1234, "planlabel-p1234.json")],
+        [
+            (0, "plannotation-p0000.json"),
+            (7, "plannotation-p0007.json"),
+            (1234, "plannotation-p1234.json"),
+        ],
     )
     def test_page_label_filename(self, page_index: int, expected: str) -> None:
         """Page attachment names are zero-padded so listings sort in page order."""
@@ -110,7 +114,7 @@ def _tracked_python_files() -> list[Path]:
     """Return every Python source file that ships in the repository."""
     return sorted(
         path
-        for pattern in ("planlabel", "planlabel_mcp", "tests", "tools")
+        for pattern in ("plannotation", "plannotation_mcp", "tests", "tools")
         for path in (REPO_ROOT / pattern).rglob("*.py")
         if ".venv" not in path.parts
     )
@@ -130,13 +134,13 @@ def test_every_source_file_has_an_spdx_header() -> None:
 def test_scaffold_covers_the_architecture() -> None:
     """Every directory named in the architecture section exists."""
     required = [
-        "planlabel/schema",
-        "planlabel/pdf",
-        "planlabel/svg",
-        "planlabel/validate",
-        "planlabel/export",
-        "planlabel/infer",
-        "planlabel_mcp/planlabel_mcp",
+        "plannotation/schema",
+        "plannotation/pdf",
+        "plannotation/svg",
+        "plannotation/validate",
+        "plannotation/export",
+        "plannotation/infer",
+        "plannotation_mcp/plannotation_mcp",
         "tools",
         "inspector",
         "bench",

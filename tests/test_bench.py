@@ -25,23 +25,23 @@ import pytest
 from typer.testing import CliRunner
 
 import tests.pdf_fixtures as fx
-from planlabel.bench import runner as runner_module
-from planlabel.bench.cli import app
-from planlabel.bench.page import PageInput, encode_png, load_page
-from planlabel.bench.pricing import PRICES, cost
-from planlabel.bench.prompt import (
+from plannotation.bench import runner as runner_module
+from plannotation.bench.cli import app
+from plannotation.bench.page import PageInput, encode_png, load_page
+from plannotation.bench.pricing import PRICES, cost
+from plannotation.bench.prompt import (
     LABEL_TOOL_USE_ID,
     PROMPT_VERSION,
     build_request,
     question_block,
 )
-from planlabel.bench.questions import (
+from plannotation.bench.questions import (
     Question,
     load_questions,
     merge_ground_truth,
     write_questions,
 )
-from planlabel.bench.report import (
+from plannotation.bench.report import (
     README_END,
     README_START,
     Tally,
@@ -51,7 +51,7 @@ from planlabel.bench.report import (
     render_report,
     update_readme,
 )
-from planlabel.bench.runner import (
+from plannotation.bench.runner import (
     Record,
     Reply,
     RunConfig,
@@ -65,15 +65,15 @@ from planlabel.bench.runner import (
     run,
     write_records,
 )
-from planlabel.bench.score import parse_number, score
-from planlabel.errors import BenchError
-from planlabel.pdf import embed
-from planlabel.pdf.extract import page_text
+from plannotation.bench.score import parse_number, score
+from plannotation.errors import BenchError
+from plannotation.pdf import embed
+from plannotation.pdf.extract import page_text
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from planlabel.bench.prompt import Condition
+    from plannotation.bench.prompt import Condition
 
 MOD_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 
@@ -293,7 +293,7 @@ class TestQuestions:
         assert all(json.loads(line) for line in path.read_text("utf-8").splitlines())
 
     def test_optional_fields_are_left_out_when_absent(self) -> None:
-        """Absent, not null, as everywhere else in PlanLabel."""
+        """Absent, not null, as everywhere else in Plannotation."""
         record = question(unit=None).to_json()
         assert "unit" not in record
         assert "requiresLabel" not in record
@@ -800,13 +800,13 @@ class TestAnthropicTransport:
 
 
 def test_without_the_extra_the_message_names_it(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``pip install 'planlabel[bench]'`` is the fix, so it is what is said."""
+    """``pip install 'plannotation[bench]'`` is the fix, so it is what is said."""
 
     def missing(name: str) -> object:
         raise ImportError(name)
 
     monkeypatch.setattr(importlib, "import_module", missing)
-    with pytest.raises(BenchError, match=r"planlabel\[bench\]"):
+    with pytest.raises(BenchError, match=r"plannotation\[bench\]"):
         anthropic_transport()
 
 
@@ -887,7 +887,7 @@ class TestReport:
     def test_the_report_holds_the_table_the_costs_and_the_answers(self) -> None:
         """Every number in it can be checked against what the model said."""
         text = render_report("claude-opus-5", "2026-09-22", PLAIN, LABELLED)
-        assert text.startswith("# PlanLabel benchmark — `claude-opus-5`, 2026-09-22\n")
+        assert text.startswith("# Plannotation benchmark — `claude-opus-5`, 2026-09-22\n")
         assert "| model (label only) | 1 | 0/1 (0%) | 1/1 (100%) | +100 pp |" in text
         assert "| **Answerable from the drawing** | **3** | **2/3 (67%)** | **3/3 (100%)**" in text
         assert "| **All questions** | **4** | **2/4 (50%)** | **4/4 (100%)** | **+50 pp** |" in text
@@ -931,7 +931,7 @@ class TestReport:
 # The command line
 # ---------------------------------------------------------------------------
 class TestCli:
-    """``planlabel-bench``: questions, run, report, readme."""
+    """``plannotation-bench``: questions, run, report, readme."""
 
     @staticmethod
     def _invoke(*args: str) -> Any:  # noqa: ANN401

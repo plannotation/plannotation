@@ -162,7 +162,7 @@
       "roomBookVersion": "2026-01",
       "roomCount": 9
     },
-    "x-planlabel-export": {
+    "x-plannotation-export": {
       "authoringTool": "Allplan 2026",
       "exportProfile": "TWP-Standard",
       "layerSet": "AR_EG"
@@ -170,7 +170,7 @@
   },
   "generator": {
     "created": "2026-01-30T10:41:18Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -184,7 +184,7 @@
     "index": 2,
     "widthMm": 841
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "authored",
   "sheet": {
     "author": "A. Neumann",

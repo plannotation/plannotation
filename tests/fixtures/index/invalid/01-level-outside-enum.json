@@ -5,14 +5,14 @@
       "package": "architecture",
       "sheetCount": 3
     },
-    "x-planlabel-export": {
+    "x-plannotation-export": {
       "authoringTool": "Allplan 2026",
       "exportProfile": "TWP-Standard"
     }
   },
   "generator": {
     "created": "2026-04-09T17:26:05Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -23,7 +23,7 @@
   },
   "pages": [
     {
-      "file": "planlabel-p0000.json",
+      "file": "plannotation-p0000.json",
       "level": "L1",
       "pageIndex": 0,
       "revision": "A",
@@ -31,7 +31,7 @@
       "title": "Übersichtsplan Bauteil A"
     },
     {
-      "file": "planlabel-p0002.json",
+      "file": "plannotation-p0002.json",
       "level": "L2",
       "pageIndex": 2,
       "revision": "C",
@@ -39,7 +39,7 @@
       "title": "Grundriss Erdgeschoss"
     },
     {
-      "file": "planlabel-p0006.json",
+      "file": "plannotation-p0006.json",
       "level": "L4",
       "pageIndex": 6,
       "revision": "C",
@@ -47,6 +47,6 @@
       "title": "Schnitt B-B"
     }
   ],
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "authored"
 }

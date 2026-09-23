@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from planlabel_mcp.server import (
+from plannotation_mcp.server import (
     PathOutsideRootError,
     ServerConfig,
     WriteNotAllowedError,
@@ -98,14 +98,14 @@ class TestTheToolSurface:
         """Section 11: the schema, the specification, and the index of a folder."""
         server = build_server(ServerConfig(root=root))
         uris = {str(resource.uri) for resource in asyncio.run(server.list_resources())}
-        assert uris == {"planlabel://schema/page", "planlabel://spec", "planlabel://index"}
+        assert uris == {"plannotation://schema/page", "plannotation://spec", "plannotation://index"}
 
     def test_the_schema_resource_is_the_schema(self, root: Path) -> None:
         """So a host can validate what it is handed without fetching anything."""
         server = build_server(ServerConfig(root=root))
-        contents = list(asyncio.run(server.read_resource("planlabel://schema/page")))
+        contents = list(asyncio.run(server.read_resource("plannotation://schema/page")))
         schema = json.loads(contents[0].content)
-        assert schema["title"] == "PlanLabel 0.1"
+        assert schema["title"] == "Plannotation 0.1"
 
 
 class TestTheReadingTools:

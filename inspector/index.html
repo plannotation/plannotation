@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PlanLabel inspector</title>
+<title>Plannotation inspector</title>
 <style>
   :root {
     --bg: #f6f6f4; --panel: #fff; --ink: #1a1a18; --muted: #6b6b66;
@@ -71,7 +71,7 @@
 </head>
 <body>
 <header>
-  <h1>PlanLabel inspector</h1>
+  <h1>Plannotation inspector</h1>
   <label class="file">Open a labelled PDF<input type="file" id="file" accept="application/pdf"></label>
   <button id="prev">&larr;</button>
   <span id="pager" class="muted">no document</span>
@@ -173,14 +173,14 @@ el("file").addEventListener("change", async (event) => {
   await render();
 });
 
-// A page label travels as an attachment named planlabel-pNNNN.json. pdf.js exposes
-// the EmbeddedFiles name tree through getAttachments(), which is why PlanLabel
+// A page label travels as an attachment named plannotation-pNNNN.json. pdf.js exposes
+// the EmbeddedFiles name tree through getAttachments(), which is why Plannotation
 // registers every file there as well as on the page's /AF.
 async function readLabels(doc) {
   const found = new Map();
   const attachments = (await doc.getAttachments()) || {};
   for (const [name, entry] of Object.entries(attachments)) {
-    const match = /^planlabel-p(\d+)\.json$/.exec(name);
+    const match = /^plannotation-p(\d+)\.json$/.exec(name);
     if (!match) continue;
     try {
       found.set(Number(match[1]) + 1, JSON.parse(new TextDecoder().decode(entry.content)));
@@ -268,7 +268,7 @@ function describe() {
   const sheet = el("sheet"), rows = el("rows");
   typeToggles(label);
   if (!label) {
-    sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no PlanLabel label.</dd>`;
+    sheet.innerHTML = `<dd class="muted" style="grid-column:1/-1">This page carries no Plannotation label.</dd>`;
     rows.innerHTML = `<tr><td colspan="3" class="empty">nothing to show</td></tr>`;
     return;
   }
@@ -279,7 +279,7 @@ function describe() {
     ["type", label.sheet?.drawingType], ["discipline", label.sheet?.discipline],
     ["page", `${label.page.widthMm} × ${label.page.heightMm} mm`],
     ["provenance", label.provenance], ["level", level],
-    ["model", label.model?.file], ["schema", label.planlabel],
+    ["model", label.model?.file], ["schema", label.plannotation],
   ].filter(([, value]) => value != null && value !== "");
   sheet.innerHTML = pairs.map(([k, v]) => `<dt>${k}</dt><dd>${escape(String(v))}</dd>`).join("");
 
@@ -363,7 +363,7 @@ el("csv").onclick = () => {
   add("annotation", label.annotations, (i) => i.type, (i) => i.text);
   const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
   const link = Object.assign(document.createElement("a"),
-    { href: url, download: `${label.sheet?.id || "planlabel"}-page${state.page}.csv` });
+    { href: url, download: `${label.sheet?.id || "plannotation"}-page${state.page}.csv` });
   link.click();
   URL.revokeObjectURL(url);
 };

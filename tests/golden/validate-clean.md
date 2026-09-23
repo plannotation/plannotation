@@ -1,4 +1,4 @@
-# PlanLabel validation report: 01-referential-clean.json
+# Plannotation validation report: 01-referential-clean.json
 
 **PASS** -- 0 error(s), 0 warning(s); exit code 0.
 
@@ -24,4 +24,4 @@ None.
 
 ---
 
-Validated by planlabel <version>, PlanLabel schema 0.1.
+Validated by plannotation <version>, Plannotation schema 0.1.

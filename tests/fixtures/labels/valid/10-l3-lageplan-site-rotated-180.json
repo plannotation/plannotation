@@ -234,7 +234,7 @@
   ],
   "generator": {
     "created": "2026-02-27T15:10:44Z",
-    "name": "planlabel",
+    "name": "plannotation",
     "version": "0.1.0"
   },
   "model": {
@@ -249,7 +249,7 @@
     "rotation": 180,
     "widthMm": 841
   },
-  "planlabel": "0.1",
+  "plannotation": "0.1",
   "provenance": "authored",
   "sheet": {
     "author": "P. Vogel",

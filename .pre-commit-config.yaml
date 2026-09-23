@@ -41,7 +41,7 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
 
   # ------------------------------------------------- JSON schema self-checks
-  # check-metaschema validates that each file under planlabel/schema/ is itself
+  # check-metaschema validates that each file under plannotation/schema/ is itself
   # a well-formed JSON Schema for the draft its own $schema declares. Phase 1
   # adds those files; until then nothing matches the pattern and the hook is
   # skipped. That is why `files:` is used and `always_run` deliberately is not.
@@ -49,8 +49,8 @@ repos:
     rev: 0.38.0
     hooks:
       - id: check-metaschema
-        name: planlabel schemas are valid JSON Schema
-        files: ^planlabel/schema/.*\.json$
+        name: plannotation schemas are valid JSON Schema
+        files: ^plannotation/schema/.*\.json$
       - id: check-github-workflows
         args: [--verbose]
 
@@ -60,13 +60,13 @@ repos:
       # failing is their whole job, and tests/test_fixtures.py asserts that they
       # fail for the one reason their manifest claims.
       - id: check-jsonschema
-        name: valid label fixtures conform to planlabel-0.1
+        name: valid label fixtures conform to plannotation-0.1
         files: ^tests/fixtures/labels/valid/.*\.json$
-        args: [--schemafile, planlabel/schema/planlabel-0.1.json]
+        args: [--schemafile, plannotation/schema/plannotation-0.1.json]
       - id: check-jsonschema
-        name: valid index fixtures conform to planlabel-index-0.1
+        name: valid index fixtures conform to plannotation-index-0.1
         files: ^tests/fixtures/index/valid/.*\.json$
-        args: [--schemafile, planlabel/schema/planlabel-index-0.1.json]
+        args: [--schemafile, plannotation/schema/plannotation-index-0.1.json]
 
   # ------------------------------------------------------- local (uv-backed)
   # mypy and uv run from the project's own locked environment. A mirrors-mypy
@@ -76,7 +76,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy --strict (both distributions)
-        entry: uv run --frozen mypy --strict planlabel planlabel_mcp/planlabel_mcp
+        entry: uv run --frozen mypy --strict plannotation plannotation_mcp/plannotation_mcp
         language: system
         types_or: [python, pyi]
         pass_filenames: false
@@ -86,7 +86,7 @@ repos:
         name: uv.lock matches pyproject.toml
         entry: uv lock --check
         language: system
-        files: ^(pyproject\.toml|planlabel_mcp/pyproject\.toml|uv\.lock)$
+        files: ^(pyproject\.toml|plannotation_mcp/pyproject\.toml|uv\.lock)$
         pass_filenames: false
 
       # Ruff's CPY001 enforces the SPDX header for Python. This extends the same

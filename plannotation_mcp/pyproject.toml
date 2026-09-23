@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: Apache-2.0
+# Workspace member. This directory holds the `plannotation-mcp` distribution; the
+# importable package is plannotation_mcp/plannotation_mcp/.
+#
+# The one level of nesting is forced, not stylistic: hatchling refuses a dev-mode
+# install when a project directory doubles as its own package directory
+# ("path rewrite in the sources option changes a prefix rather than removes it"),
+# and a package outside its distribution's project directory cannot produce a
+# self-contained PEP 517 sdist. README.md and LICENSE are real copies here for the
+# same reason -- an sdist cannot reference files above its own root.
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "plannotation-mcp"
+dynamic = ["version"]
+description = "MCP server exposing Plannotation-labelled construction drawings to MCP hosts."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "The Plannotation Authors" }]
+keywords = ["mcp", "pdf", "ifc", "bim", "aec", "construction", "drawings"]
+requires-python = ">=3.11,<3.15"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
+]
+dependencies = [
+  "plannotation>=0.1.0.dev0,<0.2",
+  "mcp>=1.3",  # MIT; permissive transitives only
+]
+
+[project.scripts]
+plannotation-mcp = "plannotation_mcp.server:main"
+
+[project.urls]
+Homepage = "https://plannotation.github.io/"
+Documentation = "https://plannotation.github.io/"
+Specification = "https://plannotation.github.io/spec/0.1"
+Source = "https://github.com/plannotation/plannotation"
+Issues = "https://github.com/plannotation/plannotation/issues"
+
+[tool.hatch.version]
+path = "plannotation_mcp/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plannotation_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/plannotation_mcp", "/README.md", "/LICENSE"]
+
+# Resolve the sibling core distribution from the workspace during development
+# rather than from PyPI.
+[tool.uv.sources]
+plannotation = { workspace = true }

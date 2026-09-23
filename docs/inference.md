@@ -1,11 +1,11 @@
 # Inferring labels for legacy PDFs
 
-A drawing office has decades of PDFs and none of them has a label. `planlabel infer`
+A drawing office has decades of PDFs and none of them has a label. `plannotation infer`
 reads what is printed on each page and writes a labelled copy.
 
 ```bash
-planlabel infer old-drawing.pdf -o old-drawing.labelled.pdf
-planlabel infer old-drawing.pdf -o old-drawing.labelled.pdf --ifc model.ifc
+plannotation infer old-drawing.pdf -o old-drawing.labelled.pdf
+plannotation infer old-drawing.pdf -o old-drawing.labelled.pdf --ifc model.ifc
 ```
 
 The input is never modified.
