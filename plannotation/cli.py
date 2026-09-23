@@ -3,11 +3,12 @@
 
 ::
 
-    plannotation attach in.pdf labels.json -o out.pdf
+    plannotation attach in.pdf plannotations.json -o out.pdf
     plannotation read out.pdf [--page N] [--json]
     plannotation strip out.pdf -o clean.pdf
     plannotation sidecar out.pdf
-    plannotation validate file.pdf|labels.json [--ifc model.ifc] [--strict] [--report md|json]
+    plannotation validate file.pdf|plannotations.json [--ifc model.ifc] [--strict]
+                          [--report md|json]
     plannotation samples build [--out samples] [--only NAME] [--inkscape-fallback]
     plannotation inspect file.pdf [--page N] [--json]
     plannotation infer old.pdf -o labelled.pdf [--ifc model.ifc]
@@ -53,12 +54,12 @@ from plannotation.errors import PlannotationError, ValidatorError
 from plannotation.model import (
     Annotation,
     Generator,
-    LabelIndex,
-    PageLabel,
+    Plannotation,
+    PlannotationIndex,
     canonical_json,
     conformance_level,
-    load_label_index,
-    load_page_label,
+    load_plannotation,
+    load_plannotation_index,
     load_sidecar,
 )
 from plannotation.pdf import embed
@@ -230,7 +231,7 @@ def _read_json(path: Path) -> object:
         raise _fail(msg) from exc
 
 
-def _load_labels(path: Path) -> tuple[list[PageLabel], LabelIndex | None]:
+def _load_plannotations(path: Path) -> tuple[list[Plannotation], PlannotationIndex | None]:
     """Read a labels file in any of the three shapes a person may reasonably have.
 
     A sidecar document carries both the labels and an index; a bare array carries
@@ -249,12 +250,12 @@ def _load_labels(path: Path) -> tuple[list[PageLabel], LabelIndex | None]:
     document = _read_json(path)
     try:
         if isinstance(document, list):
-            return [load_page_label(json.dumps(item)) for item in document], None
+            return [load_plannotation(json.dumps(item)) for item in document], None
         if isinstance(document, dict) and "index" in document:
             sidecar = load_sidecar(json.dumps(document))
             return list(sidecar.pages), sidecar.index
         if isinstance(document, dict) and "page" in document:
-            return [load_page_label(json.dumps(document))], None
+            return [load_plannotation(json.dumps(document))], None
     except ValueError as exc:
         msg = f"{path} is not a valid Plannotation document:\n{exc}"
         raise _fail(msg) from exc
@@ -266,7 +267,7 @@ def _load_labels(path: Path) -> tuple[list[PageLabel], LabelIndex | None]:
     raise _fail(msg)
 
 
-def _load_index(path: Path) -> LabelIndex:
+def _load_index(path: Path) -> PlannotationIndex:
     """Read an index file.
 
     Args:
@@ -279,7 +280,7 @@ def _load_index(path: Path) -> LabelIndex:
         typer.Exit: If it does not validate.
     """
     try:
-        return load_label_index(json.dumps(_read_json(path)))
+        return load_plannotation_index(json.dumps(_read_json(path)))
     except ValueError as exc:
         msg = f"{path} is not a valid Plannotation index:\n{exc}"
         raise _fail(msg) from exc
@@ -341,7 +342,7 @@ def _carrier_line(report: CarrierReport) -> str:
     return "; ".join(parts)
 
 
-def _index_line(index: LabelIndex | None) -> str:
+def _index_line(index: PlannotationIndex | None) -> str:
     """Describe the document-level index.
 
     Args:
@@ -430,23 +431,23 @@ def attach(
 ) -> None:
     """Attach page labels to a PDF, leaving every page exactly as it looks now."""
     moment = _resolve_mod_date(mod_date)
-    page_labels, carried_index = _load_labels(labels)
+    plannotations, carried_index = _load_plannotations(labels)
     if index is not None and carried_index is not None:
         msg = f"{labels} already carries an index; pass one or the other, not both"
         raise _fail(msg)
     document_index = _load_index(index) if index is not None else carried_index
     if document_index is None:
-        document_index = embed.build_index(page_labels, generator=_generator(moment))
-        _LOGGER.info("no index given; derived one from the %d label(s)", len(page_labels))
+        document_index = embed.build_index(plannotations, generator=_generator(moment))
+        _LOGGER.info("no index given; derived one from the %d label(s)", len(plannotations))
     try:
         report = embed.attach(
             pdf_in,
-            page_labels,
+            plannotations,
             document_index,
             out,
             mod_date=moment,
             break_signature=break_signature,
-            compress_labels=not no_compress,
+            compress_plannotations=not no_compress,
         )
     except PlannotationError as exc:
         raise _fail(str(exc)) from exc
@@ -518,7 +519,7 @@ def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not 
     Raises:
         typer.Exit: With 1 when the SVG cannot be read or does not match the PDF.
     """
-    from plannotation.svg.label import (  # noqa: PLC0415 -- only this command needs it
+    from plannotation.svg.derive import (  # noqa: PLC0415 -- only this command needs it
         SheetSource,
         attach_from_svg,
         source_from_ifc,
@@ -689,10 +690,10 @@ def sidecar(
 ) -> None:
     """Write the sidecar twin of a PDF, without touching the PDF."""
     moment = _resolve_mod_date(mod_date)
-    page_labels: list[PageLabel] | None = None
-    document_index: LabelIndex | None = None
+    plannotations: list[Plannotation] | None = None
+    document_index: PlannotationIndex | None = None
     if labels is not None:
-        page_labels, carried_index = _load_labels(labels)
+        plannotations, carried_index = _load_plannotations(labels)
         if index is not None and carried_index is not None:
             msg = f"{labels} already carries an index; pass one or the other, not both"
             raise _fail(msg)
@@ -704,7 +705,7 @@ def sidecar(
         written = embed.write_sidecar(
             pdf_in,
             out,
-            labels=page_labels,
+            labels=plannotations,
             index=document_index,
             generator=_generator(moment),
         )
@@ -714,19 +715,19 @@ def sidecar(
         msg = f"the sidecar could not be written: {exc}"
         raise _fail(msg) from exc
 
-    written_labels = embed.read_sidecar(written)
+    written_plannotations = embed.read_sidecar(written)
     if as_json:
         _echo_json(
             {
                 "output": str(written),
-                "pages": sorted(written_labels.pages),
+                "pages": sorted(written_plannotations.pages),
                 "bytes": written.stat().st_size,
             }
         )
         return
     console.print(f"[bold green]wrote[/bold green] {written}")
     console.print(
-        f"  {len(written_labels.pages)} page label(s), {written.stat().st_size} bytes; "
+        f"  {len(written_plannotations.pages)} page label(s), {written.stat().st_size} bytes; "
         "the PDF was not modified"
     )
 
@@ -931,7 +932,7 @@ def inspect(
         _print_page(index, label)
 
 
-def _print_page(index: int, label: PageLabel) -> None:
+def _print_page(index: int, label: Plannotation) -> None:
     """Print one page label as a set of tables.
 
     Args:

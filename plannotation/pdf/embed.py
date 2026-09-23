@@ -8,7 +8,7 @@ arranged around that.
 What a labelled document carries
 --------------------------------
 For each labelled page, one embedded file named ``plannotation-pNNNN.json``
-(:func:`plannotation.constants.page_label_filename`) holding
+(:func:`plannotation.constants.plannotation_filename`) holding
 :func:`plannotation.model.canonical_bytes` of the page label, with ``/Subtype``
 ``application/json``, ``/AFRelationship /Data`` and a ``/Desc``. The file is listed
 in that page's ``/AF`` array **and** in the document's ``EmbeddedFiles`` name tree.
@@ -41,7 +41,7 @@ superset of its input. The guarantee is about the page, not about the file.
 What this reader will decode, and what it will not
 --------------------------------------------------
 An embedded label and the catalog's XMP packet arrive from the same untrusted file, so
-both are read under a bound -- :data:`_MAX_LABEL_BYTES` and :data:`_MAX_XMP_BYTES` --
+both are read under a bound -- :data:`_MAX_PLANNOTATION_BYTES` and :data:`_MAX_XMP_BYTES` --
 and both are decoded here rather than by the PDF library: a single ``/FlateDecode``,
 inflated incrementally, with its ``/DecodeParms`` predictor applied to output that is
 already inside the bound. Any other filter chain is refused, by name. Section 4.3 (7)
@@ -103,37 +103,37 @@ from pikepdf import Array, Dictionary, Name, Object, Pdf
 
 from plannotation.constants import (
     INDEX_FILENAME,
-    LABEL_MIME_TYPE,
+    PLANNOTATION_MIME_TYPE,
     SCHEMA_VERSION,
     SIDECAR_SUFFIX,
     SPEC_URI,
-    page_label_filename,
+    plannotation_filename,
 )
 from plannotation.errors import (
     AttachmentConflictError,
     CarrierError,
     DeclarationError,
     EncryptedPdfError,
-    InvalidLabelError,
-    LabelMismatchError,
-    LabelNotFoundError,
+    InvalidPlannotationError,
+    PlannotationMismatchError,
+    PlannotationNotFoundError,
     SignedPdfError,
 )
 from plannotation.model import (
     ConformanceLevel,
     Generator,
     IndexPage,
-    LabelIndex,
     Model,
-    PageLabel,
+    Plannotation,
+    PlannotationIndex,
     Sidecar,
     aggregate_provenance,
     canonical_bytes,
     canonical_json,
     conformance_level,
     index_schema,
-    load_label_index,
-    load_page_label,
+    load_plannotation,
+    load_plannotation_index,
     load_sidecar,
     page_schema,
     sidecar_schema,
@@ -151,8 +151,8 @@ __all__ = [
     "PAGE_DIMENSION_TOLERANCE_MM",
     "AttachReport",
     "CarrierReport",
-    "LabelSet",
     "PageGeometry",
+    "PlannotationSet",
     "SignatureReport",
     "StripReport",
     "add_declaration",
@@ -161,7 +161,7 @@ __all__ = [
     "build_index",
     "build_sidecar",
     "carrier_report",
-    "check_labels_against",
+    "check_plannotations_against",
     "has_declaration",
     "is_plannotation_filename",
     "page_geometry",
@@ -170,7 +170,7 @@ __all__ = [
     "read_pdf",
     "read_sidecar",
     "remove_declaration",
-    "save_labelled",
+    "save_plannotated",
     "sidecar_path",
     "signature_report",
     "strip",
@@ -223,7 +223,7 @@ PAGE_DIMENSION_TOLERANCE_MM: Final = 0.5
 #: of the specification already notes this difference between Python ``re`` and the Rust
 #: engine pydantic validates with, which has no such rule; ``\Z`` means the same thing
 #: in both.
-_PAGE_LABEL_FILENAME: Final = re.compile(r"\Aplannotation-p\d{4}\.json\Z")
+_PLANNOTATION_FILENAME: Final = re.compile(r"\Aplannotation-p\d{4}\.json\Z")
 
 #: An upper bound on the form-field nodes the signature walk will visit. The field
 #: tree comes from an untrusted document and may be cyclic or enormous; section 9 of
@@ -237,9 +237,9 @@ _MAX_FIELD_NODES: Final = 10_000
 #: Sixteen mebibytes is deliberately generous. A page label is a few kilobytes -- the
 #: largest fixture in this repository is about one -- and a document's whole index is
 #: smaller still, so nothing legitimate comes close. Every reading function takes
-#: ``max_label_bytes`` so that a caller with a genuinely enormous label is inconvenienced
+#: ``max_plannotation_bytes`` so that a caller with a genuinely enormous label is inconvenienced
 #: rather than stopped.
-_MAX_LABEL_BYTES: Final = 16 * 1024 * 1024
+_MAX_PLANNOTATION_BYTES: Final = 16 * 1024 * 1024
 
 #: An upper bound on the bytes the catalog's XMP packet may decompress to.
 #:
@@ -251,7 +251,7 @@ _MAX_LABEL_BYTES: Final = 16 * 1024 * 1024
 #: a gibibyte is as easy to write as one carrying a label that does.
 #:
 #: One mebibyte is generous by two orders of magnitude and deliberately far below
-#: :data:`_MAX_LABEL_BYTES`: a real packet is a few kilobytes, and the largest thing
+#: :data:`_MAX_PLANNOTATION_BYTES`: a real packet is a few kilobytes, and the largest thing
 #: legitimately found in one -- a PDF/A extension schema describing every property of
 #: several namespaces -- is tens of kilobytes.
 _MAX_XMP_BYTES: Final = 1024 * 1024
@@ -399,7 +399,7 @@ def is_plannotation_filename(name: str) -> bool:
         >>> is_plannotation_filename("factur-x.xml")
         False
     """
-    return name == INDEX_FILENAME or bool(_PAGE_LABEL_FILENAME.match(name))
+    return name == INDEX_FILENAME or bool(_PLANNOTATION_FILENAME.match(name))
 
 
 def _spec_names(spec: Object) -> list[str]:
@@ -653,7 +653,7 @@ def _check_schema(document: object, kind: Literal["page", "index", "sidecar"], s
         source: Where the document came from, for the message.
 
     Raises:
-        InvalidLabelError: If the document does not validate, with a JSON Pointer to
+        InvalidPlannotationError: If the document does not validate, with a JSON Pointer to
             each of the first few failures.
     """
     # Take only what is reported, and only then sort. The number of violations is
@@ -669,7 +669,7 @@ def _check_schema(document: object, kind: Literal["page", "index", "sidecar"], s
         listed.append("  ... and more")
     body = "\n".join(listed)
     msg = f"{source} is not a valid Plannotation {kind} document:\n{body}"
-    raise InvalidLabelError(msg)
+    raise InvalidPlannotationError(msg)
 
 
 def _load_model(
@@ -696,14 +696,14 @@ def _load_model(
         The loaded model.
 
     Raises:
-        InvalidLabelError: If the bytes are not UTF-8, not JSON, do not validate
+        InvalidPlannotationError: If the bytes are not UTF-8, not JSON, do not validate
             against the schema, or do not load into the model.
     """
     try:
         document = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, ValueError) as exc:
         msg = f"{source} is not readable as UTF-8 JSON: {_clip(str(exc))}"
-        raise InvalidLabelError(msg) from exc
+        raise InvalidPlannotationError(msg) from exc
     except RecursionError as exc:
         # A document may nest as deeply as it likes: `extensions` and an element's
         # `properties` hold arbitrary JSON, so no depth limit could be both generous
@@ -714,13 +714,13 @@ def _load_model(
         # RecursionError is not a ValueError, so without this it escapes read(),
         # read(strict=False) and carrier_report() alike, which SPEC 4.3(2) forbids.
         msg = f"{source} nests too deeply for this reader to parse"
-        raise InvalidLabelError(msg) from exc
+        raise InvalidPlannotationError(msg) from exc
     _check_schema(document, kind, source)
     try:
         return loader(data)
     except ValueError as exc:  # pydantic's ValidationError is a ValueError
         msg = f"{source} validates against the schema but not against the model: {exc}"
-        raise InvalidLabelError(msg) from exc
+        raise InvalidPlannotationError(msg) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -1016,10 +1016,10 @@ _MEASURED_PHRASE: Final = {
 }
 
 #: What to tell someone whose *label* would not fit inside the bound.
-_LABEL_ADVICE: Final = (
+_PLANNOTATION_ADVICE: Final = (
     "A Plannotation label is a few kilobytes, so this is either damage or a decompression "
     "bomb, and section 4.3 (7) of the specification requires a reader to bound what it "
-    "spends parsing. Pass max_label_bytes to raise the limit if a label really is this "
+    "spends parsing. Pass max_plannotation_bytes to raise the limit if a label really is this "
     "large"
 )
 
@@ -1072,7 +1072,7 @@ _MAX_COLORS: Final = 32
 #: with numpy in one pass per row, or in one pass for the whole stream. Average and
 #: Paeth are not. Each reconstructed byte is an input to the next byte in the same row,
 #: so undoing them is a sequential loop in Python at roughly a tenth of a microsecond a
-#: byte, and at that rate :data:`_MAX_LABEL_BYTES` is a bound on memory and not a bound
+#: byte, and at that rate :data:`_MAX_PLANNOTATION_BYTES` is a bound on memory and not a bound
 #: on time -- sixteen mebibytes of Paeth cost seconds, and the document chooses how many
 #: labels a reader opens. Section 4.3 (7) asks for both bounds, so the two sequential
 #: predictors get a tighter one.
@@ -1084,7 +1084,9 @@ _MAX_COLORS: Final = 32
 _MAX_SEQUENTIAL_PREDICTED_BYTES: Final = 1024 * 1024
 
 
-def _oversize(source: str, limit: int, *, measured: _Measured, advice: str) -> InvalidLabelError:
+def _oversize(
+    source: str, limit: int, *, measured: _Measured, advice: str
+) -> InvalidPlannotationError:
     """Build the error raised when something will not fit inside the bound.
 
     Args:
@@ -1104,10 +1106,10 @@ def _oversize(source: str, limit: int, *, measured: _Measured, advice: str) -> I
         f"{source} {_MEASURED_PHRASE[measured]} more than the {limit} bytes this reader "
         f"will decompress. {advice}"
     )
-    return InvalidLabelError(msg)
+    return InvalidPlannotationError(msg)
 
 
-def _unsupported_filter(source: str, filters: Sequence[str]) -> InvalidLabelError:
+def _unsupported_filter(source: str, filters: Sequence[str]) -> InvalidPlannotationError:
     """Build the error raised for a filter chain this reader will not decode.
 
     Args:
@@ -1127,7 +1129,7 @@ def _unsupported_filter(source: str, filters: Sequence[str]) -> InvalidLabelErro
         "afterwards -- which is not a bound (section 4.3 (7) and section 9). A label "
         "this reader will not accept is a label that is absent (section 4.3 (2))"
     )
-    return InvalidLabelError(msg)
+    return InvalidPlannotationError(msg)
 
 
 def _stream_filters(stream: Object) -> list[str]:
@@ -1173,7 +1175,7 @@ def _bounded_inflate(raw: bytes, *, limit: int, source: str, advice: str) -> byt
         The decompressed bytes.
 
     Raises:
-        InvalidLabelError: If the stream decompresses to more than ``limit`` bytes, or
+        InvalidPlannotationError: If the stream decompresses to more than ``limit`` bytes, or
             zlib will not read it at all.
     """
     for window in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
@@ -1197,7 +1199,7 @@ def _bounded_inflate(raw: bytes, *, limit: int, source: str, advice: str) -> byt
         "the specification requires a label a reader will not accept to be treated as "
         "absent rather than repaired"
     )
-    raise InvalidLabelError(msg)
+    raise InvalidPlannotationError(msg)
 
 
 def _decode_parms(stream: Object, *, source: str) -> Object | None:
@@ -1213,7 +1215,7 @@ def _decode_parms(stream: Object, *, source: str) -> Object | None:
         this stream has one filter.
 
     Raises:
-        InvalidLabelError: If ``/DecodeParms`` is neither, which means it does not
+        InvalidPlannotationError: If ``/DecodeParms`` is neither, which means it does not
             parallel the one ``/Filter`` and the stream cannot be decoded as written.
     """
     value = stream.stream_dict.get(Name.DecodeParms)
@@ -1223,13 +1225,13 @@ def _decode_parms(stream: Object, *, source: str) -> Object | None:
                 f"{source} declares one filter and {len(value)} sets of /DecodeParms; "
                 "the two arrays must have the same length, so this stream is damaged"
             )
-            raise InvalidLabelError(msg)
+            raise InvalidPlannotationError(msg)
         value = value[0]
     if value is None:
         return None
     if not isinstance(value, Dictionary):
         msg = f"{source} has a /DecodeParms that is not a dictionary: {value!r}"
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     return value
 
 
@@ -1252,7 +1254,7 @@ def _parms_integer(parms: Object, key: Name, default: int, *, source: str) -> in
         The value, or ``default``.
 
     Raises:
-        InvalidLabelError: If the entry is present and is not an integer. ``True`` is an
+        InvalidPlannotationError: If the entry is present and is not an integer. ``True`` is an
             integer to Python and is not one to PDF, so booleans are refused with the
             rest.
     """
@@ -1268,7 +1270,7 @@ def _parms_integer(parms: Object, key: Name, default: int, *, source: str) -> in
             "32000-2 table 10 makes all four predictor parameters integers, so this "
             "stream cannot be decoded as written"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     return value
 
 
@@ -1299,7 +1301,7 @@ class _PredictorPlan:
     step: int
 
 
-def _out_of_range(source: str, key: Name, value: int, allowed: str) -> InvalidLabelError:
+def _out_of_range(source: str, key: Name, value: int, allowed: str) -> InvalidPlannotationError:
     """Build the error raised for a predictor parameter outside its range.
 
     Args:
@@ -1319,7 +1321,7 @@ def _out_of_range(source: str, key: Name, value: int, allowed: str) -> InvalidLa
         "allocation (section 4.3 (7) and section 9). A label this reader will not "
         "accept is a label that is absent (section 4.3 (2))"
     )
-    return InvalidLabelError(msg)
+    return InvalidPlannotationError(msg)
 
 
 def _predictor_plan(parms: Object, *, limit: int, source: str) -> _PredictorPlan | None:
@@ -1342,7 +1344,7 @@ def _predictor_plan(parms: Object, *, limit: int, source: str) -> _PredictorPlan
         The validated plan, or None when the stream declares no predictor at all.
 
     Raises:
-        InvalidLabelError: If any parameter is not an integer, is outside the range ISO
+        InvalidPlannotationError: If any parameter is not an integer, is outside the range ISO
             32000-2 table 10 gives it, or implies a row this reader will not allocate.
             The message names the parameter.
     """
@@ -1377,7 +1379,7 @@ def _predictor_plan(parms: Object, *, limit: int, source: str) -> _PredictorPlan
             "multiplied together before anything is allocated, exactly so that a row "
             "this large is refused rather than allocated (section 4.3 (7))"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     return _PredictorPlan(
         predictor=predictor,
         colors=colors,
@@ -1406,7 +1408,7 @@ def _apply_predictor(data: bytes, parms: Object, *, limit: int, source: str) -> 
         The unpredicted bytes, which are never longer than ``data``.
 
     Raises:
-        InvalidLabelError: If the parameters are not ones this reader will decode, or do
+        InvalidPlannotationError: If the parameters are not ones this reader will decode, or do
             not describe the data. An empty stream is refused rather than accepted: zero
             bytes are a whole number of rows of any length, so the arithmetic that checks
             the shape of the data passes vacuously on them, and a stream that declares a
@@ -1422,7 +1424,7 @@ def _apply_predictor(data: bytes, parms: Object, *, limit: int, source: str) -> 
             "whose shape cannot be checked rather than one that has been checked; "
             "section 4.3 (2) requires it to be treated as absent"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     if plan.predictor >= _PREDICTOR_PNG:
         return _png_unpredict(data, plan, source=source)
     return _tiff_unpredict(data, plan, source=source)
@@ -1527,7 +1529,7 @@ def _png_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
         The unpredicted bytes, one row shorter per row than the input.
 
     Raises:
-        InvalidLabelError: If the data is not a whole number of tagged rows, a row
+        InvalidPlannotationError: If the data is not a whole number of tagged rows, a row
             carries a tag that is not a PNG filter type, or more than
             :data:`_MAX_SEQUENTIAL_PREDICTED_BYTES` are stored under Average or Paeth.
             Both counts are taken from the tag bytes of a view over ``data``, before the
@@ -1539,7 +1541,7 @@ def _png_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
             f"{source} is {len(data)} bytes, which is not a whole number of "
             f"{stride}-byte PNG predictor rows"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     # A view, not a copy: the tag bytes are counted, and both refusals made, before a
     # second buffer the size of the data is allocated to unpredict into.
     grid = np.frombuffer(data, dtype=np.uint8).reshape(-1, stride)
@@ -1547,7 +1549,7 @@ def _png_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
     highest = int(tag_column.max())
     if highest > _PNG_PAETH:
         msg = f"{source} has a PNG predictor row tagged {highest}, which is not a filter type"
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     sequential = int(np.count_nonzero((tag_column == _PNG_AVERAGE) | (tag_column == _PNG_PAETH)))
     if sequential * plan.row_length > _MAX_SEQUENTIAL_PREDICTED_BYTES:
         raise _sequential_predictor_refusal(source, highest)
@@ -1568,7 +1570,7 @@ def _png_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
     return rows.tobytes()
 
 
-def _sequential_predictor_refusal(source: str, tag: int) -> InvalidLabelError:
+def _sequential_predictor_refusal(source: str, tag: int) -> InvalidPlannotationError:
     """Build the error raised for too many bytes under an Average or Paeth predictor.
 
     Args:
@@ -1587,7 +1589,7 @@ def _sequential_predictor_refusal(source: str, tag: int) -> InvalidLabelError:
         "legitimately stores a JSON label this way: store it unencoded, or under "
         "/FlateDecode with no predictor, or with /Predictor 12"
     )
-    return InvalidLabelError(msg)
+    return InvalidPlannotationError(msg)
 
 
 def _tiff_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
@@ -1608,7 +1610,7 @@ def _tiff_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
         The unpredicted bytes, which are the same length as the input.
 
     Raises:
-        InvalidLabelError: If the components are not whole bytes, or the data is not a
+        InvalidPlannotationError: If the components are not whole bytes, or the data is not a
             whole number of rows.
     """
     if plan.bits != _BITS_PER_BYTE:
@@ -1616,14 +1618,14 @@ def _tiff_unpredict(data: bytes, plan: _PredictorPlan, *, source: str) -> bytes:
             f"{source} declares a TIFF predictor over {plan.bits}-bit components, which "
             "this reader does not unpack"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     row_length = plan.columns * plan.colors
     if len(data) % row_length:
         msg = (
             f"{source} is {len(data)} bytes, which is not a whole number of "
             f"{row_length}-byte predictor rows"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     lanes = np.frombuffer(data, dtype=np.uint8).reshape(-1, plan.columns, plan.colors)
     return np.cumsum(lanes, axis=1, dtype=np.uint8).tobytes()
 
@@ -1669,7 +1671,7 @@ def _declared_length(stream: Object) -> int | None:
 
 
 def _bounded_stream_bytes(
-    stream: Object, *, limit: int, source: str, advice: str = _LABEL_ADVICE
+    stream: Object, *, limit: int, source: str, advice: str = _PLANNOTATION_ADVICE
 ) -> bytes:
     """Decode a stream without letting the document decide how much memory to use.
 
@@ -1709,7 +1711,7 @@ def _bounded_stream_bytes(
         The decoded contents.
 
     Raises:
-        InvalidLabelError: If the contents exceed ``limit``, or the stream is stored
+        InvalidPlannotationError: If the contents exceed ``limit``, or the stream is stored
             under a filter chain this reader does not decode, or its ``/DecodeParms``
             are not ones it will decode, or Flate will not read it.
     """
@@ -1727,7 +1729,7 @@ def _bounded_stream_bytes(
             "damaged, and section 4.3 (2) of the specification requires a label a "
             "reader will not accept to be treated as absent"
         )
-        raise InvalidLabelError(msg) from exc
+        raise InvalidPlannotationError(msg) from exc
     if len(raw) > limit:
         raise _oversize(source, limit, measured="stored", advice=advice)
     filters = _stream_filters(stream)
@@ -1938,7 +1940,7 @@ def _read_packet(pdf: Pdf, *, limit: int = _MAX_XMP_BYTES) -> _Packet:
             source="the document's XMP metadata",
             advice=_PACKET_ADVICE,
         )
-    except InvalidLabelError as exc:
+    except InvalidPlannotationError as exc:
         _LOGGER.warning("the document's XMP metadata will not be read: %s", exc)
         return _Packet(stream=meta, data=None)
     return _Packet(stream=meta, data=data)
@@ -2304,7 +2306,7 @@ def _unreadable_packet() -> DeclarationError:
         "cannot be added to it and Plannotation will not write a labelled document "
         "without one. The packet is either damaged or hostile: a real one is a few "
         "kilobytes. Write a sidecar instead (`plannotation sidecar this.pdf --labels "
-        "labels.json`), which does not touch the document at all"
+        "plannotations.json`), which does not touch the document at all"
     )
     return DeclarationError(msg)
 
@@ -2514,7 +2516,7 @@ def _embed_file(
         data,
         description=description,
         filename=filename,
-        mime_type=LABEL_MIME_TYPE,
+        mime_type=PLANNOTATION_MIME_TYPE,
         creation_date="",
         mod_date=mod_date,
     )
@@ -2569,7 +2571,7 @@ def _page_description(page_index: int) -> str:
     return f"Plannotation {SCHEMA_VERSION} label for page {page_index}"
 
 
-def save_labelled(pdf: Pdf, path: Path | str) -> None:
+def save_plannotated(pdf: Pdf, path: Path | str) -> None:
     """Save a document with every option that could disturb it pinned.
 
     Four of pikepdf's defaults would break a promise this module makes, so all of
@@ -2616,7 +2618,7 @@ def save_labelled(pdf: Pdf, path: Path | str) -> None:
 # ---------------------------------------------------------------------------
 # Building an index and a sidecar from page labels
 # ---------------------------------------------------------------------------
-def _shared_model(labels: Sequence[PageLabel]) -> Model | None:
+def _shared_model(labels: Sequence[Plannotation]) -> Model | None:
     """Return the source model every label agrees on, if there is one.
 
     Args:
@@ -2636,11 +2638,11 @@ def _shared_model(labels: Sequence[PageLabel]) -> Model | None:
 
 
 def build_index(
-    labels: Iterable[PageLabel],
+    labels: Iterable[Plannotation],
     *,
     generator: Generator | None = None,
     with_filenames: bool = True,
-) -> LabelIndex:
+) -> PlannotationIndex:
     """Derive a document-level index from the page labels it describes.
 
     Nothing is invented. Every value is copied from a label: the sheet number, title
@@ -2667,12 +2669,12 @@ def build_index(
             title=label.sheet.title,
             revision=label.sheet.revision,
             level=conformance_level(label),
-            file=page_label_filename(label.page.index) if with_filenames else None,
+            file=plannotation_filename(label.page.index) if with_filenames else None,
         )
         for label in ordered
     ]
     provenance = aggregate_provenance(label.provenance for label in ordered)
-    return LabelIndex(
+    return PlannotationIndex(
         plannotation=SCHEMA_VERSION,
         generator=generator,
         provenance=provenance,
@@ -2682,8 +2684,8 @@ def build_index(
 
 
 def build_sidecar(
-    labels: Iterable[PageLabel],
-    index: LabelIndex | None = None,
+    labels: Iterable[Plannotation],
+    index: PlannotationIndex | None = None,
     *,
     generator: Generator | None = None,
 ) -> Sidecar:
@@ -2757,7 +2759,7 @@ class AttachReport:
     pdfa_extension_schema_missing: bool
 
 
-def _labels_by_page(labels: Iterable[PageLabel]) -> dict[int, PageLabel]:
+def _plannotations_by_page(labels: Iterable[Plannotation]) -> dict[int, Plannotation]:
     """Key the labels by the page each one claims.
 
     Args:
@@ -2770,9 +2772,9 @@ def _labels_by_page(labels: Iterable[PageLabel]) -> dict[int, PageLabel]:
 
     Raises:
         ValueError: If there are no labels at all.
-        LabelMismatchError: If two labels claim the same page.
+        PlannotationMismatchError: If two labels claim the same page.
     """
-    by_page: dict[int, PageLabel] = {}
+    by_page: dict[int, Plannotation] = {}
     for label in labels:
         page_index = label.page.index
         if page_index in by_page:
@@ -2780,7 +2782,7 @@ def _labels_by_page(labels: Iterable[PageLabel]) -> dict[int, PageLabel]:
                 f"two labels claim page {page_index}; a page carries at most one "
                 "label, and page.index is what says which page a label belongs to"
             )
-            raise LabelMismatchError(msg)
+            raise PlannotationMismatchError(msg)
         by_page[page_index] = label
     if not by_page:
         msg = "no labels were given, so there is nothing to attach"
@@ -2788,7 +2790,9 @@ def _labels_by_page(labels: Iterable[PageLabel]) -> dict[int, PageLabel]:
     return by_page
 
 
-def check_labels_against(pdf: Pdf, labels: Iterable[PageLabel]) -> dict[int, PageLabel]:
+def check_plannotations_against(
+    pdf: Pdf, labels: Iterable[Plannotation]
+) -> dict[int, Plannotation]:
     """Check a set of labels against the document they describe.
 
     This is the check :func:`attach` makes before it writes anything, exposed so that
@@ -2804,16 +2808,16 @@ def check_labels_against(pdf: Pdf, labels: Iterable[PageLabel]) -> dict[int, Pag
 
     Raises:
         ValueError: If there are no labels at all.
-        LabelMismatchError: If two labels claim one page, or a label names a page the
+        PlannotationMismatchError: If two labels claim one page, or a label names a page the
             document does not have, or its dimensions or rotation disagree with that
             page.
     """
-    by_page = _labels_by_page(labels)
+    by_page = _plannotations_by_page(labels)
     _check_pages(pdf, by_page)
     return by_page
 
 
-def _check_pages(pdf: Pdf, by_page: dict[int, PageLabel]) -> None:
+def _check_pages(pdf: Pdf, by_page: dict[int, Plannotation]) -> None:
     """Check every label against the page it claims.
 
     A label that misstates its page is worse than no label: a reader that trusts it
@@ -2825,7 +2829,7 @@ def _check_pages(pdf: Pdf, by_page: dict[int, PageLabel]) -> None:
         by_page: The labels, keyed by the page each claims.
 
     Raises:
-        LabelMismatchError: If a label names a page the document does not have, or
+        PlannotationMismatchError: If a label names a page the document does not have, or
             its page dimensions differ from that page's by more than
             :data:`PAGE_DIMENSION_TOLERANCE_MM`, or its rotation differs from the
             page's ``/Rotate``.
@@ -2837,12 +2841,12 @@ def _check_pages(pdf: Pdf, by_page: dict[int, PageLabel]) -> None:
                 f"the label for page {page_index} cannot be attached to a document of "
                 f"{page_count} page(s); page.index is a zero-based index into this document"
             )
-            raise LabelMismatchError(msg)
+            raise PlannotationMismatchError(msg)
         geometry = page_geometry(pdf, page_index)
         _check_one_page(label, geometry)
 
 
-def _check_one_page(label: PageLabel, geometry: PageGeometry) -> None:
+def _check_one_page(label: Plannotation, geometry: PageGeometry) -> None:
     """Compare one label's page block with the page itself.
 
     Args:
@@ -2850,7 +2854,7 @@ def _check_one_page(label: PageLabel, geometry: PageGeometry) -> None:
         geometry: The measured page, from :func:`page_geometry`.
 
     Raises:
-        LabelMismatchError: If the dimensions or the rotation disagree.
+        PlannotationMismatchError: If the dimensions or the rotation disagree.
     """
     index = geometry.page_index
     width_off = abs(label.page.width_mm - geometry.width_mm)
@@ -2870,18 +2874,18 @@ def _check_one_page(label: PageLabel, geometry: PageGeometry) -> None:
             f"(/UserUnit {geometry.user_unit:g}); paper dimensions are unrotated and "
             f"measured from the displayed box{swapped}"
         )
-        raise LabelMismatchError(msg)
+        raise PlannotationMismatchError(msg)
     if label.page.effective_rotation != geometry.rotation:
         msg = (
             f"the label for page {index} records rotation "
             f"{label.page.effective_rotation}, but the page's /Rotate is "
             f"{geometry.rotation}"
         )
-        raise LabelMismatchError(msg)
+        raise PlannotationMismatchError(msg)
 
 
 def _check_index(
-    index: LabelIndex, by_page: dict[int, PageLabel], *, with_filenames: bool = True
+    index: PlannotationIndex, by_page: dict[int, Plannotation], *, with_filenames: bool = True
 ) -> None:
     """Check that the index describes the labels being written.
 
@@ -2895,7 +2899,7 @@ def _check_index(
             distinction :func:`build_index` makes.
 
     Raises:
-        LabelMismatchError: If the index lists a page that is not being labelled, or
+        PlannotationMismatchError: If the index lists a page that is not being labelled, or
             names an embedded file that will not exist, or records a conformance
             level that the label does not reach.
     """
@@ -2907,21 +2911,21 @@ def _check_index(
                 f"the index lists page {entry.page_index}, but no label was given for "
                 f"it; labels were given for page(s) {listed}"
             )
-            raise LabelMismatchError(msg)
-        expected_file = page_label_filename(entry.page_index)
+            raise PlannotationMismatchError(msg)
+        expected_file = plannotation_filename(entry.page_index)
         if with_filenames and entry.file is not None and entry.file != expected_file:
             msg = (
                 f"the index says page {entry.page_index}'s label is in {entry.file!r}, "
                 f"but it will be embedded as {expected_file!r}"
             )
-            raise LabelMismatchError(msg)
+            raise PlannotationMismatchError(msg)
         reached = conformance_level(label)
         if entry.level != reached:
             msg = (
                 f"the index records page {entry.page_index} as {entry.level.value}, but "
                 f"its label reaches {reached.value}"
             )
-            raise LabelMismatchError(msg)
+            raise PlannotationMismatchError(msg)
     missing = sorted(set(by_page) - {entry.page_index for entry in index.pages})
     if missing:
         listed = ", ".join(str(page) for page in missing)
@@ -3067,7 +3071,7 @@ def _refuse_signed(pdf: Pdf, *, break_signature: bool) -> None:
         "the signature: pikepdf and qpdf rewrite a PDF in full and cannot append an "
         "incremental update, so the bytes the signature covers cannot be preserved. "
         "Two options: write a sidecar, which does not touch the document at all "
-        "(`plannotation sidecar this.pdf --labels labels.json`, or "
+        "(`plannotation sidecar this.pdf --labels plannotations.json`, or "
         "write_sidecar(..., labels=...)), or pass --break-signature "
         "(break_signature=True) to label it anyway and void the signature"
     )
@@ -3091,7 +3095,7 @@ def _refuse_encrypted(pdf: Pdf) -> None:
     msg = (
         "this document is encrypted. Labelling it would rewrite its encryption, "
         "which is not Plannotation's decision to make. Write a sidecar instead "
-        "(`plannotation sidecar this.pdf --labels labels.json`), or remove the "
+        "(`plannotation sidecar this.pdf --labels plannotations.json`), or remove the "
         "encryption first with a tool meant for it and label the result"
     )
     raise EncryptedPdfError(msg)
@@ -3099,16 +3103,16 @@ def _refuse_encrypted(pdf: Pdf) -> None:
 
 def attach_in_place(
     pdf: Pdf,
-    labels: Iterable[PageLabel],
-    index: LabelIndex | None = None,
+    labels: Iterable[Plannotation],
+    index: PlannotationIndex | None = None,
     *,
     mod_date: datetime,
     break_signature: bool = False,
-    compress_labels: bool = True,
+    compress_plannotations: bool = True,
 ) -> AttachReport:
     """Embed labels into an open document, changing nothing else about it.
 
-    The document is modified but not saved; use :func:`save_labelled` to write it,
+    The document is modified but not saved; use :func:`save_plannotated` to write it,
     or :func:`attach`, which does both.
 
     Args:
@@ -3119,7 +3123,7 @@ def attach_in_place(
             read from the clock, so that the output is reproducible.
         break_signature: Proceed although the document is signed, accepting that the
             signature will not survive.
-        compress_labels: Store the embedded JSON Flate-encoded. The checksum and size
+        compress_plannotations: Store the embedded JSON Flate-encoded. The checksum and size
             in ``/Params`` still describe the plaintext, as the format requires.
 
     Returns:
@@ -3129,7 +3133,7 @@ def attach_in_place(
         ValueError: If no labels were given, or ``mod_date`` is naive.
         EncryptedPdfError: If the document is encrypted.
         SignedPdfError: If the document is signed and ``break_signature`` is False.
-        LabelMismatchError: If a label contradicts its page, or the index contradicts
+        PlannotationMismatchError: If a label contradicts its page, or the index contradicts
             the labels.
         AttachmentConflictError: If a file of the same name is already attached.
     """
@@ -3138,13 +3142,13 @@ def attach_in_place(
     _refuse_signed(pdf, break_signature=break_signature)
     packet = _read_packet(pdf)
     _can_splice(packet)
-    by_page = check_labels_against(pdf, labels)
+    by_page = check_plannotations_against(pdf, labels)
     if index is not None:
         _check_index(index, by_page)
     _refuse_conflicts(pdf)
     pdfa_part, pdfa_extension_schema_missing = _pdfa_status(packet)
 
-    planned = [page_label_filename(page_index) for page_index in sorted(by_page)]
+    planned = [plannotation_filename(page_index) for page_index in sorted(by_page)]
     if index is not None:
         planned.append(INDEX_FILENAME)
 
@@ -3152,10 +3156,10 @@ def attach_in_place(
         spec = _embed_file(
             pdf,
             canonical_bytes(label),
-            filename=page_label_filename(page_index),
+            filename=plannotation_filename(page_index),
             description=_page_description(page_index),
             mod_date=stamp,
-            compress=compress_labels,
+            compress=compress_plannotations,
         )
         _append_af(pdf.pages[page_index].obj, spec)
     if index is not None:
@@ -3165,7 +3169,7 @@ def attach_in_place(
             filename=INDEX_FILENAME,
             description=f"Plannotation {SCHEMA_VERSION} index",
             mod_date=stamp,
-            compress=compress_labels,
+            compress=compress_plannotations,
         )
         _append_af(_catalog(pdf), spec)
 
@@ -3198,13 +3202,13 @@ def attach_in_place(
 
 def attach(
     pdf_in: Path | str,
-    labels: Iterable[PageLabel],
-    index: LabelIndex | None,
+    labels: Iterable[Plannotation],
+    index: PlannotationIndex | None,
     pdf_out: Path | str,
     *,
     mod_date: datetime,
     break_signature: bool = False,
-    compress_labels: bool = True,
+    compress_plannotations: bool = True,
 ) -> AttachReport:
     """Write a labelled copy of a PDF.
 
@@ -3226,7 +3230,7 @@ def attach(
         mod_date: The timestamp recorded on every embedded file.
         break_signature: Proceed although the input is signed, accepting that the
             signature will not survive.
-        compress_labels: Store the embedded JSON Flate-encoded.
+        compress_plannotations: Store the embedded JSON Flate-encoded.
 
     Returns:
         A report of what was written.
@@ -3235,7 +3239,7 @@ def attach(
         ValueError: If no labels were given, or ``mod_date`` is naive.
         EncryptedPdfError: If the input is encrypted.
         SignedPdfError: If the input is signed and ``break_signature`` is False.
-        LabelMismatchError: If a label contradicts its page, or the index contradicts
+        PlannotationMismatchError: If a label contradicts its page, or the index contradicts
             the labels.
         AttachmentConflictError: If a file of the same name is already attached.
     """
@@ -3249,9 +3253,9 @@ def attach(
             index,
             mod_date=mod_date,
             break_signature=break_signature,
-            compress_labels=compress_labels,
+            compress_plannotations=compress_plannotations,
         )
-        save_labelled(pdf, target)
+        save_plannotated(pdf, target)
     _LOGGER.info("wrote %s", target)
     return report
 
@@ -3260,7 +3264,7 @@ def attach(
 # read
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
-class LabelSet:
+class PlannotationSet:
     """Everything a carrier holds: the index, and the labels keyed by page.
 
     It unpacks as a two-tuple, so the reading functions can be used exactly as the
@@ -3284,10 +3288,10 @@ class LabelSet:
             number is a claim.
     """
 
-    index: LabelIndex | None
-    pages: dict[int, PageLabel]
+    index: PlannotationIndex | None
+    pages: dict[int, Plannotation]
 
-    def __iter__(self) -> Iterator[LabelIndex | dict[int, PageLabel] | None]:
+    def __iter__(self) -> Iterator[PlannotationIndex | dict[int, Plannotation] | None]:
         """Yield the index and then the pages, so that the pair can be unpacked.
 
         Yields:
@@ -3326,11 +3330,11 @@ class LabelSet:
             there is none -- and every page label, ascending by page.
 
         Raises:
-            LabelNotFoundError: If there is nothing to write.
+            PlannotationNotFoundError: If there is nothing to write.
         """
         if self.is_empty:
             msg = "there are no labels to write"
-            raise LabelNotFoundError(msg)
+            raise PlannotationNotFoundError(msg)
         labels = [self.pages[index] for index in sorted(self.pages)]
         return build_sidecar(labels, self.index, generator=generator)
 
@@ -3362,7 +3366,7 @@ def _spec_bytes(spec: Object, *, limit: int, source: str) -> bytes | None:
         no embedded stream -- which is legal, and means the file lives elsewhere.
 
     Raises:
-        InvalidLabelError: If the contents exceed ``limit``, or the specification is
+        InvalidPlannotationError: If the contents exceed ``limit``, or the specification is
             malformed. A file specification comes from an untrusted document and may
             hold anything under ``/EF``; reaching for a stream's members on whatever is
             there raises out of the PDF library, which reaches a person as a traceback
@@ -3379,7 +3383,7 @@ def _spec_bytes(spec: Object, *, limit: int, source: str) -> bytes | None:
             f"{source} has an /EF that is not a dictionary but {embedded!r}, so the "
             "embedded file it names cannot be found; the file specification is damaged"
         )
-        raise InvalidLabelError(msg)
+        raise InvalidPlannotationError(msg)
     for key in (Name.UF, Name.F):
         stream = embedded.get(key)
         if stream is None:
@@ -3389,7 +3393,7 @@ def _spec_bytes(spec: Object, *, limit: int, source: str) -> bytes | None:
                 f"{source} has an /EF {key} that is not a stream but {stream!r}; an "
                 "embedded file is a stream, so this file specification is damaged"
             )
-            raise InvalidLabelError(msg)
+            raise InvalidPlannotationError(msg)
         return _bounded_stream_bytes(stream, limit=limit, source=source)
     return None
 
@@ -3409,11 +3413,11 @@ def _read_spec(spec: Object, *, limit: int, source: str, strict: bool) -> bytes 
         The embedded file's contents, or None when there are none or they were skipped.
 
     Raises:
-        InvalidLabelError: If the contents exceed ``limit`` and ``strict`` is True.
+        InvalidPlannotationError: If the contents exceed ``limit`` and ``strict`` is True.
     """
     try:
         return _spec_bytes(spec, limit=limit, source=source)
-    except InvalidLabelError as exc:
+    except InvalidPlannotationError as exc:
         if strict:
             raise
         _LOGGER.warning("ignoring a label this reader will not decompress: %s", exc)
@@ -3437,12 +3441,12 @@ def _from_associated_files(
         reference looks like after somebody deleted an attachment.
 
     Raises:
-        InvalidLabelError: If a file exceeds the bound and ``strict`` is True.
+        InvalidPlannotationError: If a file exceeds the bound and ``strict`` is True.
     """
     pages: dict[int, bytes] = {}
     for page_index, page in enumerate(pdf.pages):
         for spec in _af_entries(page.obj):
-            if spec is None or not _PAGE_LABEL_FILENAME.match(_spec_filename(spec)):
+            if spec is None or not _PLANNOTATION_FILENAME.match(_spec_filename(spec)):
                 continue
             source = f"{_spec_filename(spec)} (page {page_index})"
             data = _read_spec(spec, limit=limit, source=source, strict=strict)
@@ -3475,9 +3479,9 @@ def _from_name_tree(
         only one of the two registrations and a later tool may have dropped the other.
 
     Raises:
-        InvalidLabelError: If a file exceeds the bound and ``strict`` is True.
+        InvalidPlannotationError: If a file exceeds the bound and ``strict`` is True.
     """
-    wanted = {page_label_filename(page_index): page_index for page_index in range(page_count)}
+    wanted = {plannotation_filename(page_index): page_index for page_index in range(page_count)}
     pages: dict[int, bytes] = {}
     for filename, page_index in wanted.items():
         if filename not in pdf.attachments:
@@ -3487,7 +3491,9 @@ def _from_name_tree(
         if data is not None:
             pages[page_index] = data
     orphans = [
-        name for name in pdf.attachments if _PAGE_LABEL_FILENAME.match(name) and name not in wanted
+        name
+        for name in pdf.attachments
+        if _PLANNOTATION_FILENAME.match(name) and name not in wanted
     ]
     if orphans:
         _LOGGER.warning(
@@ -3507,7 +3513,9 @@ def _from_name_tree(
     return pages, index
 
 
-def read_pdf(pdf: Pdf, *, strict: bool = True, max_label_bytes: int = _MAX_LABEL_BYTES) -> LabelSet:
+def read_pdf(
+    pdf: Pdf, *, strict: bool = True, max_plannotation_bytes: int = _MAX_PLANNOTATION_BYTES
+) -> PlannotationSet:
     """Read every Plannotation file a document carries.
 
     Page-level ``/AF`` is preferred, because it is the association the format is
@@ -3524,30 +3532,34 @@ def read_pdf(pdf: Pdf, *, strict: bool = True, max_label_bytes: int = _MAX_LABEL
         strict: Raise on a label that does not validate. When False, an invalid label
             is reported and skipped, which is the behaviour section 4.3 requires of a
             conforming reader: an invalid label is to be treated as absent.
-        max_label_bytes: The most one embedded file may decompress to. The default,
-            :data:`_MAX_LABEL_BYTES`, is generous by three orders of magnitude; raise it
+        max_plannotation_bytes: The most one embedded file may decompress to. The default,
+            :data:`_MAX_PLANNOTATION_BYTES`, is generous by three orders of magnitude; raise it
             for a genuinely enormous label rather than going without a bound.
 
     Returns:
         The index and the page labels, keyed by the page they were found on.
 
     Raises:
-        InvalidLabelError: If a document does not validate or exceeds
-            ``max_label_bytes``, and ``strict`` is True.
+        InvalidPlannotationError: If a document does not validate or exceeds
+            ``max_plannotation_bytes``, and ``strict`` is True.
     """
     page_count = len(pdf.pages)
-    associated, index_bytes = _from_associated_files(pdf, limit=max_label_bytes, strict=strict)
-    named, named_index = _from_name_tree(pdf, page_count, limit=max_label_bytes, strict=strict)
+    associated, index_bytes = _from_associated_files(
+        pdf, limit=max_plannotation_bytes, strict=strict
+    )
+    named, named_index = _from_name_tree(
+        pdf, page_count, limit=max_plannotation_bytes, strict=strict
+    )
     raw_pages = {**named, **associated}
     if index_bytes is None:
         index_bytes = named_index
 
-    pages: dict[int, PageLabel] = {}
+    pages: dict[int, Plannotation] = {}
     for page_index in sorted(raw_pages):
-        source = f"{page_label_filename(page_index)} (page {page_index})"
+        source = f"{plannotation_filename(page_index)} (page {page_index})"
         try:
-            label = _load_model(raw_pages[page_index], "page", source, load_page_label)
-        except InvalidLabelError as exc:
+            label = _load_model(raw_pages[page_index], "page", source, load_plannotation)
+        except InvalidPlannotationError as exc:
             if strict:
                 raise
             _LOGGER.warning("ignoring an invalid label: %s", exc)
@@ -3563,18 +3575,18 @@ def read_pdf(pdf: Pdf, *, strict: bool = True, max_label_bytes: int = _MAX_LABEL
             )
         pages[page_index] = label
 
-    index: LabelIndex | None = None
+    index: PlannotationIndex | None = None
     if index_bytes is not None:
         try:
-            index = _load_model(index_bytes, "index", INDEX_FILENAME, load_label_index)
-        except InvalidLabelError as exc:
+            index = _load_model(index_bytes, "index", INDEX_FILENAME, load_plannotation_index)
+        except InvalidPlannotationError as exc:
             if strict:
                 raise
             _LOGGER.warning("ignoring an invalid index: %s", exc)
-    return LabelSet(index=index, pages=pages)
+    return PlannotationSet(index=index, pages=pages)
 
 
-def read_sidecar(source: Path | str | bytes, *, strict: bool = True) -> LabelSet:
+def read_sidecar(source: Path | str | bytes, *, strict: bool = True) -> PlannotationSet:
     """Read a sidecar file.
 
     Args:
@@ -3587,7 +3599,7 @@ def read_sidecar(source: Path | str | bytes, *, strict: bool = True) -> LabelSet
         ``page.index`` -- in a sidecar that number is all there is to key by.
 
     Raises:
-        InvalidLabelError: If the sidecar does not validate and ``strict`` is True.
+        InvalidPlannotationError: If the sidecar does not validate and ``strict`` is True.
     """
     if isinstance(source, bytes):
         data, name = source, "<bytes>"
@@ -3596,12 +3608,12 @@ def read_sidecar(source: Path | str | bytes, *, strict: bool = True) -> LabelSet
         data, name = path.read_bytes(), path.name
     try:
         sidecar = _load_model(data, "sidecar", name, load_sidecar)
-    except InvalidLabelError as exc:
+    except InvalidPlannotationError as exc:
         if strict:
             raise
         _LOGGER.warning("ignoring an invalid sidecar: %s", exc)
-        return LabelSet(index=None, pages={})
-    return LabelSet(
+        return PlannotationSet(index=None, pages={})
+    return PlannotationSet(
         index=sidecar.index,
         pages={label.page.index: label for label in sidecar.pages},
     )
@@ -3623,14 +3635,17 @@ def _looks_like_pdf(path: Path) -> bool:
 
 
 def read(
-    source: Path | str, *, strict: bool = True, max_label_bytes: int = _MAX_LABEL_BYTES
-) -> LabelSet:
+    source: Path | str,
+    *,
+    strict: bool = True,
+    max_plannotation_bytes: int = _MAX_PLANNOTATION_BYTES,
+) -> PlannotationSet:
     """Read labels from either carrier: a PDF, or a sidecar JSON file.
 
     Args:
         source: The document or sidecar to read.
         strict: Raise on a label that does not validate, rather than skipping it.
-        max_label_bytes: The most one embedded file in a PDF may decompress to. A
+        max_plannotation_bytes: The most one embedded file in a PDF may decompress to. A
             sidecar is plain JSON on disk with nothing to expand, so this does not
             apply to one.
 
@@ -3641,14 +3656,14 @@ def read(
         FileNotFoundError: If there is no such file.
         CarrierError: If the file begins like a PDF and the PDF library will not read
             it.
-        InvalidLabelError: If a document does not validate or exceeds
-            ``max_label_bytes``, and ``strict`` is True.
+        InvalidPlannotationError: If a document does not validate or exceeds
+            ``max_plannotation_bytes``, and ``strict`` is True.
     """
     path = _as_path(source)
     if not _looks_like_pdf(path):
         return read_sidecar(path, strict=strict)
     with _opened(path) as pdf:
-        return read_pdf(pdf, strict=strict, max_label_bytes=max_label_bytes)
+        return read_pdf(pdf, strict=strict, max_plannotation_bytes=max_plannotation_bytes)
 
 
 @dataclass(frozen=True)
@@ -3669,7 +3684,7 @@ class CarrierReport:
 
     source: Path
     carrier: Literal["pdf", "sidecar"]
-    labels: LabelSet
+    labels: PlannotationSet
     declaration: bool
     signature: SignatureReport | None
     page_count: int | None
@@ -3677,14 +3692,17 @@ class CarrierReport:
 
 
 def carrier_report(
-    source: Path | str, *, strict: bool = True, max_label_bytes: int = _MAX_LABEL_BYTES
+    source: Path | str,
+    *,
+    strict: bool = True,
+    max_plannotation_bytes: int = _MAX_PLANNOTATION_BYTES,
 ) -> CarrierReport:
     """Describe a carrier: its labels, its declaration, and whether it is signed.
 
     Args:
         source: The document or sidecar to examine.
         strict: Raise on a label that does not validate, rather than skipping it.
-        max_label_bytes: The most one embedded file in a PDF may decompress to.
+        max_plannotation_bytes: The most one embedded file in a PDF may decompress to.
 
     Returns:
         The report.
@@ -3692,8 +3710,8 @@ def carrier_report(
     Raises:
         FileNotFoundError: If there is no such file.
         CarrierError: If the document is damaged beyond describing.
-        InvalidLabelError: If a document does not validate or exceeds
-            ``max_label_bytes``, and ``strict`` is True.
+        InvalidPlannotationError: If a document does not validate or exceeds
+            ``max_plannotation_bytes``, and ``strict`` is True.
     """
     path = _as_path(source)
     if not _looks_like_pdf(path):
@@ -3711,7 +3729,7 @@ def carrier_report(
         return CarrierReport(
             source=path,
             carrier="pdf",
-            labels=read_pdf(pdf, strict=strict, max_label_bytes=max_label_bytes),
+            labels=read_pdf(pdf, strict=strict, max_plannotation_bytes=max_plannotation_bytes),
             declaration=has_declaration(pdf),
             signature=signature_report(pdf),
             page_count=len(pdf.pages),
@@ -4009,7 +4027,7 @@ def strip(pdf_in: Path | str, pdf_out: Path | str) -> StripReport:
                 signature.describe(),
             )
         report = strip_in_place(pdf)
-        save_labelled(pdf, target)
+        save_plannotated(pdf, target)
     _LOGGER.info("wrote %s", target)
     return report
 
@@ -4021,8 +4039,8 @@ def write_sidecar(
     pdf: Path | str,
     out: Path | str | None = None,
     *,
-    labels: Iterable[PageLabel] | None = None,
-    index: LabelIndex | None = None,
+    labels: Iterable[Plannotation] | None = None,
+    index: PlannotationIndex | None = None,
     generator: Generator | None = None,
     strict: bool = True,
 ) -> Path:
@@ -4062,15 +4080,15 @@ def write_sidecar(
         The path written.
 
     Raises:
-        LabelNotFoundError: If no labels were given and the document carries none.
-        LabelMismatchError: If a given label contradicts the page it claims.
-        InvalidLabelError: If a label does not validate, or -- which would be a bug
+        PlannotationNotFoundError: If no labels were given and the document carries none.
+        PlannotationMismatchError: If a given label contradicts the page it claims.
+        InvalidPlannotationError: If a label does not validate, or -- which would be a bug
             here -- the assembled sidecar does not.
     """
     source = _as_path(pdf)
     if labels is not None:
         with _opened(source) as document:
-            by_page = check_labels_against(document, labels)
+            by_page = check_plannotations_against(document, labels)
         if index is not None:
             _check_index(index, by_page, with_filenames=False)
         sidecar = build_sidecar(by_page.values(), index, generator=generator)
@@ -4080,10 +4098,10 @@ def write_sidecar(
             msg = (
                 f"{source} carries no Plannotation data, so there is nothing to write a "
                 "sidecar from. Pass the labels themselves (labels=..., or "
-                "`plannotation sidecar this.pdf --labels labels.json`) to write a sidecar "
+                "`plannotation sidecar this.pdf --labels plannotations.json`) to write a sidecar "
                 "for a document that does not carry any"
             )
-            raise LabelNotFoundError(msg)
+            raise PlannotationNotFoundError(msg)
         sidecar = found.to_sidecar(generator=generator)
     data = canonical_bytes(sidecar)
     _check_schema(json.loads(data.decode("utf-8")), "sidecar", "the assembled sidecar")

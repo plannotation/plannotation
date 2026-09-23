@@ -8,7 +8,7 @@ the checkable part of that.
 
 None of the arithmetic is written twice. :func:`plannotation.model.aggregate_provenance`
 already implements 4.6.3's inheritance and 4.6.4's aggregation, and
-:attr:`plannotation.model.PageLabel.provenance_is_consistent` already applies them to a
+:attr:`plannotation.model.Plannotation.provenance_is_consistent` already applies them to a
 label; this module reports what they decide and adds the three rules they do not cover
 -- a missing confidence, a confidence where there should be none, and a ``mixed`` label
 whose items are silent.
@@ -31,7 +31,7 @@ from plannotation.validate.schema import json_pointer
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from plannotation.model import LabelIndex, PageLabel
+    from plannotation.model import Plannotation, PlannotationIndex
     from plannotation.validate.report import Finding
 
 __all__ = [
@@ -178,7 +178,7 @@ def _check_one_item(
     return found
 
 
-def check_provenance(label: PageLabel, *, source: str) -> list[Finding]:
+def check_provenance(label: Plannotation, *, source: str) -> list[Finding]:
     """Check a label's top-level provenance against its items.
 
     Args:
@@ -209,8 +209,8 @@ def check_provenance(label: PageLabel, *, source: str) -> list[Finding]:
 
 
 def check_index_provenance(
-    index: LabelIndex,
-    labels: Sequence[tuple[int, PageLabel]],
+    index: PlannotationIndex,
+    labels: Sequence[tuple[int, Plannotation]],
     *,
     source: str,
 ) -> list[Finding]:

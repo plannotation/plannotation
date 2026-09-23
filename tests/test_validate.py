@@ -4,7 +4,7 @@
 The rule corpus under ``tests/fixtures/rules`` is the point of this module. Every case
 there is a document that is perfectly **schema-valid** and still wrong, which is the
 distinction the whole phase exists for: the twelve negative fixtures in
-``tests/fixtures/labels/invalid`` test the schema, and these test everything the schema
+``tests/fixtures/plannotations/invalid`` test the schema, and these test everything the schema
 cannot say.
 
 Two failures matter in a validator and they are not symmetrical. A false negative means
@@ -30,12 +30,12 @@ from typer.testing import CliRunner
 
 import tests.pdf_fixtures as fx
 from plannotation.cli import app
-from plannotation.model import PageLabel, canonical_json, load_page_label
+from plannotation.model import Plannotation, canonical_json, load_plannotation
 from plannotation.pdf import embed
 from plannotation.validate import (
     Report,
     Severity,
-    check_page_label,
+    check_plannotation,
     render_json,
     render_markdown,
     rule_inventory,
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from plannotation.validate import Finding
 
 RULES_ROOT = Path(__file__).parent / "fixtures" / "rules"
-LABELS_ROOT = Path(__file__).parent / "fixtures" / "labels"
+PLANNOTATIONS_ROOT = Path(__file__).parent / "fixtures" / "plannotations"
 GOLDEN = Path(__file__).parent / "golden"
 
 
@@ -90,8 +90,10 @@ def findings_for(entry: dict[str, Any]) -> list[Finding]:
     """
     path = RULES_ROOT / entry["file"]
     if entry.get("needsPageCount"):
-        label = load_page_label(path.read_text("utf-8"))
-        return check_page_label(label, source=entry["file"], page_count=entry["documentPageCount"])
+        label = load_plannotation(path.read_text("utf-8"))
+        return check_plannotation(
+            label, source=entry["file"], page_count=entry["documentPageCount"]
+        )
     return list(validate(path).findings)
 
 
@@ -218,7 +220,7 @@ class TestTheValidatorDoesNotTouchWhatItReads:
     def test_a_label_file_is_unchanged(self, name: str, tmp_path: Path) -> None:
         """Checked by bytes, because "did not modify" is a claim about bytes."""
         target = tmp_path / name
-        shutil.copy(LABELS_ROOT / "valid" / name, target)
+        shutil.copy(PLANNOTATIONS_ROOT / "valid" / name, target)
         before = target.read_bytes()
         validate(target)
         assert target.read_bytes() == before
@@ -227,10 +229,12 @@ class TestTheValidatorDoesNotTouchWhatItReads:
 class TestTheRepositorysOwnFixturesPass:
     """The corpus this project ships must satisfy the validator this project ships."""
 
-    @pytest.mark.parametrize("name", sorted(p.name for p in (LABELS_ROOT / "valid").glob("*.json")))
+    @pytest.mark.parametrize(
+        "name", sorted(p.name for p in (PLANNOTATIONS_ROOT / "valid").glob("*.json"))
+    )
     def test_every_valid_label_fixture_validates(self, name: str) -> None:
         """Twelve drawings that are meant to be right, checked by 46 rules."""
-        report = validate(LABELS_ROOT / "valid" / name)
+        report = validate(PLANNOTATIONS_ROOT / "valid" / name)
         errors = [f for f in report.findings if f.severity is Severity.ERROR]
         assert errors == [], [f"{f.code} at {f.path}: {f.message}" for f in errors]
 
@@ -398,8 +402,8 @@ class TestTheCommandLine:
         source = tmp_path / "two-page.pdf"
         source.write_bytes(fx.build_drawing_set())
         labels = [
-            fx.page_label(page_index=0, width_mm=420, height_mm=297, sheet_id="TWP-101"),
-            fx.page_label(
+            fx.plannotation(page_index=0, width_mm=420, height_mm=297, sheet_id="TWP-101"),
+            fx.plannotation(
                 page_index=1, width_mm=210, height_mm=297, rotation=90, sheet_id="TWP-102"
             ),
         ]
@@ -454,7 +458,7 @@ class TestTheModelCrossCheck:
         guid: str = created.GlobalId
         return path, guid
 
-    def _label_naming(self, guid: str, ifc_class: str) -> PageLabel:
+    def _plannotation_naming(self, guid: str, ifc_class: str) -> Plannotation:
         """Build a page label whose single element names a GlobalId.
 
         Args:
@@ -473,7 +477,7 @@ class TestTheModelCrossCheck:
                 {"id": "e1", "ifcClass": ifc_class, "ifcGuid": guid, "paperBBox": [10, 10, 20, 20]}
             ],
         }
-        return load_page_label(json.dumps(document))
+        return load_plannotation(json.dumps(document))
 
     def _findings(self, guid: str, ifc_class: str, model_path: Path) -> list[Finding]:
         """Run the model cross-check.
@@ -489,7 +493,7 @@ class TestTheModelCrossCheck:
         from plannotation.validate.ifc import check_against_model, open_model
 
         return check_against_model(
-            self._label_naming(guid, ifc_class), open_model(model_path), source="label"
+            self._plannotation_naming(guid, ifc_class), open_model(model_path), source="label"
         )
 
     def test_a_guid_that_exists_and_matches_is_clean(self, tmp_path: Path) -> None:
@@ -522,7 +526,9 @@ class TestTheModelCrossCheck:
         """--ifc is how a user reaches rule 4."""
         path, guid = self._model(tmp_path)
         label = tmp_path / "label.json"
-        label.write_text(canonical_json(self._label_naming(guid, "IfcDoor")), encoding="utf-8")
+        label.write_text(
+            canonical_json(self._plannotation_naming(guid, "IfcDoor")), encoding="utf-8"
+        )
         result = CliRunner().invoke(app, ["validate", "--ifc", str(path), str(label)])
         assert result.exit_code == 1
         assert "PL-IFC-002" in result.stdout
@@ -663,7 +669,7 @@ class TestTheVeraPdfPassThrough:
 class TestCarrierRules:
     """The rules that need a carrier rather than a bare label."""
 
-    def _labelled(self, tmp_path: Path) -> Path:
+    def _plannotated(self, tmp_path: Path) -> Path:
         """Build a labelled two-page PDF.
 
         Args:
@@ -675,8 +681,8 @@ class TestCarrierRules:
         source = tmp_path / "two-page.pdf"
         source.write_bytes(fx.build_drawing_set())
         labels = [
-            fx.page_label(page_index=0, width_mm=420, height_mm=297, sheet_id="TWP-101"),
-            fx.page_label(
+            fx.plannotation(page_index=0, width_mm=420, height_mm=297, sheet_id="TWP-101"),
+            fx.plannotation(
                 page_index=1, width_mm=210, height_mm=297, rotation=90, sheet_id="TWP-102"
             ),
         ]
@@ -692,22 +698,22 @@ class TestCarrierRules:
 
     def test_a_labelled_pdf_validates_clean(self, tmp_path: Path) -> None:
         """The carrier this project writes must satisfy the validator it ships."""
-        findings = list(validate(self._labelled(tmp_path)).findings)
+        findings = list(validate(self._plannotated(tmp_path)).findings)
         assert findings == [], [f"{f.code}: {f.message}" for f in findings]
 
     def test_the_report_names_the_carrier(self, tmp_path: Path) -> None:
         """A reader needs to know whether it read a PDF, a sidecar or a labels file."""
-        assert validate(self._labelled(tmp_path)).carrier == "pdf"
+        assert validate(self._plannotated(tmp_path)).carrier == "pdf"
 
     def test_a_sidecar_validates_clean(self, tmp_path: Path) -> None:
         """Three carriers, one validator, one answer."""
-        sidecar = embed.write_sidecar(self._labelled(tmp_path))
+        sidecar = embed.write_sidecar(self._plannotated(tmp_path))
         findings = list(validate(sidecar).findings)
         assert findings == [], [f"{f.code}: {f.message}" for f in findings]
 
     def test_stripping_the_declaration_is_reported(self, tmp_path: Path) -> None:
         """PL-CAR-008: a labelled document should carry the claim it is entitled to."""
-        labelled = self._labelled(tmp_path)
+        labelled = self._plannotated(tmp_path)
         with pikepdf.open(labelled, allow_overwriting_input=True) as pdf:
             embed.remove_declaration(pdf)
             pdf.save(labelled)
@@ -716,7 +722,7 @@ class TestCarrierRules:
 
     def test_the_validator_does_not_modify_a_pdf(self, tmp_path: Path) -> None:
         """SPEC 4.4, checked by bytes."""
-        labelled = self._labelled(tmp_path)
+        labelled = self._plannotated(tmp_path)
         before = labelled.read_bytes()
         validate(labelled)
         assert labelled.read_bytes() == before
@@ -740,7 +746,7 @@ class TestWhatCouldBeRemeasured:
         """The commonest case, and the one most easily mistaken for success."""
         from plannotation.validate.ifc import remeasurable
 
-        label = load_page_label((RULES_ROOT / "valid" / "01-referential-clean.json").read_text())
+        label = load_plannotation((RULES_ROOT / "valid" / "01-referential-clean.json").read_text())
         assert remeasurable(label) >= 0
 
     def test_a_dimension_naming_two_guid_bearing_elements_is_remeasurable(self) -> None:
@@ -777,7 +783,7 @@ class TestWhatCouldBeRemeasured:
                 }
             ],
         }
-        assert remeasurable(load_page_label(json.dumps(document))) == 1
+        assert remeasurable(load_plannotation(json.dumps(document))) == 1
 
 
 class TestTheReportSurvivesExtremes:
@@ -892,7 +898,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         return path, guids[0], guids[1]
 
     @staticmethod
-    def _label(first: str, second: str, value: float) -> PageLabel:
+    def _label(first: str, second: str, value: float) -> Plannotation:
         """Build a label whose dimension measures between two GlobalIds.
 
         Args:
@@ -934,7 +940,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
                 }
             ],
         }
-        return load_page_label(json.dumps(document))
+        return load_plannotation(json.dumps(document))
 
     def _check(self, tmp_path: Path, value: float) -> list[Finding]:
         """Cross-check a claimed distance against the model.

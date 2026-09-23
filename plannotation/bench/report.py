@@ -127,7 +127,7 @@ def render_report(
         f"- `plain`: the page rendered at {BENCH_DPI:.0f} dpi, and its extracted text.",
         (
             "- `labelled`: the same, then the Plannotation page label as the result of a "
-            "`get_page_label` tool call."
+            "`get_plannotation` tool call."
         ),
         (
             f"- Prompt version {PROMPT_VERSION}. Numbers are scored within 1 %, everything "
@@ -141,17 +141,21 @@ def render_report(
     ]
     for category in categories(everything):
         in_plain = [record for record in plain if record.category == category]
-        in_labelled = [record for record in labelled if record.category == category]
-        only = " (label only)" if any(r.requires_label for r in [*in_plain, *in_labelled]) else ""
-        questions = max(len(in_plain), len(in_labelled))
-        lines.append(
-            f"| {category}{only} | {questions} | {tally(in_plain)} | {tally(in_labelled)} "
-            f"| {delta(tally(in_plain), tally(in_labelled))} |"
+        in_plannotated = [record for record in labelled if record.category == category]
+        only = (
+            " (label only)"
+            if any(r.requires_plannotation for r in [*in_plain, *in_plannotated])
+            else ""
         )
-    drawing_plain = [record for record in plain if not record.requires_label]
-    drawing_labelled = [record for record in labelled if not record.requires_label]
+        questions = max(len(in_plain), len(in_plannotated))
+        lines.append(
+            f"| {category}{only} | {questions} | {tally(in_plain)} | {tally(in_plannotated)} "
+            f"| {delta(tally(in_plain), tally(in_plannotated))} |"
+        )
+    drawing_plain = [record for record in plain if not record.requires_plannotation]
+    drawing_plannotated = [record for record in labelled if not record.requires_plannotation]
     lines += [
-        _total_row("Answerable from the drawing", drawing_plain, drawing_labelled),
+        _total_row("Answerable from the drawing", drawing_plain, drawing_plannotated),
         _total_row("All questions", plain, labelled),
         "",
         (
@@ -184,13 +188,13 @@ def render_report(
         "| --- | --- | --- | --- | --- |",
     ]
     by_id = {record.id: record for record in plain}
-    labelled_by_id = {record.id: record for record in labelled}
-    for question_id in sorted({*by_id, *labelled_by_id}):
-        first = by_id.get(question_id) or labelled_by_id[question_id]
+    plannotated_by_id = {record.id: record for record in labelled}
+    for question_id in sorted({*by_id, *plannotated_by_id}):
+        first = by_id.get(question_id) or plannotated_by_id[question_id]
         lines.append(
             f"| {question_id} | {first.category} | {_cell(_expected(first))} "
             f"| {_answer_cell(by_id.get(question_id))} "
-            f"| {_answer_cell(labelled_by_id.get(question_id))} |"
+            f"| {_answer_cell(plannotated_by_id.get(question_id))} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -297,10 +301,12 @@ def render_readme_section(
         The section, markers excluded.
     """
     drawing = [
-        [record for record in records if not record.requires_label] for records in (plain, labelled)
+        [record for record in records if not record.requires_plannotation]
+        for records in (plain, labelled)
     ]
     only = [
-        [record for record in records if record.requires_label] for records in (plain, labelled)
+        [record for record in records if record.requires_plannotation]
+        for records in (plain, labelled)
     ]
     total = max(len(plain), len(labelled))
     lines = [

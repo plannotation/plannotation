@@ -2,7 +2,7 @@
 """Measure how much of an authored label inference recovers.
 
 Design brief section 12's gate is stated as recall -- at least 90% of tags, 80% of
-dimensions and every grid -- against the authored ``labels.json``, with precision
+dimensions and every grid -- against the authored ``plannotations.json``, with precision
 reported alongside. Recall alone is easy to game: report everything as a tag and every
 tag is found. Precision is what says the recovered items are real.
 
@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 from plannotation.infer.match_ifc import normalise_mark
 
 if TYPE_CHECKING:
-    from plannotation.model import PageLabel
+    from plannotation.model import Plannotation
 
 #: The gate of design brief section 12, as recall per category.
 GATE: dict[str, float] = {"tag": 0.90, "dimension": 0.80, "grid": 1.00}
@@ -58,7 +58,7 @@ class Score:
         return self.recall >= GATE.get(self.category, 0.0)
 
 
-def _keys(label: PageLabel, kind: str) -> Counter[str]:
+def _keys(label: Plannotation, kind: str) -> Counter[str]:
     """Return the recognisable keys of one kind of annotation.
 
     Args:
@@ -92,7 +92,7 @@ def _keys(label: PageLabel, kind: str) -> Counter[str]:
     return keys
 
 
-def score(authored: PageLabel, inferred: PageLabel) -> list[Score]:
+def score(authored: Plannotation, inferred: Plannotation) -> list[Score]:
     """Score one inferred label against the authored one for the same page.
 
     Args:

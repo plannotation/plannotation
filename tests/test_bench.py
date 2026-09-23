@@ -30,7 +30,7 @@ from plannotation.bench.cli import app
 from plannotation.bench.page import PageInput, encode_png, load_page
 from plannotation.bench.pricing import PRICES, cost
 from plannotation.bench.prompt import (
-    LABEL_TOOL_USE_ID,
+    PLANNOTATION_TOOL_USE_ID,
     PROMPT_VERSION,
     build_request,
     question_block,
@@ -94,7 +94,7 @@ def drawings(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("bench")
     plain = root / "plain.pdf"
     plain.write_bytes(fx.build_drawing_set())
-    labels = fx.drawing_set_labels()
+    labels = fx.drawing_set_plannotations()
     embed.attach(plain, labels, embed.build_index(labels), root / "labelled.pdf", mod_date=MOD_DATE)
     return root
 
@@ -131,7 +131,7 @@ QUESTIONS = (
         question="What is the GlobalId?",
         answer="0abc",
         unit=None,
-        requires_label=True,
+        requires_plannotation=True,
     ),
 )
 
@@ -247,7 +247,7 @@ class TestQuestions:
                     "category": "model",
                     "question": "GlobalId?",
                     "answer": "x",
-                    "requiresLabel": True,
+                    "requiresPlannotation": True,
                 },
             ]
             text = "\n".join(json.dumps(line) for line in lines) + "\n\n"
@@ -265,9 +265,9 @@ class TestQuestions:
             "B-1-02",
             "B-1-03",
         ]
-        assert merged[0].document == "samples/a-plan/sheet.labelled.pdf"
+        assert merged[0].document == "samples/a-plan/sheet.plannotated.pdf"
         assert merged[1].answer == ("1", "A")
-        assert merged[2].requires_label
+        assert merged[2].requires_plannotation
 
     def test_a_document_outside_the_run_directory_is_recorded_absolute(
         self, tmp_path: Path
@@ -296,7 +296,7 @@ class TestQuestions:
         """Absent, not null, as everywhere else in Plannotation."""
         record = question(unit=None).to_json()
         assert "unit" not in record
-        assert "requiresLabel" not in record
+        assert "requiresPlannotation" not in record
 
     @pytest.mark.parametrize(
         ("line", "message"),
@@ -341,7 +341,7 @@ class TestQuestions:
         loaded = load_questions(committed)
         assert len(loaded) >= 30
         assert {q.category for q in loaded} >= {"count", "dimension", "grid", "tag", "model"}
-        assert all(q.requires_label == (q.category == "model") for q in loaded)
+        assert all(q.requires_plannotation == (q.category == "model") for q in loaded)
 
 
 # ---------------------------------------------------------------------------
@@ -502,7 +502,7 @@ class TestPrompt:
         tool_use = call["content"][0]
         assert call["role"] == "assistant"
         assert tool_use["type"] == "tool_use"
-        assert result["content"][0]["tool_use_id"] == tool_use["id"] == LABEL_TOOL_USE_ID
+        assert result["content"][0]["tool_use_id"] == tool_use["id"] == PLANNOTATION_TOOL_USE_ID
         assert result["content"][0]["content"] == PAGE.label
         assert result["content"][1]["text"] == question_block(question())
         assert labelled["system"] == plain["system"]
@@ -840,7 +840,7 @@ def record(
         "expected": 8000.0,
         "given": "8000" if correct else "7000",
         "correct": correct,
-        "requires_label": False,
+        "requires_plannotation": False,
         "stop_reason": "end_turn",
         "usage": Usage(100, 10, 0, 1000),
         "cost_usd": 0.01,
@@ -859,13 +859,19 @@ PLAIN = [
         correct=False,
         expected="0abc",
         given=None,
-        requires_label=True,
+        requires_plannotation=True,
         stop_reason="refusal",
     ),
     record("A-101-04", "zeta", correct=True, given="x" * 200),
 ]
-LABELLED = [
-    record(r.id, r.category, correct=True, condition="labelled", requires_label=r.requires_label)
+PLANNOTATED = [
+    record(
+        r.id,
+        r.category,
+        correct=True,
+        condition="labelled",
+        requires_plannotation=r.requires_plannotation,
+    )
     for r in PLAIN
 ]
 
@@ -886,7 +892,7 @@ class TestReport:
 
     def test_the_report_holds_the_table_the_costs_and_the_answers(self) -> None:
         """Every number in it can be checked against what the model said."""
-        text = render_report("claude-opus-5", "2026-09-22", PLAIN, LABELLED)
+        text = render_report("claude-opus-5", "2026-09-22", PLAIN, PLANNOTATED)
         assert text.startswith("# Plannotation benchmark — `claude-opus-5`, 2026-09-22\n")
         assert "| model (label only) | 1 | 0/1 (0%) | 1/1 (100%) | +100 pp |" in text
         assert "| **Answerable from the drawing** | **3** | **2/3 (67%)** | **3/3 (100%)**" in text
@@ -909,7 +915,7 @@ class TestReport:
         """And only there; a second identical write changes nothing."""
         readme = tmp_path / "README.md"
         readme.write_text(f"# x\n\n{README_START}\nold\n{README_END}\n\ntail\n", encoding="utf-8")
-        section = render_readme_section("claude-opus-5", "bench/results/r.md", PLAIN, LABELLED)
+        section = render_readme_section("claude-opus-5", "bench/results/r.md", PLAIN, PLANNOTATED)
         assert update_readme(readme, section) is True
         text = readme.read_text("utf-8")
         assert "old" not in text

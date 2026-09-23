@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from plannotation.model import Element, PageLabel
+    from plannotation.model import Element, Plannotation
 
 #: The confidence a mark matched to exactly one model element carries. High, and not
 #: one: the mark could still be a different element's that happens to share it.
@@ -76,7 +76,7 @@ def model_marks(model_path: Path) -> dict[str, list[tuple[str, str]]]:
     return marks
 
 
-def match_to_model(label: PageLabel, model_path: Path) -> tuple[PageLabel, int]:
+def match_to_model(label: Plannotation, model_path: Path) -> tuple[Plannotation, int]:
     """Fill in GlobalIds and classes for inferred elements whose mark the model holds.
 
     An ambiguous mark -- one the model gives to two elements -- is left unmatched

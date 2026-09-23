@@ -29,10 +29,18 @@ from plannotation_mcp.server import (
 )
 
 SAMPLES = Path(__file__).parent.parent / "samples"
-TOOLS = {"list_sheets", "get_label", "find_elements", "measure", "validate", "attach", "infer"}
+TOOLS = {
+    "list_sheets",
+    "get_plannotation",
+    "find_elements",
+    "measure",
+    "validate",
+    "attach",
+    "infer",
+}
 
 pytestmark = pytest.mark.skipif(
-    not (SAMPLES / "floorplan" / "sheet.labelled.pdf").exists(),
+    not (SAMPLES / "floorplan" / "sheet.plannotated.pdf").exists(),
     reason="samples are not built; run make samples",
 )
 
@@ -121,7 +129,10 @@ class TestTheReadingTools:
     def test_get_label_returns_the_whole_label(self, root: Path) -> None:
         """Exactly what the carrier holds."""
         result = call(
-            ServerConfig(root=root), "get_label", pdf="floorplan/sheet.labelled.pdf", page=0
+            ServerConfig(root=root),
+            "get_plannotation",
+            pdf="floorplan/sheet.plannotated.pdf",
+            page=0,
         )
         assert result["label"]["sheet"]["id"] == "ARC-101"
         assert len(result["label"]["elements"]) == 9
@@ -129,14 +140,19 @@ class TestTheReadingTools:
     def test_get_label_on_an_unlabelled_page_says_so(self, root: Path) -> None:
         """And names the pages that are labelled, so the next call can be right."""
         with pytest.raises(RuntimeError, match="carries no label"):
-            call(ServerConfig(root=root), "get_label", pdf="floorplan/sheet.labelled.pdf", page=9)
+            call(
+                ServerConfig(root=root),
+                "get_plannotation",
+                pdf="floorplan/sheet.plannotated.pdf",
+                page=9,
+            )
 
     def test_find_elements_by_class(self, root: Path) -> None:
         """Case-insensitive, on class, tag and name."""
         result = call(
             ServerConfig(root=root),
             "find_elements",
-            pdf="positionsplan/sheet.labelled.pdf",
+            pdf="positionsplan/sheet.plannotated.pdf",
             query="ifccolumn",
         )
         assert len(result["matches"]) == 9
@@ -147,7 +163,7 @@ class TestTheReadingTools:
         result = call(
             ServerConfig(root=root),
             "find_elements",
-            pdf="floorplan/sheet.labelled.pdf",
+            pdf="floorplan/sheet.plannotated.pdf",
             query="Pos. 3",
         )
         assert [match["tag"] for match in result["matches"]] == ["Pos. 3"]
@@ -157,7 +173,7 @@ class TestTheReadingTools:
         result = call(
             ServerConfig(root=root),
             "measure",
-            pdf="floorplan/sheet.labelled.pdf",
+            pdf="floorplan/sheet.plannotated.pdf",
             page=0,
             id_a="g-A",
             id_b="g-D",
@@ -172,7 +188,7 @@ class TestTheReadingTools:
             call(
                 ServerConfig(root=root),
                 "measure",
-                pdf="floorplan/sheet.labelled.pdf",
+                pdf="floorplan/sheet.plannotated.pdf",
                 page=0,
                 id_a="g-A",
                 id_b="nonesuch",
@@ -180,7 +196,7 @@ class TestTheReadingTools:
 
     def test_validate_reports_the_sample_clean(self, root: Path) -> None:
         """The validator's own report, through the server."""
-        result = call(ServerConfig(root=root), "validate", pdf="section/sheet.labelled.pdf")
+        result = call(ServerConfig(root=root), "validate", pdf="section/sheet.plannotated.pdf")
         assert result["findings"] == []
 
 
@@ -194,7 +210,7 @@ class TestReadOnlyByDefault:
                 ServerConfig(root=root),
                 "attach",
                 pdf="floorplan/sheet.pdf",
-                labels_json="floorplan/labels.json",
+                plannotations_json="floorplan/plannotations.json",
                 out="floorplan/again.pdf",
             )
 
@@ -219,13 +235,13 @@ class TestWritingWhenAllowed:
     """With --allow-write, both writing tools work on the samples."""
 
     def test_attach_writes_a_labelled_copy(self, root: Path) -> None:
-        """Labels from labels.json onto the unlabelled sheet."""
+        """Labels from plannotations.json onto the unlabelled sheet."""
         config = ServerConfig(root=root, allow_write=True)
         result = call(
             config,
             "attach",
             pdf="floorplan/sheet.pdf",
-            labels_json="floorplan/labels.json",
+            plannotations_json="floorplan/plannotations.json",
             out="floorplan/attached.pdf",
         )
         assert result["written"] == "floorplan/attached.pdf"
@@ -252,7 +268,7 @@ class TestConfinement:
     def test_a_tool_refuses_an_escaping_path(self, root: Path) -> None:
         """Through the MCP interface, not only through the config."""
         with pytest.raises(RuntimeError, match="outside the directory"):
-            call(ServerConfig(root=root), "get_label", pdf="../../etc/passwd", page=0)
+            call(ServerConfig(root=root), "get_plannotation", pdf="../../etc/passwd", page=0)
 
     def test_a_symlink_out_of_the_root_is_refused(self, root: Path, tmp_path: Path) -> None:
         """The check is on the resolved path, so a link cannot smuggle a read out."""

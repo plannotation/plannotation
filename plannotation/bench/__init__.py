@@ -8,7 +8,7 @@ that differ in one thing only:
     The page rendered at 150 dpi, and the text extracted from it.
 ``labelled``
     The same, followed by the page's Plannotation label, supplied as the result of a
-    ``get_page_label`` tool call -- the way an MCP host would hand it over.
+    ``get_plannotation`` tool call -- the way an MCP host would hand it over.
 
 Every answer comes from the model the drawing was exported from, never from reading
 the drawing, so the answer key cannot share a mistake with the thing it grades.

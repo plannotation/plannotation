@@ -21,13 +21,13 @@ from pathlib import Path
 import pytest
 
 import tests.pdf_fixtures as fx
-from plannotation.errors import CarrierError, LabelMismatchError
-from plannotation.model import PageLabel, canonical_json
+from plannotation.errors import CarrierError, PlannotationMismatchError
+from plannotation.model import Plannotation, canonical_json
 from plannotation.svg import (
     SheetSource,
     attach_from_svg,
     carrier,
-    derive_label,
+    derive_plannotation,
     parse_svg,
     read_svg,
 )
@@ -37,7 +37,7 @@ from plannotation.svg.carrier import (
     parse_transform,
     uuid_from_guid,
 )
-from plannotation.svg.label import paper_to_plane
+from plannotation.svg.derive import paper_to_plane
 from plannotation.validate import validate
 
 SAMPLES = Path(__file__).parent.parent / "samples"
@@ -511,7 +511,7 @@ class TestLabel:
             model_file="model.ifc",
             ifc_schema="IFC4",
         )
-        label = derive_label(sheet, source, page_index=2)
+        label = derive_plannotation(sheet, source, page_index=2)
         data = json.loads(canonical_json(label))
         assert data["provenance"] == "authored"
         assert label.level is not None
@@ -529,7 +529,7 @@ class TestLabel:
         """A view whose axes leave the horizontal is not a plan."""
         vertical = "[[1,0,0,0],[0,0,1,0],[0,-1,0,5],[0,0,0,1]]"
         body = f"<g class='section' ifc:plane='{vertical}' ifc:matrix3='{MATRIX3}'>{product()}</g>"
-        label = derive_label(parse_svg(svg(body)), SOURCE)
+        label = derive_plannotation(parse_svg(svg(body)), SOURCE)
         assert label.viewports is not None
         assert label.viewports[0].kind == "section"
         assert label.sheet.drawing_type == "section"
@@ -541,12 +541,12 @@ class TestLabel:
             + product(guid="1" * 22, ifc_class="IfcGridAxis")
             + product(guid="2" * 22)
         )
-        label = derive_label(parse_svg(svg(body)), SOURCE)
+        label = derive_plannotation(parse_svg(svg(body)), SOURCE)
         assert [e.ifc_guid for e in label.elements or []] == ["2" * 22]
 
     def test_a_sheet_with_no_products_is_l1(self) -> None:
         """Still a valid label: the sheet is described, nothing on it is."""
-        label = derive_label(parse_svg(svg("<rect width='1' height='1'/>")), SOURCE)
+        label = derive_plannotation(parse_svg(svg("<rect width='1' height='1'/>")), SOURCE)
         assert label.viewports is None
         assert label.elements is None
         assert label.sheet.scale is None
@@ -558,7 +558,7 @@ class TestLabel:
             + view(product())
             + view(product(), transform="translate(200,12) scale(0.5)")
         )
-        label = derive_label(parse_svg(svg(body)), SOURCE)
+        label = derive_plannotation(parse_svg(svg(body)), SOURCE)
         assert label.elements is not None
         assert label.elements[0].viewport is None
         assert label.viewports is not None
@@ -578,7 +578,7 @@ class TestAttach:
         page.write_bytes(svg(view(product()), root='width="210mm" height="297mm"'))
         pdf = tmp_path / "sheet.pdf"
         pdf.write_bytes(fx.build_drawing_set())
-        with pytest.raises(LabelMismatchError, match="not a rendering"):
+        with pytest.raises(PlannotationMismatchError, match="not a rendering"):
             attach_from_svg(page, pdf, tmp_path / "out.pdf", SOURCE, mod_date=MOD_DATE)
 
     def test_a_matching_pdf_is_labelled_and_validates(self, tmp_path: Path) -> None:
@@ -601,7 +601,7 @@ class TestAttach:
         self, name: str, tmp_path: Path
     ) -> None:
         """Same elements, same boxes, same transform: from the SVG, not the model."""
-        authored = json.loads((SAMPLES / name / "labels.json").read_text("utf-8"))
+        authored = json.loads((SAMPLES / name / "plannotations.json").read_text("utf-8"))
         source = SheetSource(sheet_id=authored["sheet"]["id"], unit_scale_to_m=1.0, length_unit="m")
         out = tmp_path / "out.pdf"
         label = attach_from_svg(
@@ -726,14 +726,14 @@ class TestFromSvgCommand:
         )
         assert result.exit_code == 0, result.output
         assert "level L2" in result.stdout
-        label = next(iter(read_pdf_labels(out).values()))
+        label = next(iter(read_pdf_plannotations(out).values()))
         assert label.source_model is not None
         assert label.source_model.ifc_schema == "IFC4"
         marks = {e.tag for e in label.elements or []}
         assert marks == {f"Pos. {n}" for n in range(1, 6)} | {"T1", "T2", "W1", "W2"}
 
 
-def read_pdf_labels(path: Path) -> dict[int, PageLabel]:
+def read_pdf_plannotations(path: Path) -> dict[int, Plannotation]:
     """Read the labels a PDF carries.
 
     Args:
@@ -768,7 +768,7 @@ class TestModelSource:
         """``pip install 'plannotation[ifc]'`` is the fix."""
         import importlib
 
-        from plannotation.svg.label import source_from_ifc
+        from plannotation.svg.derive import source_from_ifc
 
         def missing(name: str) -> object:
             raise ImportError(name)

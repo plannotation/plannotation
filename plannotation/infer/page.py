@@ -33,7 +33,7 @@ from plannotation.model import (
     Element,
     Generator,
     Page,
-    PageLabel,
+    Plannotation,
     Provenance,
     Sheet,
     Shows,
@@ -145,7 +145,7 @@ def _distance_to_segment(point: tuple[float, float], segment: Segment) -> float:
     return float(((point[0] - closest[0]) ** 2 + (point[1] - closest[1]) ** 2) ** 0.5)
 
 
-def infer_page(content: PageContent, *, page_index: int, generator_version: str) -> PageLabel:
+def infer_page(content: PageContent, *, page_index: int, generator_version: str) -> Plannotation:
     """Reconstruct one page's label from its printed content.
 
     Args:
@@ -170,7 +170,7 @@ def infer_page(content: PageContent, *, page_index: int, generator_version: str)
     annotations += _callouts(content, used)
 
     sheet = _sheet(content, used)
-    return PageLabel(
+    return Plannotation(
         plannotation=SCHEMA_VERSION,
         generator=Generator(name="plannotation-infer", version=generator_version),
         provenance=Provenance.INFERRED,

@@ -69,7 +69,7 @@ from plannotation.constants import (
     INDEX_FILENAME,
     SCHEMA_VERSION,
     SPEC_URI,
-    page_label_filename,
+    plannotation_filename,
 )
 from plannotation.errors import (
     AppearanceChangedError,
@@ -77,9 +77,9 @@ from plannotation.errors import (
     CarrierError,
     DeclarationError,
     EncryptedPdfError,
-    InvalidLabelError,
-    LabelMismatchError,
-    LabelNotFoundError,
+    InvalidPlannotationError,
+    PlannotationMismatchError,
+    PlannotationNotFoundError,
     RenderError,
     SignedPdfError,
 )
@@ -92,7 +92,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from pikepdf import Object, Pdf
 
-    from plannotation.model import LabelIndex, PageLabel
+    from plannotation.model import Plannotation, PlannotationIndex
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -160,10 +160,16 @@ REQUIRE_EXTERNAL_ENV: Final = "PLANNOTATION_REQUIRE_EXTERNAL"
 VERAPDF_TIMEOUT: Final = 300.0
 
 #: The three files a fully labelled two-page document carries.
-LABEL_FILENAMES: Final = ("plannotation-p0000.json", "plannotation-p0001.json", INDEX_FILENAME)
+PLANNOTATION_FILENAMES: Final = (
+    "plannotation-p0000.json",
+    "plannotation-p0001.json",
+    INDEX_FILENAME,
+)
 
 #: Every file a labelled copy of the fixture carries, sorted as the name tree lists them.
-ALL_FILENAMES: Final = sorted([*LABEL_FILENAMES, fx.FOREIGN_DOC_FILENAME, fx.FOREIGN_PAGE_FILENAME])
+ALL_FILENAMES: Final = sorted(
+    [*PLANNOTATION_FILENAMES, fx.FOREIGN_DOC_FILENAME, fx.FOREIGN_PAGE_FILENAME]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -186,11 +192,11 @@ def write_bytes(path: Path, data: bytes) -> Path:
 def label(
     source: Path,
     target: Path,
-    labels: list[PageLabel],
-    index: LabelIndex | None,
+    labels: list[Plannotation],
+    index: PlannotationIndex | None,
     *,
     break_signature: bool = False,
-    compress_labels: bool = True,
+    compress_plannotations: bool = True,
 ) -> embed.AttachReport:
     """Attach labels with this module's fixed timestamp.
 
@@ -200,7 +206,7 @@ def label(
         labels: The page labels.
         index: The document-level index, or None to embed none.
         break_signature: Proceed although the document is signed.
-        compress_labels: Store the embedded JSON Flate-encoded.
+        compress_plannotations: Store the embedded JSON Flate-encoded.
 
     Returns:
         The attach report.
@@ -212,7 +218,7 @@ def label(
         target,
         mod_date=MOD_DATE,
         break_signature=break_signature,
-        compress_labels=compress_labels,
+        compress_plannotations=compress_plannotations,
     )
 
 
@@ -516,8 +522,8 @@ def labelled(drawing_set: Path, tmp_path_factory: pytest.TempPathFactory) -> Pat
         The path of the labelled copy.
     """
     target = tmp_path_factory.mktemp("carrier") / "labelled.pdf"
-    page_labels = fx.drawing_set_labels()
-    label(drawing_set, target, page_labels, embed.build_index(page_labels))
+    plannotations = fx.drawing_set_plannotations()
+    label(drawing_set, target, plannotations, embed.build_index(plannotations))
     return target
 
 
@@ -565,17 +571,17 @@ def geometry_set(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.fixture
-def labels() -> list[PageLabel]:
+def labels() -> list[Plannotation]:
     """Build one label per page of the drawing set.
 
     Returns:
         An L3 label for page 0 and an L2 label for page 1.
     """
-    return fx.drawing_set_labels()
+    return fx.drawing_set_plannotations()
 
 
 @pytest.fixture
-def index(labels: list[PageLabel]) -> LabelIndex:
+def index(labels: list[Plannotation]) -> PlannotationIndex:
     """Derive the document index from the labels.
 
     Args:
@@ -726,11 +732,15 @@ class TestAppearanceGuarantee:
             assert np.array_equal(before, after), difference_message(page_index, before, after)
 
     def test_an_uncompressed_label_changes_nothing_either(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """The guarantee does not depend on how the label stream happens to be stored."""
         target = tmp_path / "plain.pdf"
-        label(drawing_set, target, labels, index, compress_labels=False)
+        label(drawing_set, target, labels, index, compress_plannotations=False)
         render.assert_same_appearance(drawing_set, target, dpi=DPI)
 
 
@@ -788,7 +798,7 @@ class TestTheAppearanceTestCanFail:
         twin = tmp_path / "unrotated.pdf"
         with pikepdf.open(drawing_set) as pdf:
             pdf.pages[1].obj[Name.Rotate] = 0
-            embed.save_labelled(pdf, twin)
+            embed.save_plannotated(pdf, twin)
         diffs = render.compare_documents(drawing_set, twin, dpi=DPI)
         assert [diff.page_index for diff in diffs] == [1]
         assert diffs[0].shape_before != diffs[0].shape_after
@@ -801,7 +811,7 @@ class TestTheAppearanceTestCanFail:
         twin = tmp_path / "noannots.pdf"
         with pikepdf.open(drawing_set) as pdf:
             del pdf.pages[0].obj[Name.Annots]
-            embed.save_labelled(pdf, twin)
+            embed.save_plannotated(pdf, twin)
         with pytest.raises(AppearanceChangedError, match="page 0"):
             render.assert_same_appearance(drawing_set, twin, dpi=DPI)
 
@@ -812,7 +822,7 @@ class TestTheAppearanceTestCanFail:
         shorter = tmp_path / "one-page.pdf"
         with pikepdf.open(drawing_set) as pdf:
             del pdf.pages[1]
-            embed.save_labelled(pdf, shorter)
+            embed.save_plannotated(pdf, shorter)
         with pytest.raises(RenderError, match="page count changed"):
             render.compare_documents(drawing_set, shorter, dpi=DPI)
 
@@ -824,7 +834,7 @@ class TestRoundTrip:
     """What goes in must come out, byte for byte."""
 
     def test_every_label_comes_back_unchanged(
-        self, labelled: Path, labels: list[PageLabel]
+        self, labelled: Path, labels: list[Plannotation]
     ) -> None:
         """``read(attach(x)) == x`` for a multi-page document, as canonical bytes."""
         found = embed.read(labelled)
@@ -832,7 +842,7 @@ class TestRoundTrip:
         for page_index, original in enumerate(labels):
             assert canonical_bytes(found.pages[page_index]) == canonical_bytes(original)
 
-    def test_the_index_comes_back_unchanged(self, labelled: Path, index: LabelIndex) -> None:
+    def test_the_index_comes_back_unchanged(self, labelled: Path, index: PlannotationIndex) -> None:
         """The document-level index round-trips as well as the page labels do."""
         found = embed.read(labelled)
         assert found.index is not None
@@ -851,12 +861,12 @@ class TestRoundTrip:
         assert [level.value for level in found.levels.values()] == ["L3", "L2"]
 
     def test_the_embedded_bytes_are_the_canonical_bytes(
-        self, labelled: Path, labels: list[PageLabel], index: LabelIndex
+        self, labelled: Path, labels: list[Plannotation], index: PlannotationIndex
     ) -> None:
         """A third-party reader sees exactly what :func:`canonical_bytes` produced."""
         with pikepdf.open(labelled) as pdf:
             for page_index, original in enumerate(labels):
-                assert attachment_bytes(pdf, page_label_filename(page_index)) == canonical_bytes(
+                assert attachment_bytes(pdf, plannotation_filename(page_index)) == canonical_bytes(
                     original
                 )
             assert attachment_bytes(pdf, INDEX_FILENAME) == canonical_bytes(index)
@@ -868,8 +878,8 @@ class TestRoundTrip:
     def test_the_round_trip_survives_both_cross_reference_styles(
         self,
         tmp_path: Path,
-        labels: list[PageLabel],
-        index: LabelIndex,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
         *,
         object_streams: bool,
         compress: bool,
@@ -892,7 +902,7 @@ class TestRoundTrip:
         render.assert_same_appearance(source, target, dpi=DPI)
 
     def test_an_unindexed_document_round_trips_too(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel]
+        self, drawing_set: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """Attaching without an index leaves the catalog's /AF exactly as it found it."""
         target = tmp_path / "noindex.pdf"
@@ -923,7 +933,7 @@ class TestReaderCompatibility:
         """``pikepdf.open().attachments`` lists all three Plannotation files."""
         with pikepdf.open(labelled) as pdf:
             found = attachment_names(pdf)
-        for name in LABEL_FILENAMES:
+        for name in PLANNOTATION_FILENAMES:
             assert name in found
 
     def test_the_foreign_files_are_still_listed_beside_them(self, labelled: Path) -> None:
@@ -934,14 +944,14 @@ class TestReaderCompatibility:
     def test_every_file_declares_its_mime_type(self, labelled: Path) -> None:
         """A reader that dispatches on ``/Subtype`` is told ``application/json``."""
         with pikepdf.open(labelled) as pdf:
-            for name in LABEL_FILENAMES:
+            for name in PLANNOTATION_FILENAMES:
                 stream = pdf.attachments[name].obj[Name.EF][Name.F]
                 assert str(stream.stream_dict[Name.Subtype]) == "/application/json"
 
     def test_every_file_names_itself_the_same_way_twice(self, labelled: Path) -> None:
         """``/F`` and ``/UF`` agree, so a reader matching on either finds one file."""
         with pikepdf.open(labelled) as pdf:
-            for name in LABEL_FILENAMES:
+            for name in PLANNOTATION_FILENAMES:
                 spec = pdf.attachments[name].obj
                 assert str(spec[Name.UF]) == name
                 assert str(spec[Name.F]) == name
@@ -950,7 +960,7 @@ class TestReaderCompatibility:
         """``/Desc`` is what an attachment pane shows, and it names the page."""
         with pikepdf.open(labelled) as pdf:
             for page_index in range(2):
-                spec = pdf.attachments[page_label_filename(page_index)].obj
+                spec = pdf.attachments[plannotation_filename(page_index)].obj
                 assert str(spec[Name.Desc]) == f"Plannotation 0.1 label for page {page_index}"
 
 
@@ -966,7 +976,7 @@ class TestAssociatedFiles:
             assert af_filenames(pdf.pages[0].obj)[-1] == "plannotation-p0000.json"
             assert af_filenames(pdf.pages[1].obj) == ["plannotation-p0001.json"]
             assert af_filenames(pdf.Root)[-1] == INDEX_FILENAME
-            for name in LABEL_FILENAMES:
+            for name in PLANNOTATION_FILENAMES:
                 assert name in pdf.attachments
 
     def test_one_indirect_object_serves_both(self, labelled: Path) -> None:
@@ -992,7 +1002,7 @@ class TestAssociatedFiles:
         actually written is worth asserting rather than assuming.
         """
         with pikepdf.open(labelled) as pdf:
-            for name in LABEL_FILENAMES:
+            for name in PLANNOTATION_FILENAMES:
                 assert str(pdf.attachments[name].obj[Name.AFRelationship]) == "/Data"
 
     def test_the_foreign_relationships_are_untouched(self, labelled: Path) -> None:
@@ -1003,15 +1013,15 @@ class TestAssociatedFiles:
             assert str(document_spec[Name.AFRelationship]) == "/Supplement"
             assert str(page_spec[Name.AFRelationship]) == "/Source"
 
-    @pytest.mark.parametrize("compress_labels", [True, False])
+    @pytest.mark.parametrize("compress_plannotations", [True, False])
     def test_the_checksum_is_the_md5_of_the_plaintext(
         self,
         drawing_set: Path,
         tmp_path: Path,
-        labels: list[PageLabel],
-        index: LabelIndex,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
         *,
-        compress_labels: bool,
+        compress_plannotations: bool,
     ) -> None:
         """``/Params`` describes the label, not the stored stream.
 
@@ -1020,11 +1030,11 @@ class TestAssociatedFiles:
         the MD5 of the compressed bytes and a size that is not the file's. Compressing
         afterwards is what keeps both honest, and this asserts it in both modes.
         """
-        target = tmp_path / f"labelled-{compress_labels}.pdf"
-        label(drawing_set, target, labels, index, compress_labels=compress_labels)
+        target = tmp_path / f"labelled-{compress_plannotations}.pdf"
+        label(drawing_set, target, labels, index, compress_plannotations=compress_plannotations)
         with pikepdf.open(target) as pdf:
             for page_index, original in enumerate(labels):
-                name = page_label_filename(page_index)
+                name = plannotation_filename(page_index)
                 stream = pdf.attachments[name].obj[Name.EF][Name.F]
                 params = stream.stream_dict[Name.Params]
                 plaintext = canonical_bytes(original)
@@ -1032,10 +1042,16 @@ class TestAssociatedFiles:
                 assert bytes(params[Name.CheckSum]) == hashlib.md5(plaintext).digest()  # noqa: S324
                 assert str(params[Name.ModDate]) == MOD_DATE_STRING
                 stored = stream.stream_dict.get(Name.Filter)
-                assert (stored is not None and str(stored) == "/FlateDecode") is compress_labels
+                assert (
+                    stored is not None and str(stored) == "/FlateDecode"
+                ) is compress_plannotations
 
     def test_compression_actually_saves_space(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """The stored stream is smaller than the label, which is the point of it."""
         target = tmp_path / "packed.pdf"
@@ -1047,23 +1063,23 @@ class TestAssociatedFiles:
         assert len(raw) < len(decoded)
         assert decoded == canonical_bytes(labels[0])
 
-    @pytest.mark.parametrize("compress_labels", [True, False])
+    @pytest.mark.parametrize("compress_plannotations", [True, False])
     def test_the_structural_rules_hold(
         self,
         drawing_set: Path,
         tmp_path: Path,
-        labels: list[PageLabel],
-        index: LabelIndex,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
         *,
-        compress_labels: bool,
+        compress_plannotations: bool,
     ) -> None:
         """Every embedded-file rule a PDF/A validator checks is satisfied.
 
         This is the part of the PDF/A story that runs on every machine, with or without
         veraPDF, and it covers the mistakes the carrier is actually at risk of making.
         """
-        target = tmp_path / f"lint-{compress_labels}.pdf"
-        label(drawing_set, target, labels, index, compress_labels=compress_labels)
+        target = tmp_path / f"lint-{compress_plannotations}.pdf"
+        label(drawing_set, target, labels, index, compress_plannotations=compress_plannotations)
         with pikepdf.open(target) as pdf:
             assert associated_file_problems(pdf) == []
 
@@ -1076,7 +1092,7 @@ class TestAssociatedFiles:
         broken = tmp_path / "broken.pdf"
         with pikepdf.open(labelled) as pdf:
             del pdf.pages[1].obj[Name.AF]
-            embed.save_labelled(pdf, broken)
+            embed.save_plannotated(pdf, broken)
         with pikepdf.open(broken) as pdf:
             problems = associated_file_problems(pdf)
         assert problems == [
@@ -1166,7 +1182,7 @@ class TestNothingElseIsTouched:
         assert drawing_set.read_bytes()[:9] == b"%PDF-2.0\n"
 
     def test_a_pdf_1_7_input_stays_pdf_1_7(
-        self, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self, tmp_path: Path, labels: list[Plannotation], index: PlannotationIndex
     ) -> None:
         """Raising the header of a PDF/A-3 file would break its conformance claim.
 
@@ -1196,8 +1212,8 @@ class TestNothingElseIsTouched:
         """When there is no packet to splice into, one is created, uncompressed."""
         source = write_bytes(tmp_path / "bare.pdf", fx.build_bare())
         target = tmp_path / "bare-labelled.pdf"
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        label(source, target, page_labels, None)
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        label(source, target, plannotations, None)
         packet = xmp_packet(target)
         assert packet is not None
         assert SPEC_URI.encode() in packet
@@ -1215,7 +1231,7 @@ class TestStrip:
     def test_the_report_names_what_it_removed(self, labelled: Path, tmp_path: Path) -> None:
         """Three files, three associations, one declaration."""
         report = embed.strip(labelled, tmp_path / "clean.pdf")
-        assert sorted(report.filenames) == sorted(LABEL_FILENAMES)
+        assert sorted(report.filenames) == sorted(PLANNOTATION_FILENAMES)
         assert report.associations_cleared == 3
         assert report.declaration_removed is True
         assert report.declaration_remaining is False
@@ -1291,8 +1307,8 @@ class TestStrip:
         """An empty XMP packet would itself be a trace, so it is removed."""
         source = write_bytes(tmp_path / "bare.pdf", fx.build_bare())
         target = tmp_path / "bare-labelled.pdf"
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        label(source, target, page_labels, embed.build_index(page_labels))
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        label(source, target, plannotations, embed.build_index(plannotations))
         clean = tmp_path / "bare-clean.pdf"
         report = embed.strip(target, clean)
         assert report.metadata_removed is True
@@ -1318,14 +1334,14 @@ class TestStrip:
         with pikepdf.open(source) as pdf:
             assert Name.Names not in pdf.Root
         target = tmp_path / "bare-labelled.pdf"
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        label(source, target, page_labels, embed.build_index(page_labels))
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        label(source, target, plannotations, embed.build_index(plannotations))
         clean = tmp_path / "bare-clean.pdf"
         embed.strip(target, clean)
 
         reference = tmp_path / "bare-resaved.pdf"
         with pikepdf.open(source) as pdf:
-            embed.save_labelled(pdf, reference)
+            embed.save_plannotated(pdf, reference)
         with pikepdf.open(clean) as pdf:
             names = pdf.Root.get(Name.Names)
             residue = None if names is None else str(names)
@@ -1404,8 +1420,8 @@ class TestTheDeclarationComposes:
         """With no Bag to join, the property is written in full, once."""
         source = write_bytes(tmp_path / "bare.pdf", fx.build_bare())
         target = tmp_path / "bare-labelled.pdf"
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        label(source, target, page_labels, None)
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        label(source, target, plannotations, None)
         bag = declarations_bag(target)
         assert bag.count(b"<rdf:li") == 1
         assert SPEC_URI.encode() in bag
@@ -1425,8 +1441,8 @@ class TestTheDeclarationComposes:
             fx.build_with_xmp(fx.SELF_CLOSING_DECLARATIONS_PACKET),
         )
         target = tmp_path / "self-closing-labelled.pdf"
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        label(source, target, page_labels, None)
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        label(source, target, plannotations, None)
         bag = declarations_bag(target)
         assert bag.count(b"<rdf:li") == 1
         assert SPEC_URI.encode() in bag
@@ -1449,9 +1465,9 @@ class TestTheDeclarationComposes:
             b"<pdfd:declarations />",
         )
         source = write_bytes(tmp_path / "not-an-array.pdf", fx.build_with_xmp(packet))
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pytest.raises(DeclarationError, match="self-closing declarations property"):
-            label(source, tmp_path / "out.pdf", page_labels, None)
+            label(source, tmp_path / "out.pdf", plannotations, None)
 
     def test_the_claim_describes_the_subject_the_packet_already_describes(
         self, tmp_path: Path
@@ -1465,8 +1481,8 @@ class TestTheDeclarationComposes:
             tmp_path / "named-subject.pdf", fx.build_with_xmp(fx.NAMED_SUBJECT_PACKET)
         )
         target = tmp_path / "named-subject-labelled.pdf"
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-        label(source, target, page_labels, None)
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+        label(source, target, plannotations, None)
 
         packet = xmp_packet(target)
         assert packet is not None
@@ -1490,7 +1506,7 @@ class TestNothingIsWrittenIntoAComment:
     """
 
     @staticmethod
-    def labelled_with(tmp_path: Path, name: str, packet: bytes) -> Path:
+    def plannotated_with(tmp_path: Path, name: str, packet: bytes) -> Path:
         """Label a one-page document carrying a packet of the caller's choosing.
 
         Args:
@@ -1503,7 +1519,9 @@ class TestNothingIsWrittenIntoAComment:
         """
         source = write_bytes(tmp_path / f"{name}-in.pdf", fx.build_with_xmp(packet))
         target = tmp_path / f"{name}.pdf"
-        label(source, target, [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)], None)
+        label(
+            source, target, [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)], None
+        )
         return target
 
     @pytest.mark.parametrize(
@@ -1518,7 +1536,7 @@ class TestNothingIsWrittenIntoAComment:
         self, tmp_path: Path, name: str, packet: bytes
     ) -> None:
         """Inside the RDF element, outside every comment, and once."""
-        target = self.labelled_with(tmp_path, name, packet)
+        target = self.plannotated_with(tmp_path, name, packet)
         written = xmp_packet(target)
         assert written is not None
         visible = embed._visible(written)
@@ -1541,7 +1559,7 @@ class TestNothingIsWrittenIntoAComment:
         self, tmp_path: Path, name: str, packet: bytes
     ) -> None:
         """Whatever was spliced in must come out again, comments included."""
-        target = self.labelled_with(tmp_path, name, packet)
+        target = self.plannotated_with(tmp_path, name, packet)
         stripped = tmp_path / f"{name}-stripped.pdf"
         report = embed.strip(target, stripped)
         assert report.declaration_removed is True
@@ -1555,7 +1573,7 @@ class TestNothingIsWrittenIntoAComment:
         bytes: the question is how many properties a reader sees, not how many the file
         spells.
         """
-        target = self.labelled_with(tmp_path, "commented", fx.COMMENTED_DECLARATIONS_PACKET)
+        target = self.plannotated_with(tmp_path, "commented", fx.COMMENTED_DECLARATIONS_PACKET)
         written = xmp_packet(target)
         assert written is not None
         visible = embed._visible(written)
@@ -1619,7 +1637,11 @@ class TestAttachRefuses:
     """A wrong label is worse than no label, so the carrier refuses rather than guesses."""
 
     def test_a_pre_existing_plannotation_attachment_is_not_overwritten(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """Assigning into the attachments mapping replaces silently; refuse instead."""
         source = tmp_path / "occupied.pdf"
@@ -1635,19 +1657,23 @@ class TestAttachRefuses:
             )
             pdf.attachments[INDEX_FILENAME] = spec
             pdf.Root[Name.AF].append(pdf.attachments[INDEX_FILENAME].obj)
-            embed.save_labelled(pdf, source)
+            embed.save_plannotated(pdf, source)
         with pytest.raises(AttachmentConflictError, match="already attached"):
             label(source, tmp_path / "out.pdf", labels, index)
 
     def test_labelling_twice_refuses_rather_than_duplicating(
-        self, labelled: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self, labelled: Path, tmp_path: Path, labels: list[Plannotation], index: PlannotationIndex
     ) -> None:
         """A document already carrying labels must be stripped before it is relabelled."""
         with pytest.raises(AttachmentConflictError, match="already attached"):
             label(labelled, tmp_path / "twice.pdf", labels, index)
 
     def test_a_foreign_file_whose_uf_is_a_plannotation_name_is_refused(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """An existing attachment with a Plannotation filename must stop the write."""
         source = tmp_path / "disguised.pdf"
@@ -1663,7 +1689,7 @@ class TestAttachRefuses:
             )
             pdf.attachments["innocent-name.json"] = spec
             pdf.pages[0].obj[Name.AF].append(pdf.attachments["innocent-name.json"].obj)
-            embed.save_labelled(pdf, source)
+            embed.save_plannotated(pdf, source)
 
         outcome = "accepted"
         try:
@@ -1677,7 +1703,7 @@ class TestAttachRefuses:
         )
 
     def test_labels_reachable_only_from_af_are_still_a_conflict(
-        self, labelled: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self, labelled: Path, tmp_path: Path, labels: list[Plannotation], index: PlannotationIndex
     ) -> None:
         """A conflict check that reads only the name tree misses a state ``read`` supports.
 
@@ -1694,7 +1720,7 @@ class TestAttachRefuses:
                 if not embed.is_plannotation_filename(str(tree[position])):
                     kept.extend([tree[position], tree[position + 1]])
             pdf.Root[Name.Names][Name.EmbeddedFiles][Name.Names] = Array(kept)
-            embed.save_labelled(pdf, target)
+            embed.save_plannotated(pdf, target)
         with pikepdf.open(target) as pdf:
             assert not any(embed.is_plannotation_filename(name) for name in pdf.attachments)
             assert af_filenames(pdf.pages[0].obj) == [
@@ -1725,23 +1751,31 @@ class TestAttachRefuses:
         the caller's open ``Pdf`` was left half-labelled.
         """
         source = write_bytes(tmp_path / "unspliceable.pdf", fx.build_unspliceable_metadata())
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pikepdf.open(source) as pdf:
             with pytest.raises(DeclarationError, match="rdf:RDF"):
-                embed.attach_in_place(pdf, page_labels, None, mod_date=MOD_DATE)
+                embed.attach_in_place(pdf, plannotations, None, mod_date=MOD_DATE)
             assert attachment_names(pdf) == []
             assert Name.AF not in pdf.pages[0].obj
             assert Name.Names not in pdf.Root
 
     def test_a_signed_document_is_refused_by_default(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        signed_document: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """No save can preserve a signature, so the default is to say so and stop."""
         with pytest.raises(SignedPdfError, match="Signature1"):
             label(signed_document, tmp_path / "out.pdf", labels, index)
 
     def test_the_refusal_names_both_real_options(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        signed_document: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """A refusal that does not say what to do instead is half an error message."""
         with pytest.raises(SignedPdfError) as caught:
@@ -1753,26 +1787,26 @@ class TestAttachRefuses:
     def test_an_encrypted_document_is_refused(self, tmp_path: Path) -> None:
         """Saving would quietly hand back a decrypted copy of an encrypted document."""
         source = write_bytes(tmp_path / "locked.pdf", fx.build_encrypted())
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pytest.raises(EncryptedPdfError, match="encrypted"):
-            label(source, tmp_path / "out.pdf", page_labels, None)
+            label(source, tmp_path / "out.pdf", plannotations, None)
 
     def test_a_label_whose_page_size_disagrees_is_refused(
         self, drawing_set: Path, tmp_path: Path
     ) -> None:
         """A label that misstates its page sends every reader to the wrong geometry."""
-        wrong = [fx.page_label(page_index=0, width_mm=400.0, height_mm=297.0)]
-        with pytest.raises(LabelMismatchError, match="400 x 297 mm"):
+        wrong = [fx.plannotation(page_index=0, width_mm=400.0, height_mm=297.0)]
+        with pytest.raises(PlannotationMismatchError, match="400 x 297 mm"):
             label(drawing_set, tmp_path / "out.pdf", wrong, None)
 
     def test_half_a_millimetre_of_slack_is_allowed_and_no_more(
         self, drawing_set: Path, tmp_path: Path
     ) -> None:
         """The specification's geometric tolerance is 0.5 mm, and so is this one."""
-        near = [fx.page_label(page_index=0, width_mm=420.4, height_mm=296.6)]
+        near = [fx.plannotation(page_index=0, width_mm=420.4, height_mm=296.6)]
         label(drawing_set, tmp_path / "near.pdf", near, None)
-        far = [fx.page_label(page_index=0, width_mm=420.6, height_mm=297.0)]
-        with pytest.raises(LabelMismatchError, match=r"420\.6"):
+        far = [fx.plannotation(page_index=0, width_mm=420.6, height_mm=297.0)]
+        with pytest.raises(PlannotationMismatchError, match=r"420\.6"):
             label(drawing_set, tmp_path / "far.pdf", far, None)
 
     def test_swapped_dimensions_are_named_as_such(self, drawing_set: Path, tmp_path: Path) -> None:
@@ -1781,41 +1815,41 @@ class TestAttachRefuses:
         Measuring a ``/Rotate 90`` page as it is displayed rather than as it is stored
         is exactly what ``pypdfium2``'s ``get_size()`` does, so the message says so.
         """
-        swapped = [fx.page_label(page_index=1, width_mm=297.0, height_mm=210.0, rotation=90)]
-        with pytest.raises(LabelMismatchError, match="look swapped"):
+        swapped = [fx.plannotation(page_index=1, width_mm=297.0, height_mm=210.0, rotation=90)]
+        with pytest.raises(PlannotationMismatchError, match="look swapped"):
             label(drawing_set, tmp_path / "out.pdf", swapped, None)
 
     def test_a_label_whose_rotation_disagrees_is_refused(
         self, drawing_set: Path, tmp_path: Path
     ) -> None:
         """A label recording rotation 0 for a /Rotate 90 page is refused."""
-        wrong = [fx.page_label(page_index=1, width_mm=210.0, height_mm=297.0, rotation=0)]
-        with pytest.raises(LabelMismatchError, match="/Rotate is 90"):
+        wrong = [fx.plannotation(page_index=1, width_mm=210.0, height_mm=297.0, rotation=0)]
+        with pytest.raises(PlannotationMismatchError, match="/Rotate is 90"):
             label(drawing_set, tmp_path / "out.pdf", wrong, None)
 
     def test_a_label_for_a_page_that_does_not_exist_is_refused(
         self, drawing_set: Path, tmp_path: Path
     ) -> None:
         """``page.index`` is a zero-based index into this document, not a page number."""
-        wrong = [fx.page_label(page_index=9, width_mm=420.0, height_mm=297.0)]
-        with pytest.raises(LabelMismatchError, match="2 page"):
+        wrong = [fx.plannotation(page_index=9, width_mm=420.0, height_mm=297.0)]
+        with pytest.raises(PlannotationMismatchError, match="2 page"):
             label(drawing_set, tmp_path / "out.pdf", wrong, None)
 
     def test_two_labels_for_one_page_are_refused(self, drawing_set: Path, tmp_path: Path) -> None:
         """A page carries at most one label."""
         both = [
-            fx.page_label(page_index=0, width_mm=420.0, height_mm=297.0),
-            fx.page_label(page_index=0, width_mm=420.0, height_mm=297.0, sheet_id="A-999"),
+            fx.plannotation(page_index=0, width_mm=420.0, height_mm=297.0),
+            fx.plannotation(page_index=0, width_mm=420.0, height_mm=297.0, sheet_id="A-999"),
         ]
-        with pytest.raises(LabelMismatchError, match="two labels claim page 0"):
+        with pytest.raises(PlannotationMismatchError, match="two labels claim page 0"):
             label(drawing_set, tmp_path / "out.pdf", both, None)
 
     def test_an_index_that_names_an_unlabelled_page_is_refused(
-        self, drawing_set: Path, tmp_path: Path, index: LabelIndex
+        self, drawing_set: Path, tmp_path: Path, index: PlannotationIndex
     ) -> None:
         """The index must describe the labels being written, and not more of them."""
-        only_first = [fx.page_label(page_index=0, width_mm=420.0, height_mm=297.0, level="L3")]
-        with pytest.raises(LabelMismatchError, match="index lists page 1"):
+        only_first = [fx.plannotation(page_index=0, width_mm=420.0, height_mm=297.0, level="L3")]
+        with pytest.raises(PlannotationMismatchError, match="index lists page 1"):
             label(drawing_set, tmp_path / "out.pdf", only_first, index)
 
     def test_no_labels_at_all_is_a_programming_error(
@@ -1826,7 +1860,11 @@ class TestAttachRefuses:
             label(drawing_set, tmp_path / "out.pdf", [], None)
 
     def test_a_naive_timestamp_is_refused(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """A wrong offset is silently wrong, so an offset must be given."""
         with pytest.raises(ValueError, match="timezone-aware"):
@@ -1843,8 +1881,8 @@ class TestAttachRefuses:
     ) -> None:
         """A refusal leaves no half-written output behind."""
         target = tmp_path / "never.pdf"
-        wrong = [fx.page_label(page_index=9, width_mm=420.0, height_mm=297.0)]
-        with pytest.raises(LabelMismatchError):
+        wrong = [fx.plannotation(page_index=9, width_mm=420.0, height_mm=297.0)]
+        with pytest.raises(PlannotationMismatchError):
             label(drawing_set, target, wrong, None)
         assert not target.exists()
 
@@ -1883,7 +1921,11 @@ class TestSignatures:
         assert len(fx.signature_digest(data)) == 64
 
     def test_break_signature_proceeds_and_the_signature_is_void(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        signed_document: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """The escape hatch works, and it really does break the signature.
 
@@ -1901,7 +1943,11 @@ class TestSignatures:
         assert not rewritten.startswith(original)
 
     def test_the_labels_are_still_readable_afterwards(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        signed_document: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """Breaking the signature is the only thing that breaks."""
         target = tmp_path / "broken-signature.pdf"
@@ -1910,13 +1956,17 @@ class TestSignatures:
         assert canonical_bytes(found.pages[0]) == canonical_bytes(labels[0])
 
     def test_a_signed_document_can_still_be_stripped(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        signed_document: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """Taking Plannotation's files back out must always be possible."""
         target = tmp_path / "broken-signature.pdf"
         label(signed_document, target, labels, index, break_signature=True)
         report = embed.strip(target, tmp_path / "clean.pdf")
-        assert sorted(report.filenames) == sorted(LABEL_FILENAMES)
+        assert sorted(report.filenames) == sorted(PLANNOTATION_FILENAMES)
 
 
 # ===========================================================================
@@ -1974,7 +2024,11 @@ class TestDeterminism:
     """Two runs over the same inputs must produce the same file."""
 
     def test_two_runs_in_one_process_agree(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """The obvious half of the claim."""
         first = tmp_path / "first.pdf"
@@ -1985,7 +2039,11 @@ class TestDeterminism:
 
     @pytest.mark.slow
     def test_a_fresh_interpreter_a_second_later_agrees_too(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """The half that matters.
 
@@ -1994,7 +2052,7 @@ class TestDeterminism:
         anything is pinned. This one crosses a process boundary *and* a second
         boundary, with a different hash seed and a different time zone -- verified to
         fail when ``deterministic_id`` is taken out of
-        :func:`plannotation.pdf.embed.save_labelled`, which the immediate comparison did
+        :func:`plannotation.pdf.embed.save_plannotated`, which the immediate comparison did
         not.
         """
         here = tmp_path / "here.pdf"
@@ -2003,13 +2061,13 @@ class TestDeterminism:
         there = run_in_fresh_interpreter(
             tmp_path,
             "from datetime import UTC, datetime\n"
-            "from tests.pdf_fixtures import build_drawing_set, drawing_set_labels\n"
+            "from tests.pdf_fixtures import build_drawing_set, drawing_set_plannotations\n"
             "from plannotation.pdf.embed import attach, build_index\n"
             "target = Path(sys.argv[1])\n"
             "source = target.with_name('source.pdf')\n"
             "source.write_bytes(build_drawing_set())\n"
-            "page_labels = drawing_set_labels()\n"
-            "attach(source, page_labels, build_index(page_labels), target,\n"
+            "plannotations = drawing_set_plannotations()\n"
+            "attach(source, plannotations, build_index(plannotations), target,\n"
             "       mod_date=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC))\n",
         )
         wait_past_a_clock_second(started)
@@ -2019,7 +2077,11 @@ class TestDeterminism:
         assert again.read_bytes() == here.read_bytes()
 
     def test_the_timestamp_really_reaches_the_output(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """Otherwise the determinism tests would prove only that nothing ever varies."""
         first = tmp_path / "first.pdf"
@@ -2038,7 +2100,11 @@ class TestDeterminism:
             assert str(stream.stream_dict[Name.Params][Name.ModDate]) == "D:20250601093000Z"
 
     def test_writing_in_place_gives_the_same_file(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """Labelling a document over itself is the same operation as labelling a copy."""
         copy = write_bytes(tmp_path / "in-place.pdf", drawing_set.read_bytes())
@@ -2105,7 +2171,7 @@ class TestReadPaths:
     """Both registrations are read, because a document in the wild may carry only one."""
 
     def test_labels_are_found_when_only_the_af_arrays_name_them(
-        self, labelled: Path, tmp_path: Path, labels: list[PageLabel]
+        self, labelled: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """A later tool may have rebuilt the name tree without our entries in it."""
         target = tmp_path / "af-only.pdf"
@@ -2116,7 +2182,7 @@ class TestReadPaths:
                 if not embed.is_plannotation_filename(str(tree[position])):
                     kept.extend([tree[position], tree[position + 1]])
             pdf.Root[Name.Names][Name.EmbeddedFiles][Name.Names] = Array(kept)
-            embed.save_labelled(pdf, target)
+            embed.save_plannotated(pdf, target)
         with pikepdf.open(target) as pdf:
             assert INDEX_FILENAME not in pdf.attachments
         found = embed.read(target)
@@ -2125,7 +2191,7 @@ class TestReadPaths:
         assert canonical_bytes(found.pages[0]) == canonical_bytes(labels[0])
 
     def test_labels_are_found_when_only_the_name_tree_names_them(
-        self, labelled: Path, tmp_path: Path, labels: list[PageLabel]
+        self, labelled: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """A producer may have written only the name tree, and that is readable too."""
         target = tmp_path / "tree-only.pdf"
@@ -2134,14 +2200,14 @@ class TestReadPaths:
             for page in pdf.pages:
                 if Name.AF in page.obj:
                     del page.obj[Name.AF]
-            embed.save_labelled(pdf, target)
+            embed.save_plannotated(pdf, target)
         found = embed.read(target)
         assert sorted(found.pages) == [0, 1]
         assert found.index is not None
         assert canonical_bytes(found.pages[1]) == canonical_bytes(labels[1])
 
     def test_a_dangling_association_is_tolerated(
-        self, labelled: Path, tmp_path: Path, labels: list[PageLabel]
+        self, labelled: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """Deleting an attachment leaves a null in ``/AF``; a reader must survive it.
 
@@ -2152,22 +2218,24 @@ class TestReadPaths:
         target = tmp_path / "dangling.pdf"
         with pikepdf.open(labelled) as pdf:
             del pdf.attachments["plannotation-p0000.json"]
-            embed.save_labelled(pdf, target)
+            embed.save_plannotated(pdf, target)
         found = embed.read(target)
         assert sorted(found.pages) == [1]
         assert canonical_bytes(found.pages[1]) == canonical_bytes(labels[1])
 
     def test_an_invalid_label_is_an_error_by_default(self, labelled: Path, tmp_path: Path) -> None:
         """A person running a tool wants to be told that a label is broken."""
-        target = corrupt_page_label(labelled, tmp_path)
-        with pytest.raises(InvalidLabelError, match="is not a valid Plannotation page document"):
+        target = corrupt_plannotation(labelled, tmp_path)
+        with pytest.raises(
+            InvalidPlannotationError, match="is not a valid Plannotation page document"
+        ):
             embed.read(target)
 
     def test_an_invalid_label_reads_as_absent_when_asked(
         self, labelled: Path, tmp_path: Path
     ) -> None:
         """Section 4.3 requires a conforming reader to treat it as absent."""
-        target = corrupt_page_label(labelled, tmp_path)
+        target = corrupt_plannotation(labelled, tmp_path)
         found = embed.read(target, strict=False)
         assert sorted(found.pages) == [0]
 
@@ -2188,7 +2256,7 @@ class TestReadPaths:
             )
             pdf.attachments["plannotation-p0009.json"] = spec
             pdf.attachments["plannotation-p0009.json"].obj[Name.AFRelationship] = Name.Data
-            embed.save_labelled(pdf, target)
+            embed.save_plannotated(pdf, target)
         found = embed.read(target)
         assert sorted(found.pages) == [0, 1]
 
@@ -2205,12 +2273,12 @@ class TestReadPaths:
         assert report.carrier == "pdf"
         assert report.declaration is True
         assert report.page_count == 2
-        assert sorted(report.filenames) == sorted(LABEL_FILENAMES)
+        assert sorted(report.filenames) == sorted(PLANNOTATION_FILENAMES)
         assert report.signature is not None
         assert report.signature.signed is False
 
 
-def corrupt_page_label(labelled: Path, tmp_path: Path) -> Path:
+def corrupt_plannotation(labelled: Path, tmp_path: Path) -> Path:
     """Replace page 1's label with a document that does not validate.
 
     Args:
@@ -2224,7 +2292,7 @@ def corrupt_page_label(labelled: Path, tmp_path: Path) -> Path:
     with pikepdf.open(labelled) as pdf:
         spec = pdf.attachments["plannotation-p0001.json"].obj
         spec[Name.EF][Name.F].write(b'{"plannotation": "0.1", "page": 3}\n')
-        embed.save_labelled(pdf, target)
+        embed.save_plannotated(pdf, target)
     return target
 
 
@@ -2233,10 +2301,10 @@ class TestBoundedReading:
 
     def test_the_bomb_fixture_really_is_one(self, tmp_path: Path) -> None:
         """A few tens of kilobytes on disk, tens of megabytes once decompressed."""
-        source = write_bytes(tmp_path / "bomb.pdf", fx.build_label_bomb())
+        source = write_bytes(tmp_path / "bomb.pdf", fx.build_plannotation_bomb())
         assert source.stat().st_size < FIXTURE_SIZE_LIMIT
         with pikepdf.open(source) as pdf:
-            stream = pdf.attachments[page_label_filename(0)].obj[Name.EF][Name.F]
+            stream = pdf.attachments[plannotation_filename(0)].obj[Name.EF][Name.F]
             assert len(stream.read_raw_bytes()) < FIXTURE_SIZE_LIMIT
             assert int(stream.stream_dict[Name.Params][Name.Size]) == fx.BOMB_MEGABYTES * 1024**2
 
@@ -2253,45 +2321,47 @@ class TestBoundedReading:
         """
         source = write_bytes(
             tmp_path / f"bomb-{honest_size}.pdf",
-            fx.build_label_bomb(honest_size=honest_size),
+            fx.build_plannotation_bomb(honest_size=honest_size),
         )
-        with pytest.raises(InvalidLabelError, match="decompression bomb"):
+        with pytest.raises(InvalidPlannotationError, match="decompression bomb"):
             embed.read(source)
 
     def test_the_name_tree_path_is_bounded_too(self, tmp_path: Path) -> None:
         """Both registrations reach the same stream, and a reader consults both."""
-        source = write_bytes(tmp_path / "bomb-tree.pdf", fx.build_label_bomb())
+        source = write_bytes(tmp_path / "bomb-tree.pdf", fx.build_plannotation_bomb())
         target = tmp_path / "bomb-tree-only.pdf"
         with pikepdf.open(source) as pdf:
             del pdf.pages[0].obj[Name.AF]
-            embed.save_labelled(pdf, target)
-        with pytest.raises(InvalidLabelError, match="decompression bomb"):
+            embed.save_plannotated(pdf, target)
+        with pytest.raises(InvalidPlannotationError, match="decompression bomb"):
             embed.read(target)
 
     def test_carrier_report_is_bounded_as_well(self, tmp_path: Path) -> None:
         """``plannotation read`` goes through the report, so the bound must be there too."""
-        source = write_bytes(tmp_path / "bomb-report.pdf", fx.build_label_bomb())
-        with pytest.raises(InvalidLabelError, match="decompression bomb"):
+        source = write_bytes(tmp_path / "bomb-report.pdf", fx.build_plannotation_bomb())
+        with pytest.raises(InvalidPlannotationError, match="decompression bomb"):
             embed.carrier_report(source)
 
     def test_the_bound_is_an_argument_and_not_a_wall(self, labelled: Path) -> None:
         """A genuinely large label must remain possible, so the caller may raise it."""
-        with pytest.raises(InvalidLabelError, match="decompression bomb"):
-            embed.read(labelled, max_label_bytes=16)
-        found = embed.read(labelled, max_label_bytes=embed._MAX_LABEL_BYTES)
+        with pytest.raises(InvalidPlannotationError, match="decompression bomb"):
+            embed.read(labelled, max_plannotation_bytes=16)
+        found = embed.read(labelled, max_plannotation_bytes=embed._MAX_PLANNOTATION_BYTES)
         assert sorted(found.pages) == [0, 1]
 
     def test_a_bomb_reads_as_absent_when_the_reader_is_lenient(self, tmp_path: Path) -> None:
         """Section 4.3 treats a label a reader will not accept as one that is not there."""
-        source = write_bytes(tmp_path / "bomb-lenient.pdf", fx.build_label_bomb())
+        source = write_bytes(tmp_path / "bomb-lenient.pdf", fx.build_plannotation_bomb())
         found = embed.read(source, strict=False)
         assert found.is_empty is True
 
-    def test_an_ordinary_label_is_unaffected(self, labelled: Path, labels: list[PageLabel]) -> None:
+    def test_an_ordinary_label_is_unaffected(
+        self, labelled: Path, labels: list[Plannotation]
+    ) -> None:
         """The default bound is generous: a real page label is a few kilobytes."""
         found = embed.read(labelled)
         assert canonical_bytes(found.pages[0]) == canonical_bytes(labels[0])
-        assert embed._MAX_LABEL_BYTES >= 1024 * 1024
+        assert embed._MAX_PLANNOTATION_BYTES >= 1024 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -2330,22 +2400,24 @@ def filter_chain_bomb(chain: str) -> bytes:
     """
     flate = fx.flate_bomb_bytes()
     if chain == "flate-decodeparms":
-        return fx.build_filtered_label(flate, filters=Name.FlateDecode, decode_parms=Dictionary())
+        return fx.build_filtered_plannotation(
+            flate, filters=Name.FlateDecode, decode_parms=Dictionary()
+        )
     if chain == "flate-predictor":
         # Zeros under a PNG "None" predictor are zeros: every row is its own tag byte
         # followed by 511 more of them, so the payload needs no separate encoding.
-        return fx.build_filtered_label(
+        return fx.build_filtered_plannotation(
             flate,
             filters=Name.FlateDecode,
             decode_parms=Dictionary(Predictor=12, Colors=1, BitsPerComponent=8, Columns=511),
         )
     if chain == "double-flate":
-        return fx.build_filtered_label(
+        return fx.build_filtered_plannotation(
             zlib.compress(flate, 9),
             filters=Array([Name.FlateDecode, Name.FlateDecode]),
         )
     if chain == "runlength":
-        return fx.build_filtered_label(
+        return fx.build_filtered_plannotation(
             fx.run_length_encode(bytes(FILTER_BOMB_BYTES)),
             filters=Name.RunLengthDecode,
         )
@@ -2353,7 +2425,9 @@ def filter_chain_bomb(chain: str) -> bytes:
     raise ValueError(msg)
 
 
-def peak_rss_reading(tmp_path: Path, source: Path, *, max_label_bytes: int) -> tuple[str, int]:
+def peak_rss_reading(
+    tmp_path: Path, source: Path, *, max_plannotation_bytes: int
+) -> tuple[str, int]:
     """Read one document in a fresh interpreter and report what it cost.
 
     Peak resident memory is the only honest measure of a bound: a reader that refuses a
@@ -2363,7 +2437,7 @@ def peak_rss_reading(tmp_path: Path, source: Path, *, max_label_bytes: int) -> t
     Args:
         tmp_path: A directory for the probe script and its result.
         source: The document to read.
-        max_label_bytes: The bound to read under.
+        max_plannotation_bytes: The bound to read under.
 
     Returns:
         What became of the read -- the name of the error class, or ``"accepted"`` -- and
@@ -2377,7 +2451,7 @@ from plannotation.errors import PlannotationError
 from plannotation.pdf import embed
 
 try:
-    embed.read(Path({str(source)!r}), max_label_bytes={max_label_bytes})
+    embed.read(Path({str(source)!r}), max_plannotation_bytes={max_plannotation_bytes})
     outcome = "accepted"
 except PlannotationError as exc:
     outcome = type(exc).__name__
@@ -2407,7 +2481,7 @@ def reader_baseline_rss(tmp_path_factory: pytest.TempPathFactory, labelled: Path
         bomb costs no more than reading a drawing -- on a machine of any size.
     """
     directory = tmp_path_factory.mktemp("rss-baseline")
-    _, peak = peak_rss_reading(directory, labelled, max_label_bytes=PROBE_LIMIT)
+    _, peak = peak_rss_reading(directory, labelled, max_plannotation_bytes=PROBE_LIMIT)
     return peak
 
 
@@ -2429,9 +2503,9 @@ class TestTheBoundHoldsForEveryFilter:
     ) -> None:
         """Measured, in a fresh interpreter, for each chain the attacker might choose."""
         source = write_bytes(tmp_path / f"{chain}.pdf", filter_chain_bomb(chain))
-        outcome, peak = peak_rss_reading(tmp_path, source, max_label_bytes=PROBE_LIMIT)
+        outcome, peak = peak_rss_reading(tmp_path, source, max_plannotation_bytes=PROBE_LIMIT)
         spent = peak - reader_baseline_rss
-        assert outcome == "InvalidLabelError", (
+        assert outcome == "InvalidPlannotationError", (
             f"reading a {chain} bomb ended in {outcome!r}; a payload this reader will "
             "not accept must be refused as an invalid label, not raised out of the PDF "
             "library as a traceback"
@@ -2444,7 +2518,7 @@ class TestTheBoundHoldsForEveryFilter:
         )
 
     def test_a_chain_this_reader_does_not_decode_is_named_and_treated_as_absent(
-        self, tmp_path: Path, labels: list[PageLabel]
+        self, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """A label under RunLengthDecode is refused by name, not by the PDF library.
 
@@ -2455,26 +2529,28 @@ class TestTheBoundHoldsForEveryFilter:
         payload = fx.run_length_encode(canonical_bytes(labels[0]))
         source = write_bytes(
             tmp_path / "runlength.pdf",
-            fx.build_filtered_label(payload, filters=Name.RunLengthDecode),
+            fx.build_filtered_plannotation(payload, filters=Name.RunLengthDecode),
         )
-        with pytest.raises(InvalidLabelError, match="/RunLengthDecode"):
+        with pytest.raises(InvalidPlannotationError, match="/RunLengthDecode"):
             embed.read(source)
         assert embed.read(source, strict=False).is_empty is True
 
     def test_a_chain_of_two_filters_is_refused_and_both_are_named(
-        self, tmp_path: Path, labels: list[PageLabel]
+        self, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """Two Flate filters are not one Flate filter, and the message says so."""
         payload = zlib.compress(zlib.compress(canonical_bytes(labels[0]), 9), 9)
         source = write_bytes(
             tmp_path / "double-flate.pdf",
-            fx.build_filtered_label(payload, filters=Array([Name.FlateDecode, Name.FlateDecode])),
+            fx.build_filtered_plannotation(
+                payload, filters=Array([Name.FlateDecode, Name.FlateDecode])
+            ),
         )
-        with pytest.raises(InvalidLabelError, match=r"/FlateDecode, /FlateDecode"):
+        with pytest.raises(InvalidPlannotationError, match=r"/FlateDecode, /FlateDecode"):
             embed.read(source)
 
     def test_a_stored_length_over_the_bound_is_refused_from_the_dictionary_alone(
-        self, tmp_path: Path, labels: list[PageLabel]
+        self, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """A stream cannot decode to less than the bound if it is already over it.
 
@@ -2490,13 +2566,13 @@ class TestTheBoundHoldsForEveryFilter:
         assert len(stored) > len(payload)
         source = write_bytes(
             tmp_path / "stored-large.pdf",
-            fx.build_filtered_label(stored, filters=Name.FlateDecode),
+            fx.build_filtered_plannotation(stored, filters=Name.FlateDecode),
         )
-        with pytest.raises(InvalidLabelError, match="declares a stored length of"):
-            embed.read(source, max_label_bytes=len(payload))
+        with pytest.raises(InvalidPlannotationError, match="declares a stored length of"):
+            embed.read(source, max_plannotation_bytes=len(payload))
 
     def test_the_stored_bytes_are_measured_too_when_the_dictionary_declares_nothing(
-        self, tmp_path: Path, labels: list[PageLabel], monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, labels: list[Plannotation], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """``/Length`` is a claim, and the backstop behind it is the measurement.
 
@@ -2508,11 +2584,11 @@ class TestTheBoundHoldsForEveryFilter:
         stored = zlib.compress(payload, 0)
         source = write_bytes(
             tmp_path / "stored-large-undeclared.pdf",
-            fx.build_filtered_label(stored, filters=Name.FlateDecode),
+            fx.build_filtered_plannotation(stored, filters=Name.FlateDecode),
         )
         monkeypatch.setattr(embed, "_declared_length", lambda _stream: None)
-        with pytest.raises(InvalidLabelError, match="is stored as"):
-            embed.read(source, max_label_bytes=len(payload))
+        with pytest.raises(InvalidPlannotationError, match="is stored as"):
+            embed.read(source, max_plannotation_bytes=len(payload))
 
     def test_a_flate_stream_zlib_will_not_read_is_absent_rather_than_a_traceback(
         self, tmp_path: Path
@@ -2520,15 +2596,15 @@ class TestTheBoundHoldsForEveryFilter:
         """What neither zlib nor raw deflate reads is damage, and damage is absence."""
         source = write_bytes(
             tmp_path / "damaged-flate.pdf",
-            fx.build_filtered_label(b"\xde\xad\xbe\xef" * 64, filters=Name.FlateDecode),
+            fx.build_filtered_plannotation(b"\xde\xad\xbe\xef" * 64, filters=Name.FlateDecode),
         )
-        with pytest.raises(InvalidLabelError, match="zlib will not decompress it"):
+        with pytest.raises(InvalidPlannotationError, match="zlib will not decompress it"):
             embed.read(source)
         assert embed.read(source, strict=False).is_empty is True
 
     @pytest.mark.parametrize("tag", [0, 1, 2, 3, 4])
     def test_a_png_predictor_is_applied_here_and_not_by_the_library(
-        self, tmp_path: Path, labels: list[PageLabel], tag: int
+        self, tmp_path: Path, labels: list[Plannotation], tag: int
     ) -> None:
         """Refusing every predictor would be a bound bought by breaking valid files.
 
@@ -2541,7 +2617,7 @@ class TestTheBoundHoldsForEveryFilter:
         stored = zlib.compress(fx.png_encode(padded, columns=columns, tag=tag), 9)
         source = write_bytes(
             tmp_path / f"png-{tag}.pdf",
-            fx.build_filtered_label(
+            fx.build_filtered_plannotation(
                 stored,
                 filters=Name.FlateDecode,
                 decode_parms=Dictionary(
@@ -2552,7 +2628,9 @@ class TestTheBoundHoldsForEveryFilter:
         found = embed.read(source)
         assert canonical_bytes(found.pages[0]) == payload
 
-    def test_a_tiff_predictor_is_applied_too(self, tmp_path: Path, labels: list[PageLabel]) -> None:
+    def test_a_tiff_predictor_is_applied_too(
+        self, tmp_path: Path, labels: list[Plannotation]
+    ) -> None:
         """Predictor 2 is horizontal differencing, and is legal on any stream."""
         payload = canonical_bytes(labels[0])
         differenced = bytearray(payload)
@@ -2560,7 +2638,7 @@ class TestTheBoundHoldsForEveryFilter:
             differenced[at] = (payload[at] - payload[at - 1]) & 0xFF
         source = write_bytes(
             tmp_path / "tiff-predictor.pdf",
-            fx.build_filtered_label(
+            fx.build_filtered_plannotation(
                 zlib.compress(bytes(differenced), 9),
                 filters=Name.FlateDecode,
                 decode_parms=Dictionary(
@@ -2572,11 +2650,11 @@ class TestTheBoundHoldsForEveryFilter:
         assert canonical_bytes(found.pages[0]) == payload
 
     def test_an_unfiltered_label_is_read_as_it_stands(
-        self, tmp_path: Path, labels: list[PageLabel]
+        self, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """The simplest case still has to work, and is the one the bound is cheapest on."""
         payload = canonical_bytes(labels[0])
-        source = write_bytes(tmp_path / "unfiltered.pdf", fx.build_filtered_label(payload))
+        source = write_bytes(tmp_path / "unfiltered.pdf", fx.build_filtered_plannotation(payload))
         found = embed.read(source)
         assert canonical_bytes(found.pages[0]) == payload
 
@@ -2586,10 +2664,10 @@ class TestTheBoundHoldsForEveryFilter:
         """``/EF`` comes from the document, and a document may hold anything there."""
         target = tmp_path / "not-a-stream.pdf"
         with pikepdf.open(labelled) as pdf:
-            spec = pdf.attachments[page_label_filename(0)].obj
+            spec = pdf.attachments[plannotation_filename(0)].obj
             spec[Name.EF] = Dictionary(F=Dictionary(Type=Name.EmbeddedFile))
-            embed.save_labelled(pdf, target)
-        with pytest.raises(InvalidLabelError, match="is not a stream"):
+            embed.save_plannotated(pdf, target)
+        with pytest.raises(InvalidPlannotationError, match="is not a stream"):
             embed.read(target)
         assert sorted(embed.read(target, strict=False).pages) == [1]
 
@@ -2599,9 +2677,9 @@ class TestTheBoundHoldsForEveryFilter:
         """One level further up, the same question and the same answer."""
         target = tmp_path / "not-a-dictionary.pdf"
         with pikepdf.open(labelled) as pdf:
-            pdf.attachments[page_label_filename(0)].obj[Name.EF] = Array([1, 2])
-            embed.save_labelled(pdf, target)
-        with pytest.raises(InvalidLabelError, match="/EF that is not a dictionary"):
+            pdf.attachments[plannotation_filename(0)].obj[Name.EF] = Array([1, 2])
+            embed.save_plannotated(pdf, target)
+        with pytest.raises(InvalidPlannotationError, match="/EF that is not a dictionary"):
             embed.read(target)
         assert sorted(embed.read(target, strict=False).pages) == [1]
 
@@ -2639,7 +2717,7 @@ def predicted_zeros(tag: int, *, megabytes: int, columns: int = 512) -> bytes:
     """
     rows = megabytes * 1024 * 1024 // columns
     encoded = (bytes([tag]) + bytes(columns)) * rows
-    return fx.build_filtered_label(
+    return fx.build_filtered_plannotation(
         zlib.compress(encoded, 9),
         filters=Name.FlateDecode,
         decode_parms=Dictionary(Predictor=15, Colors=1, BitsPerComponent=8, Columns=columns),
@@ -2672,7 +2750,7 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
         """
         return write_bytes(
             tmp_path / name,
-            fx.build_filtered_label(
+            fx.build_filtered_plannotation(
                 zlib.compress(b"", 9), filters=Name.FlateDecode, decode_parms=parms
             ),
         )
@@ -2700,7 +2778,7 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
     ) -> None:
         """The message names the parameter, because it is what nobody can see."""
         source = self.with_parms(tmp_path, "parms.pdf", parms)
-        with pytest.raises(InvalidLabelError, match=re.escape(named)):
+        with pytest.raises(InvalidPlannotationError, match=re.escape(named)):
             embed.read(source)
         assert embed.read(source, strict=False).is_empty is True
 
@@ -2711,7 +2789,7 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
         row buffer was allocated anyway.
         """
         source = self.with_parms(tmp_path, "empty.pdf", PNG_PARMS)
-        with pytest.raises(InvalidLabelError, match="decompresses to nothing"):
+        with pytest.raises(InvalidPlannotationError, match="decompresses to nothing"):
             embed.read(source)
         assert embed.read(source, strict=False).is_empty is True
 
@@ -2722,7 +2800,7 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
             "product.pdf",
             Dictionary(Predictor=12, Colors=32, BitsPerComponent=16, Columns=10_000_000),
         )
-        with pytest.raises(InvalidLabelError, match="describing rows of"):
+        with pytest.raises(InvalidPlannotationError, match="describing rows of"):
             embed.read(source)
 
     @pytest.mark.slow
@@ -2740,9 +2818,9 @@ class TestPredictorParametersAreCheckedBeforeAnythingIsAllocated:
             tmp_path, "absurd-columns.pdf", Dictionary(Predictor=12, Columns=2_000_000_000)
         )
         assert source.stat().st_size < 4096
-        outcome, peak = peak_rss_reading(tmp_path, source, max_label_bytes=PROBE_LIMIT)
+        outcome, peak = peak_rss_reading(tmp_path, source, max_plannotation_bytes=PROBE_LIMIT)
         spent = peak - reader_baseline_rss
-        assert outcome == "InvalidLabelError", (
+        assert outcome == "InvalidPlannotationError", (
             f"reading a document with an absurd /Columns ended in {outcome!r}; a "
             "MemoryError is not a PlannotationError, so it reaches a caller as a traceback "
             "and never as the absence section 4.3 (2) promises"
@@ -2765,7 +2843,7 @@ class TestUndoingAPredictorIsBounded:
 
     def test_the_sequential_cap_is_far_below_the_byte_cap(self) -> None:
         """The two caps exist because the two costs are different."""
-        assert embed._MAX_SEQUENTIAL_PREDICTED_BYTES < embed._MAX_LABEL_BYTES
+        assert embed._MAX_SEQUENTIAL_PREDICTED_BYTES < embed._MAX_PLANNOTATION_BYTES
 
     @pytest.mark.slow
     @pytest.mark.parametrize("tag", [0, 1, 2])
@@ -2779,7 +2857,7 @@ class TestUndoingAPredictorIsBounded:
         """
         source = write_bytes(tmp_path / f"big-{tag}.pdf", predicted_zeros(tag, megabytes=15))
         started = time.perf_counter()
-        with pytest.raises(InvalidLabelError, match="not readable as UTF-8 JSON"):
+        with pytest.raises(InvalidPlannotationError, match="not readable as UTF-8 JSON"):
             embed.read(source)
         elapsed = time.perf_counter() - started
         assert elapsed < PREDICTOR_TIME_BUDGET, (
@@ -2794,13 +2872,13 @@ class TestUndoingAPredictorIsBounded:
     ) -> None:
         """Each reconstructed byte is an input to the next, so there is no array form."""
         source = write_bytes(tmp_path / f"seq-{tag}.pdf", predicted_zeros(tag, megabytes=4))
-        with pytest.raises(InvalidLabelError, match="one byte at a time"):
+        with pytest.raises(InvalidPlannotationError, match="one byte at a time"):
             embed.read(source)
         assert embed.read(source, strict=False).is_empty is True
 
     @pytest.mark.parametrize("tag", [0, 1, 2, 3, 4])
     def test_a_label_under_a_multi_component_predictor_still_round_trips(
-        self, tmp_path: Path, labels: list[PageLabel], tag: int
+        self, tmp_path: Path, labels: list[Plannotation], tag: int
     ) -> None:
         """Vectorising by lane is where a rewrite goes wrong quietly.
 
@@ -2815,7 +2893,7 @@ class TestUndoingAPredictorIsBounded:
         stored = zlib.compress(fx.png_encode(padded, columns=width, tag=tag, step=colors), 9)
         source = write_bytes(
             tmp_path / f"lanes-{tag}.pdf",
-            fx.build_filtered_label(
+            fx.build_filtered_plannotation(
                 stored,
                 filters=Name.FlateDecode,
                 decode_parms=Dictionary(
@@ -2826,7 +2904,7 @@ class TestUndoingAPredictorIsBounded:
         assert canonical_bytes(embed.read(source).pages[0]) == payload
 
     def test_a_tiff_predictor_over_several_components_round_trips_too(
-        self, tmp_path: Path, labels: list[PageLabel]
+        self, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """The TIFF predictor has the same lanes, and no rows depending on each other."""
         colors, columns = 3, 5
@@ -2839,7 +2917,7 @@ class TestUndoingAPredictorIsBounded:
                 differenced[at] = (padded[at] - padded[at - colors]) & 0xFF
         source = write_bytes(
             tmp_path / "tiff-lanes.pdf",
-            fx.build_filtered_label(
+            fx.build_filtered_plannotation(
                 zlib.compress(bytes(differenced), 9),
                 filters=Name.FlateDecode,
                 decode_parms=Dictionary(
@@ -2882,7 +2960,7 @@ class TestTheMetadataPacketIsBounded:
 
     def test_the_packet_cap_is_far_below_the_label_cap(self) -> None:
         """An XMP packet is smaller than a label, and its bound says so."""
-        assert embed._MAX_XMP_BYTES < embed._MAX_LABEL_BYTES
+        assert embed._MAX_XMP_BYTES < embed._MAX_PLANNOTATION_BYTES
 
     def test_attach_refuses_rather_than_writing_a_document_with_no_declaration(
         self, metadata_bomb: Path, tmp_path: Path
@@ -2893,26 +2971,26 @@ class TestTheMetadataPacketIsBounded:
         produce a labelled document that announces nothing, and would have decided what
         to do with a packet it never saw.
         """
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pytest.raises(DeclarationError, match="could not be read"):
-            label(metadata_bomb, tmp_path / "out.pdf", page_labels, None)
+            label(metadata_bomb, tmp_path / "out.pdf", plannotations, None)
         assert not (tmp_path / "out.pdf").exists()
 
     def test_the_refusal_names_the_carrier_that_does_not_touch_the_document(
         self, metadata_bomb: Path, tmp_path: Path
     ) -> None:
         """A refusal that does not say what to do instead is half an error message."""
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pytest.raises(DeclarationError) as caught:
-            label(metadata_bomb, tmp_path / "out.pdf", page_labels, None)
+            label(metadata_bomb, tmp_path / "out.pdf", plannotations, None)
         assert "sidecar" in str(caught.value)
 
     def test_nothing_is_written_before_the_refusal(self, metadata_bomb: Path) -> None:
         """The packet is read with the other refusals, before the first byte is written."""
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pikepdf.open(metadata_bomb) as pdf:
             with pytest.raises(DeclarationError):
-                embed.attach_in_place(pdf, page_labels, None, mod_date=MOD_DATE)
+                embed.attach_in_place(pdf, plannotations, None, mod_date=MOD_DATE)
             assert attachment_names(pdf) == []
             assert Name.AF not in pdf.pages[0].obj
 
@@ -2963,12 +3041,12 @@ class TestTheMetadataPacketIsBounded:
 
         :func:`plannotation.pdf.embed.attach` and :func:`plannotation.pdf.embed.strip` are the
         only two functions in the module that call
-        :func:`plannotation.pdf.embed.save_labelled`, and the asymmetry between them was the
+        :func:`plannotation.pdf.embed.save_plannotated`, and the asymmetry between them was the
         defect: one refused, the other saved.
         """
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pytest.raises(DeclarationError):
-            label(metadata_bomb, tmp_path / "attached.pdf", page_labels, None)
+            label(metadata_bomb, tmp_path / "attached.pdf", plannotations, None)
         with pytest.raises(DeclarationError):
             embed.strip(metadata_bomb, tmp_path / "stripped.pdf")
         assert list(tmp_path.iterdir()) == []
@@ -2977,8 +3055,8 @@ class TestTheMetadataPacketIsBounded:
         self,
         drawing_set: Path,
         tmp_path: Path,
-        labels: list[PageLabel],
-        index: LabelIndex,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Three unbounded reads were three times the defect; three bounded ones are waste.
@@ -3038,7 +3116,7 @@ class TestRefusalAndRemovalAgree:
             pdf.attachments[key] = spec
             if under_af:
                 pdf.pages[0].obj[Name.AF].append(pdf.attachments[key].obj)
-            embed.save_labelled(pdf, target)
+            embed.save_plannotated(pdf, target)
         return target
 
     @pytest.mark.parametrize(
@@ -3054,8 +3132,8 @@ class TestRefusalAndRemovalAgree:
         self,
         drawing_set: Path,
         tmp_path: Path,
-        labels: list[PageLabel],
-        index: LabelIndex,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
         key: str,
         uf: str,
         registration: str,
@@ -3075,9 +3153,9 @@ class TestRefusalAndRemovalAgree:
         report = embed.strip(occupied, cleaned)
         assert report.is_empty is False
 
-        labelled_again = tmp_path / "labelled-again.pdf"
-        label(cleaned, labelled_again, labels, index)
-        assert sorted(embed.read(labelled_again).pages) == [0, 1]
+        plannotated_again = tmp_path / "labelled-again.pdf"
+        label(cleaned, plannotated_again, labels, index)
+        assert sorted(embed.read(plannotated_again).pages) == [0, 1]
 
     def test_an_af_entry_whose_f_alone_is_ours_is_dropped_as_well(
         self, drawing_set: Path, tmp_path: Path
@@ -3096,9 +3174,9 @@ class TestRefusalAndRemovalAgree:
             )
             pdf.attachments["innocent.json"] = spec
             registered = pdf.attachments["innocent.json"].obj
-            registered[Name.F] = page_label_filename(0)
+            registered[Name.F] = plannotation_filename(0)
             pdf.pages[0].obj[Name.AF].append(registered)
-            embed.save_labelled(pdf, occupied)
+            embed.save_plannotated(pdf, occupied)
 
         cleaned = tmp_path / "cleaned.pdf"
         embed.strip(occupied, cleaned)
@@ -3138,7 +3216,7 @@ class TestWhichNamesPlannotationOwns:
             "plannotation-p000.json",
             "plannotation-p00000.json",
             "plannotation-p0000.json.bak",
-            "рlanlabel-p0000.json",  # noqa: RUF001 - a Cyrillic er is the point
+            "рlannotation-p0000.json",  # noqa: RUF001 - a Cyrillic er is the point
             "plannotation-index.json\n",
         ],
     )
@@ -3200,7 +3278,7 @@ class TestStripNeverDestroysAFileItShares:
         """Two keys, one file specification: the shape the defect needs."""
         with pikepdf.open(aliased) as pdf:
             assert attachment_names(pdf) == sorted(
-                [page_label_filename(0), fx.FOREIGN_DOC_FILENAME]
+                [plannotation_filename(0), fx.FOREIGN_DOC_FILENAME]
             )
             assert len(filespec_objects(pdf)) == 1
 
@@ -3208,7 +3286,7 @@ class TestStripNeverDestroysAFileItShares:
         """The whole promise of :func:`plannotation.pdf.embed.strip`, under aliasing."""
         cleaned = tmp_path / "cleaned.pdf"
         report = embed.strip(aliased, cleaned)
-        assert report.filenames == (page_label_filename(0),)
+        assert report.filenames == (plannotation_filename(0),)
         with pikepdf.open(cleaned) as pdf:
             assert attachment_names(pdf) == [fx.FOREIGN_DOC_FILENAME]
             assert attachment_bytes(pdf, fx.FOREIGN_DOC_FILENAME).startswith(b"Third-party")
@@ -3226,25 +3304,25 @@ class TestStripNeverDestroysAFileItShares:
         """Narrowing what strip deletes must not narrow it past Plannotation's own files."""
         source = write_bytes(
             tmp_path / "both-ours.pdf",
-            fx.build_aliased_attachment(key=INDEX_FILENAME, filename=page_label_filename(0)),
+            fx.build_aliased_attachment(key=INDEX_FILENAME, filename=plannotation_filename(0)),
         )
         cleaned = tmp_path / "cleaned.pdf"
         report = embed.strip(source, cleaned)
-        assert sorted(report.filenames) == sorted([INDEX_FILENAME, page_label_filename(0)])
+        assert sorted(report.filenames) == sorted([INDEX_FILENAME, plannotation_filename(0)])
         with pikepdf.open(cleaned) as pdf:
             assert attachment_names(pdf) == []
             assert Name.AF not in pdf.pages[0].obj
 
     def test_the_document_can_then_be_labelled(self, aliased: Path, tmp_path: Path) -> None:
         """The parity of the refusal and the removal, under aliasing too."""
-        page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
+        plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
         with pytest.raises(AttachmentConflictError, match="plannotation strip"):
-            label(aliased, tmp_path / "refused.pdf", page_labels, None)
+            label(aliased, tmp_path / "refused.pdf", plannotations, None)
         cleaned = tmp_path / "cleaned.pdf"
         embed.strip(aliased, cleaned)
-        labelled_again = tmp_path / "labelled-again.pdf"
-        label(cleaned, labelled_again, page_labels, None)
-        assert sorted(embed.read(labelled_again).pages) == [0]
+        plannotated_again = tmp_path / "labelled-again.pdf"
+        label(cleaned, plannotated_again, plannotations, None)
+        assert sorted(embed.read(plannotated_again).pages) == [0]
 
 
 # ===========================================================================
@@ -3271,7 +3349,7 @@ class TestSidecar:
         assert errors == []
 
     def test_it_round_trips(
-        self, labelled: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self, labelled: Path, tmp_path: Path, labels: list[Plannotation], index: PlannotationIndex
     ) -> None:
         """Reading the sidecar gives back the same labels and the same index."""
         written = embed.write_sidecar(labelled, tmp_path / "out.plannotation.json")
@@ -3296,7 +3374,7 @@ class TestSidecar:
         assert copy.read_bytes() == before
 
     def test_it_is_the_answer_for_a_signed_document(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel]
+        self, signed_document: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """A signed PDF carries no labels, so the labels are given to the sidecar.
 
@@ -3316,12 +3394,12 @@ class TestSidecar:
         self, signed_document: Path, tmp_path: Path
     ) -> None:
         """A sidecar must not claim a page size the document contradicts."""
-        wrong = [fx.page_label(page_index=0, width_mm=200.0, height_mm=100.0)]
-        with pytest.raises(LabelMismatchError, match="200 x 100 mm"):
+        wrong = [fx.plannotation(page_index=0, width_mm=200.0, height_mm=100.0)]
+        with pytest.raises(PlannotationMismatchError, match="200 x 100 mm"):
             embed.write_sidecar(signed_document, tmp_path / "out.json", labels=wrong)
 
     def test_an_index_that_contradicts_its_labels_is_refused(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel]
+        self, signed_document: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """The sidecar makes the same check ``attach`` makes, on the same inputs.
 
@@ -3330,22 +3408,22 @@ class TestSidecar:
         the labels beside them is refused there, and must be refused here.
         """
         index = embed.build_index(labels, with_filenames=False)
-        with pytest.raises(LabelMismatchError, match="the index lists page 1"):
+        with pytest.raises(PlannotationMismatchError, match="the index lists page 1"):
             embed.write_sidecar(
                 signed_document, tmp_path / "out.json", labels=labels[:1], index=index
             )
         assert not (tmp_path / "out.json").exists()
 
     def test_the_same_inputs_are_refused_by_attach(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel]
+        self, drawing_set: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """The parity is the point, so it is asserted rather than assumed."""
         index = embed.build_index(labels)
-        with pytest.raises(LabelMismatchError, match="the index lists page 1"):
+        with pytest.raises(PlannotationMismatchError, match="the index lists page 1"):
             label(drawing_set, tmp_path / "out.pdf", labels[:1], index)
 
     def test_an_index_naming_embedded_files_is_still_fine_for_a_sidecar(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel]
+        self, signed_document: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """A sidecar names no embedded files, so the file-name rule is relaxed for it."""
         index = embed.build_index(labels, with_filenames=True)
@@ -3355,15 +3433,15 @@ class TestSidecar:
         found = embed.read(written)
         assert found.index is not None
         assert [entry.file for entry in found.index.pages] == [
-            page_label_filename(0),
-            page_label_filename(1),
+            plannotation_filename(0),
+            plannotation_filename(1),
         ]
 
     def test_a_document_with_nothing_to_copy_out_says_so(
         self, drawing_set: Path, tmp_path: Path
     ) -> None:
         """An empty sidecar would be a worse answer than an error."""
-        with pytest.raises(LabelNotFoundError, match="carries no Plannotation data"):
+        with pytest.raises(PlannotationNotFoundError, match="carries no Plannotation data"):
             embed.write_sidecar(drawing_set, tmp_path / "out.json")
 
     def test_the_bytes_are_canonical_and_stable(self, labelled: Path, tmp_path: Path) -> None:
@@ -3383,7 +3461,7 @@ class TestSidecar:
 # ===========================================================================
 # PDF/A, which the declaration interacts with
 # ===========================================================================
-def label_one_page(source: Path, target: Path) -> embed.AttachReport:
+def plannotate_one_page(source: Path, target: Path) -> embed.AttachReport:
     """Attach a single A4 label to page 0 of a document.
 
     Args:
@@ -3393,8 +3471,8 @@ def label_one_page(source: Path, target: Path) -> embed.AttachReport:
     Returns:
         The attach report.
     """
-    page_labels = [fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)]
-    return label(source, target, page_labels, None)
+    plannotations = [fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)]
+    return label(source, target, plannotations, None)
 
 
 class TestPdfAConformance:
@@ -3414,7 +3492,7 @@ class TestPdfAConformance:
         """Loudly, and on the report, so a caller can act on it rather than read logs."""
         source = write_bytes(tmp_path / f"pdfa{part}.pdf", fx.build_pdfa(part))
         with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
-            report = label_one_page(source, tmp_path / f"pdfa{part}-labelled.pdf")
+            report = plannotate_one_page(source, tmp_path / f"pdfa{part}-labelled.pdf")
         assert report.pdfa_part == part
         assert report.pdfa_extension_schema_missing is True
         assert "extension schema" in caplog.text
@@ -3426,7 +3504,7 @@ class TestPdfAConformance:
         """Part 4 dropped extension schemas, so there is nothing to warn about."""
         source = write_bytes(tmp_path / "pdfa4.pdf", fx.build_pdfa(4))
         with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
-            report = label_one_page(source, tmp_path / "pdfa4-labelled.pdf")
+            report = plannotate_one_page(source, tmp_path / "pdfa4-labelled.pdf")
         assert report.pdfa_part == 4
         assert report.pdfa_extension_schema_missing is False
         assert "extension schema" not in caplog.text
@@ -3439,13 +3517,17 @@ class TestPdfAConformance:
             tmp_path / "pdfa3ext.pdf", fx.build_pdfa(3, with_extension_schema=True)
         )
         with caplog.at_level(logging.WARNING, logger="plannotation.pdf.embed"):
-            report = label_one_page(source, tmp_path / "pdfa3ext-labelled.pdf")
+            report = plannotate_one_page(source, tmp_path / "pdfa3ext-labelled.pdf")
         assert report.pdfa_part == 3
         assert report.pdfa_extension_schema_missing is False
         assert "extension schema" not in caplog.text
 
     def test_a_document_that_claims_no_part_reports_none(
-        self, drawing_set: Path, tmp_path: Path, labels: list[PageLabel], index: LabelIndex
+        self,
+        drawing_set: Path,
+        tmp_path: Path,
+        labels: list[Plannotation],
+        index: PlannotationIndex,
     ) -> None:
         """Most drawings are not PDF/A at all, and say nothing about it either way."""
         report = label(drawing_set, tmp_path / "plain.pdf", labels, index)
@@ -3467,7 +3549,7 @@ class TestDamagedDocuments:
         """
         source = write_bytes(tmp_path / "damaged.pdf", fx.build_damaged_metadata())
         with pytest.raises(CarrierError, match="damaged"):
-            label_one_page(source, tmp_path / "out.pdf")
+            plannotate_one_page(source, tmp_path / "out.pdf")
         with pytest.raises(CarrierError, match="damaged"):
             embed.strip(source, tmp_path / "clean.pdf")
         with pytest.raises(CarrierError, match="damaged"):
@@ -3494,11 +3576,11 @@ class TestCommandLine:
     """An error a person can read, and a non-zero exit, for every refusal."""
 
     def test_sidecar_refuses_an_index_that_contradicts_its_labels(
-        self, signed_document: Path, tmp_path: Path, labels: list[PageLabel]
+        self, signed_document: Path, tmp_path: Path, labels: list[Plannotation]
     ) -> None:
         """The highest-stakes path in the module, driven the way a person drives it."""
-        labels_file = tmp_path / "labels.json"
-        labels_file.write_text(canonical_json(labels[0]), encoding="utf-8")
+        plannotations_file = tmp_path / "plannotations.json"
+        plannotations_file.write_text(canonical_json(labels[0]), encoding="utf-8")
         index_file = tmp_path / "index.json"
         index_file.write_text(
             canonical_json(embed.build_index(labels, with_filenames=False)), encoding="utf-8"
@@ -3508,7 +3590,7 @@ class TestCommandLine:
             "sidecar",
             str(signed_document),
             "--labels",
-            str(labels_file),
+            str(plannotations_file),
             "--index",
             str(index_file),
             "--out",
@@ -3855,7 +3937,7 @@ class TestVeraPdf:
 class TestParsingIsBoundedToo:
     """The byte cap bounds a label's size; these bound what parsing it costs.
 
-    A label can sit well inside :data:`_MAX_LABEL_BYTES` and still be expensive, and
+    A label can sit well inside :data:`_MAX_PLANNOTATION_BYTES` and still be expensive, and
     the document chooses how. SPEC 4.3 (7) bounds the resources a reader spends, not
     merely the bytes it reads, and SPEC 4.3 (2) requires anything that fails to read
     as absent rather than escaping.
@@ -3872,14 +3954,14 @@ class TestParsingIsBoundedToo:
             The document's bytes.
         """
         payload = b'{"plannotation":"0.1","x":' + b"[" * depth + b"]" * depth + b"}"
-        return fx.build_filtered_label(payload)
+        return fx.build_filtered_plannotation(payload)
 
     def test_a_label_that_nests_too_deeply_is_refused_and_not_a_recursion_error(
         self, tmp_path: Path
     ) -> None:
         """RecursionError is not a PlannotationError, so unconverted it escapes read()."""
         source = write_bytes(tmp_path / "deep.pdf", self._deeply_nested())
-        with pytest.raises(InvalidLabelError, match="nests too deeply"):
+        with pytest.raises(InvalidPlannotationError, match="nests too deeply"):
             embed.read(source)
 
     def test_such_a_label_reads_as_absent_when_lenient(self, tmp_path: Path) -> None:
@@ -3891,7 +3973,7 @@ class TestParsingIsBoundedToo:
         """The scanner raises before the payload is consumed, so this must be fast."""
         source = write_bytes(tmp_path / "deep.pdf", self._deeply_nested())
         started = time.perf_counter()
-        with pytest.raises(InvalidLabelError):
+        with pytest.raises(InvalidPlannotationError):
             embed.read(source)
         assert time.perf_counter() - started < 1.0
 
@@ -3915,7 +3997,7 @@ class TestParsingIsBoundedToo:
                 for n in range(count)
             ],
         }
-        return fx.build_filtered_label(json.dumps(document).encode())
+        return fx.build_filtered_plannotation(json.dumps(document).encode())
 
     def test_many_violations_cost_little_to_refuse(self, tmp_path: Path) -> None:
         """Only the reported errors are taken, so the refusal does not scale with them.
@@ -3925,7 +4007,7 @@ class TestParsingIsBoundedToo:
         """
         source = write_bytes(tmp_path / "many.pdf", self._many_violations())
         started = time.perf_counter()
-        with pytest.raises(InvalidLabelError) as caught:
+        with pytest.raises(InvalidPlannotationError) as caught:
             embed.read(source)
         assert time.perf_counter() - started < 0.5
         # The signature of taking only what is reported: the total is never counted,
@@ -3936,7 +4018,7 @@ class TestParsingIsBoundedToo:
     def test_the_refusal_message_is_bounded(self, tmp_path: Path) -> None:
         """A refusal is what "treat as absent" invites a caller to log."""
         source = write_bytes(tmp_path / "many.pdf", self._many_violations())
-        with pytest.raises(InvalidLabelError) as caught:
+        with pytest.raises(InvalidPlannotationError) as caught:
             embed.read(source)
         assert len(str(caught.value)) < 4000
 

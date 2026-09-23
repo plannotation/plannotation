@@ -98,7 +98,7 @@ samples: ## Build the three reference sample sets
 samples-check: samples ## Build the samples and validate every one of them
 	@for name in floorplan positionsplan section; do \
 	  printf '%-16s' "$$name"; \
-	  $(RUN) plannotation validate $(SAMPLES_DIR)/$$name/sheet.labelled.pdf >/dev/null \
+	  $(RUN) plannotation validate $(SAMPLES_DIR)/$$name/sheet.plannotated.pdf >/dev/null \
 	    && echo "valid" || exit 1; \
 	done
 
@@ -130,7 +130,7 @@ docs: ## Stage spec/, schema/ and README into site/ for GitHub Pages
 # The inspector is one static file with no build step; this only makes sure there is
 # a labelled drawing to open in it. `open` is macOS, `xdg-open` elsewhere.
 inspector: samples ## Build the samples and open the single-file inspector
-	@printf 'open %s/floorplan/sheet.labelled.pdf in the page that opens\n' '$(SAMPLES_DIR)'
+	@printf 'open %s/floorplan/sheet.plannotated.pdf in the page that opens\n' '$(SAMPLES_DIR)'
 	@if command -v open >/dev/null 2>&1; then open inspector/index.html; \
 	 elif command -v xdg-open >/dev/null 2>&1; then xdg-open inspector/index.html; \
 	 else printf 'open inspector/index.html in a browser\n'; fi

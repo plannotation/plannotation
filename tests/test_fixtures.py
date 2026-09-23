@@ -3,7 +3,7 @@
 
 Two corpora share one manifest shape and are therefore tested by one module:
 
-``tests/fixtures/labels/``
+``tests/fixtures/plannotations/``
     12 valid and 12 invalid page labels -- the Phase 1 gate.
 
 ``tests/fixtures/index/``
@@ -32,8 +32,8 @@ from plannotation.model import (
     canonical_json,
     conformance_level,
     index_schema,
-    load_label_index,
-    load_page_label,
+    load_plannotation,
+    load_plannotation_index,
     page_schema,
 )
 
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
-EXPECTED_COUNTS = {"labels": (12, 12), "index": (3, 3)}
+EXPECTED_COUNTS = {"plannotations": (12, 12), "index": (3, 3)}
 
 
 class Corpus(NamedTuple):
@@ -54,8 +54,8 @@ class Corpus(NamedTuple):
 
 
 CORPORA = [
-    Corpus("labels", page_schema(), load_page_label),
-    Corpus("index", index_schema(), load_label_index),
+    Corpus("plannotations", page_schema(), load_plannotation),
+    Corpus("index", index_schema(), load_plannotation_index),
 ]
 
 
@@ -107,7 +107,7 @@ INVALID_PARAMS = [pytest.param(c, e, id=f"{c.name}/{e['file']}") for c, e in ALL
 class TestManifestsMatchDisk:
     """A manifest that has drifted from the files is worse than none."""
 
-    @pytest.mark.parametrize("corpus", ["labels", "index"])
+    @pytest.mark.parametrize("corpus", ["plannotations", "index"])
     def test_counts(self, corpus: str) -> None:
         """The Phase 1 gate fixes the label counts at 12 and 12."""
         expected_valid, expected_invalid = EXPECTED_COUNTS[corpus]
@@ -115,7 +115,7 @@ class TestManifestsMatchDisk:
         assert len(man["valid"]) == expected_valid
         assert len(man["invalid"]) == expected_invalid
 
-    @pytest.mark.parametrize("corpus", ["labels", "index"])
+    @pytest.mark.parametrize("corpus", ["plannotations", "index"])
     @pytest.mark.parametrize("bucket", ["valid", "invalid"])
     def test_no_orphans_either_way(self, corpus: str, bucket: str) -> None:
         """Every file is listed and every listing exists."""
@@ -123,7 +123,7 @@ class TestManifestsMatchDisk:
         listed = {e["file"] for e in manifest(corpus)[bucket]}
         assert on_disk == listed
 
-    @pytest.mark.parametrize("corpus", ["labels", "index"])
+    @pytest.mark.parametrize("corpus", ["plannotations", "index"])
     def test_schema_path_is_real(self, corpus: str) -> None:
         """The manifest names the schema its fixtures were written against."""
         assert (Path(manifest(corpus)["schema"])).is_file()
@@ -167,20 +167,20 @@ class TestValidFixtures:
         ]
         assert not offenders, offenders
 
-    @pytest.mark.parametrize("entry", cases("labels", "valid"))
+    @pytest.mark.parametrize("entry", cases("plannotations", "valid"))
     def test_conformance_level_matches_the_manifest(self, entry: dict[str, Any]) -> None:
         """The level a fixture claims is the level the rules actually yield."""
-        label = load_page_label(text_of("labels", entry))
+        label = load_plannotation(text_of("plannotations", entry))
         assert conformance_level(label).value == entry["level"]
 
-    @pytest.mark.parametrize("entry", cases("labels", "valid"))
+    @pytest.mark.parametrize("entry", cases("plannotations", "valid"))
     def test_filename_matches_the_level(self, entry: dict[str, Any]) -> None:
         """The filename says the level, so a mismatch is visible in a directory listing."""
         assert entry["level"].lower() in entry["file"].lower()
 
     def test_every_conformance_level_is_represented(self) -> None:
         """A corpus that never reaches L3 would not test the level rules at all."""
-        levels = {e["level"] for e in manifest("labels")["valid"]}
+        levels = {e["level"] for e in manifest("plannotations")["valid"]}
         assert levels == {"L1", "L2", "L3"}
 
 
@@ -208,7 +208,7 @@ class TestInvalidFixtures:
         assert error.validator == entry["keyword"]
         assert error.json_path == entry["errorPath"]
 
-    @pytest.mark.parametrize("corpus", ["labels", "index"])
+    @pytest.mark.parametrize("corpus", ["plannotations", "index"])
     def test_each_negative_targets_a_distinct_rule(self, corpus: str) -> None:
         """Twelve fixtures all testing `required` would be one fixture twelve times."""
         entries = manifest(corpus)["invalid"]
@@ -217,7 +217,7 @@ class TestInvalidFixtures:
 
     def test_negative_keyword_coverage_is_broad(self) -> None:
         """The label negatives span the schema's keyword families, not one or two."""
-        keywords = {e["keyword"] for e in manifest("labels")["invalid"]}
+        keywords = {e["keyword"] for e in manifest("plannotations")["invalid"]}
         # `type` and `minimum` were added deliberately: `type` has the most sites in
         # the schema and a wrong JSON type is the likeliest real exporter bug.
         assert {"type", "minimum", "const", "required", "enum", "pattern"} <= keywords
@@ -229,10 +229,10 @@ class TestCorporaAgree:
     def test_index_levels_match_the_labels_they_describe(self) -> None:
         """A level recorded in an index is the level that label actually reaches."""
         by_sheet = {
-            load_page_label(text_of("labels", e)).sheet.sheet_id: conformance_level(
-                load_page_label(text_of("labels", e))
+            load_plannotation(text_of("plannotations", e)).sheet.sheet_id: conformance_level(
+                load_plannotation(text_of("plannotations", e))
             ).value
-            for e in manifest("labels")["valid"]
+            for e in manifest("plannotations")["valid"]
         }
         checked = 0
         for entry in manifest(

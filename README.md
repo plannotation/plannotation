@@ -41,7 +41,7 @@ depend on.
 
 ```bash
 uvx --from 'plannotation[all]' plannotation samples build
-uvx plannotation inspect samples/positionsplan/sheet.labelled.pdf
+uvx plannotation inspect samples/positionsplan/sheet.plannotated.pdf
 ```
 
 The first command builds three IFC models and draws them — a floor plan, a structural
@@ -57,8 +57,8 @@ From a clone, before the package is on PyPI:
 ```bash
 uv sync --all-extras
 uv run plannotation samples build
-uv run plannotation inspect samples/positionsplan/sheet.labelled.pdf
-uv run plannotation validate samples/positionsplan/sheet.labelled.pdf
+uv run plannotation inspect samples/positionsplan/sheet.plannotated.pdf
+uv run plannotation validate samples/positionsplan/sheet.plannotated.pdf
 ```
 
 ## Why a label helps

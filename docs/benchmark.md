@@ -20,10 +20,10 @@ rendered at 150 dpi, the text a PDF reader extracts from it, and the same questi
 | Condition | What the model gets |
 | --- | --- |
 | `plain` | The page image and its extracted text. |
-| `labelled` | The same, then a `get_page_label` tool call and its result: the page's label as canonical JSON. |
+| `labelled` | The same, then a `get_plannotation` tool call and its result: the page's label as canonical JSON. |
 
 The label arrives as a tool result because that is how it reaches a model in practice,
-through the MCP server's `get_label` tool. The model is asked for `{"answer": "..."}`
+through the MCP server's `get_plannotation` tool. The model is asked for `{"answer": "..."}`
 through structured output, and the answer is scored against the key.
 
 ## The questions

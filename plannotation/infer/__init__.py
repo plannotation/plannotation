@@ -27,12 +27,14 @@ from plannotation.pdf.extract import extract_page, page_count
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from plannotation.model import PageLabel
+    from plannotation.model import Plannotation
 
-__all__ = ["infer_document", "infer_labels"]
+__all__ = ["infer_document", "infer_plannotations"]
 
 
-def infer_labels(pdf: Path, *, ifc_model: Path | None = None) -> tuple[list[PageLabel], int]:
+def infer_plannotations(
+    pdf: Path, *, ifc_model: Path | None = None
+) -> tuple[list[Plannotation], int]:
     """Reconstruct a label for every page of a document.
 
     Args:
@@ -42,7 +44,7 @@ def infer_labels(pdf: Path, *, ifc_model: Path | None = None) -> tuple[list[Page
     Returns:
         One label per page, and how many elements were matched to the model.
     """
-    labels: list[PageLabel] = []
+    labels: list[Plannotation] = []
     matched = 0
     for page_index in range(page_count(pdf)):
         label = infer_page(
@@ -82,7 +84,7 @@ def infer_document(
     if out.resolve() == pdf.resolve():
         msg = "infer writes a labelled copy and never modifies its input; choose another -o"
         raise ValueError(msg)
-    labels, matched = infer_labels(pdf, ifc_model=ifc_model)
+    labels, matched = infer_plannotations(pdf, ifc_model=ifc_model)
     embed.attach(
         pdf,
         labels,

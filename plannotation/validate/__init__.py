@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """The Plannotation validator: schema, references, geometry, provenance, model, veraPDF.
 
-``plannotation validate file.pdf|labels.json [--ifc model.ifc] [--strict] [--report md|json]``
+::
+
+    plannotation validate file.pdf|plannotations.json [--ifc model.ifc] [--strict]
+                          [--report md|json]
 
 One entry point, :func:`validate`, which takes a labelled PDF, a sidecar, a bare page
 label, an array of page labels or an index, and returns a
 :class:`~plannotation.validate.report.Report`. Two rule engines for a single page, for a
 caller that has already read one: :func:`check_page_document` for the rules that must
-see the parsed JSON, and :func:`check_page_label` for everything the loaded model can
+see the parsed JSON, and :func:`check_plannotation` for everything the loaded model can
 answer. ``tools/check_fixtures.py`` is that caller, and it calls these rather than
 keeping its own copy of any rule, which is the whole point of the arrangement.
 
@@ -93,7 +96,7 @@ from plannotation.validate.report import (
     render_json_text,
     render_markdown,
 )
-from plannotation.validate.runner import check_page_document, check_page_label, validate
+from plannotation.validate.runner import check_page_document, check_plannotation, validate
 
 __all__ = [
     "REPORT_VERSION",
@@ -104,7 +107,7 @@ __all__ = [
     "Rule",
     "Severity",
     "check_page_document",
-    "check_page_label",
+    "check_plannotation",
     "render_json",
     "render_json_text",
     "render_markdown",

@@ -7,7 +7,7 @@ drawing sets to MCP hosts such as Claude Desktop, over stdio or streamable HTTP.
 uvx plannotation-mcp --root ~/Drawings
 ```
 
-Tools: `list_sheets`, `get_label`, `find_elements`, `measure`, `validate`, and — only
+Tools: `list_sheets`, `get_plannotation`, `find_elements`, `measure`, `validate`, and — only
 with `--allow-write` — `attach` and `infer`. Resources: the page schema, the
 specification and a folder index.
 

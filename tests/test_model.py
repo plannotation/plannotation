@@ -19,14 +19,14 @@ from plannotation.constants import SCHEMA_VERSION
 from plannotation.model import (
     ConformanceLevel,
     Element,
-    PageLabel,
+    Plannotation,
     Provenance,
     aggregate_provenance,
     canonical_bytes,
     canonical_json,
     conformance_level,
     index_schema,
-    load_page_label,
+    load_plannotation,
     page_schema,
 )
 
@@ -64,16 +64,16 @@ def element(**extra: JsonValue) -> dict[str, Any]:
     return {"id": "e1", "ifcClass": "IfcWall", "paperBBox": [10, 10, 20, 20], **extra}
 
 
-def load(doc: dict[str, Any]) -> PageLabel:
+def load(doc: dict[str, Any]) -> Plannotation:
     """Load a document through the public loader.
 
     Args:
         doc: The document.
 
     Returns:
-        The parsed :class:`PageLabel`.
+        The parsed :class:`Plannotation`.
     """
-    return load_page_label(json.dumps(doc))
+    return load_plannotation(json.dumps(doc))
 
 
 class TestCanonicalSerialisation:
@@ -82,12 +82,12 @@ class TestCanonicalSerialisation:
     def test_round_trip_is_byte_for_byte(self) -> None:
         """Loading a canonical document and re-emitting it reproduces the bytes."""
         text = canonical_json(load(label()))
-        assert canonical_json(load_page_label(text)) == text
+        assert canonical_json(load_plannotation(text)) == text
 
     def test_round_trip_is_a_fixed_point(self) -> None:
         """Serialising twice changes nothing the second time."""
         once = canonical_json(load(label()))
-        twice = canonical_json(load_page_label(once))
+        twice = canonical_json(load_plannotation(once))
         assert once == twice
 
     def test_keys_are_sorted(self) -> None:
@@ -207,7 +207,7 @@ class TestSchemaFidelity:
     def test_json_has_no_nan_or_infinity(self, token: str) -> None:
         """Python's json accepts these by default; JSON itself does not."""
         with pytest.raises(ValueError, match=r"(?i)nan|infinit|valid"):
-            load_page_label(
+            load_plannotation(
                 '{"plannotation":"0.1","provenance":"authored","sheet":{"id":"A"},'
                 '"page":{"index":0,"widthMm":' + token + ',"heightMm":297}}'
             )

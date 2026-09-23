@@ -10,7 +10,7 @@ from them for the PDF the same tool rendered from that SVG.
 from __future__ import annotations
 
 from plannotation.svg.carrier import SvgProduct, SvgSheet, SvgView, parse_svg, read_svg
-from plannotation.svg.label import SheetSource, attach_from_svg, derive_label
+from plannotation.svg.derive import SheetSource, attach_from_svg, derive_plannotation
 
 __all__ = [
     "SheetSource",
@@ -18,7 +18,7 @@ __all__ = [
     "SvgSheet",
     "SvgView",
     "attach_from_svg",
-    "derive_label",
+    "derive_plannotation",
     "parse_svg",
     "read_svg",
 ]

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 #: The PDF each sample directory's questions are asked about.
-SAMPLE_DOCUMENT = "sheet.labelled.pdf"
+SAMPLE_DOCUMENT = "sheet.plannotated.pdf"
 
 #: Scalar or list: what one question expects.
 Answer = str | int | float | tuple[str, ...]
@@ -36,7 +36,7 @@ class Question:
         document: The PDF to show, relative to the directory the run starts in.
         page: The one-based page of that PDF.
         unit: The unit a numeric answer is in, when it has one.
-        requires_label: True when only the label carries the answer, such as an IFC
+        requires_plannotation: True when only the label carries the answer, such as an IFC
             GlobalId. Such questions are reported apart, since the plain condition
             cannot be expected to get them right.
     """
@@ -49,7 +49,7 @@ class Question:
     document: str
     page: int = 1
     unit: str | None = None
-    requires_label: bool = False
+    requires_plannotation: bool = False
 
     def to_json(self) -> dict[str, object]:
         """Return the question as one line of ``questions.jsonl`` would hold it.
@@ -68,8 +68,8 @@ class Question:
         }
         if self.unit is not None:
             record["unit"] = self.unit
-        if self.requires_label:
-            record["requiresLabel"] = True
+        if self.requires_plannotation:
+            record["requiresPlannotation"] = True
         return record
 
     @classmethod
@@ -98,7 +98,7 @@ class Question:
                 document=str(record["document"]),
                 page=page,
                 unit=None if unit is None else str(unit),
-                requires_label=bool(record.get("requiresLabel", False)),
+                requires_plannotation=bool(record.get("requiresPlannotation", False)),
             )
         except (KeyError, TypeError) as error:
             msg = f"not a benchmark question: {error}"

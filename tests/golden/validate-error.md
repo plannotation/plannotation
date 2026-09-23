@@ -3,7 +3,7 @@
 **FAIL** -- 1 error(s), 0 warning(s); exit code 1.
 
 - Source: `<path>`
-- Carrier: labels
+- Carrier: plannotations
 - Page labels examined: 1
 
 ## Pages

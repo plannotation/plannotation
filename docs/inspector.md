@@ -9,14 +9,14 @@ time and cached after that; everything else is in the file.
 
 ```bash
 make samples                       # build something to look at
-open inspector/index.html          # then choose samples/floorplan/sheet.labelled.pdf
+open inspector/index.html          # then choose samples/floorplan/sheet.plannotated.pdf
 ```
 
 For a terminal, `plannotation inspect` prints the same information as tables:
 
 ```bash
-plannotation inspect samples/floorplan/sheet.labelled.pdf
-plannotation inspect samples/floorplan/sheet.labelled.pdf --json | jq .pages
+plannotation inspect samples/floorplan/sheet.plannotated.pdf
+plannotation inspect samples/floorplan/sheet.plannotated.pdf --json | jq .pages
 ```
 
 ## What it reads
@@ -37,7 +37,7 @@ it hard-codes still match what Plannotation writes. They cannot establish that i
 right, so that part is checked by hand against the samples:
 
 1. `make samples`
-2. Open `inspector/index.html` and choose `samples/floorplan/sheet.labelled.pdf`.
+2. Open `inspector/index.html` and choose `samples/floorplan/sheet.plannotated.pdf`.
 3. The five walls, two doors and two windows should be outlined, each with its mark's
    tag box beside it (`Pos. n`, `T1`, `W1`).
 4. The grid bubbles A–D and 1–4 should be circled, and the eight dimensions drawn.

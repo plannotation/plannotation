@@ -36,11 +36,11 @@ __all__ = [
     "ExportError",
     "ExternalToolError",
     "InputNotValidatableError",
-    "InvalidLabelError",
-    "LabelMismatchError",
-    "LabelNotFoundError",
+    "InvalidPlannotationError",
     "MissingExtraError",
     "PlannotationError",
+    "PlannotationMismatchError",
+    "PlannotationNotFoundError",
     "RenderError",
     "SignedPdfError",
     "ValidatorError",
@@ -78,11 +78,11 @@ class AttachmentConflictError(CarrierError):
     """
 
 
-class LabelNotFoundError(CarrierError):
+class PlannotationNotFoundError(CarrierError):
     """The document carries no Plannotation data at all."""
 
 
-class InvalidLabelError(CarrierError):
+class InvalidPlannotationError(CarrierError):
     """A label or index was found but does not validate against its schema.
 
     Section 4.3 of the specification requires a reader to treat such a label as
@@ -92,7 +92,7 @@ class InvalidLabelError(CarrierError):
     """
 
 
-class LabelMismatchError(CarrierError):
+class PlannotationMismatchError(CarrierError):
     """A label contradicts the document it is being attached to, or its index.
 
     A page size that disagrees with the page, a rotation that disagrees with

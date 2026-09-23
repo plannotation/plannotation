@@ -15,8 +15,8 @@ beside the PDF Revit exported; Plannotation's CLI attaches and validates it:
 ```text
 Revit  ──Document.Export(PDFExportOptions)──▶  A-101.pdf
   └────collect sheet, viewports, elements──▶  A-101.plannotation.json
-plannotation attach A-101.pdf A-101.plannotation.json -o A-101.labelled.pdf
-plannotation validate A-101.labelled.pdf
+plannotation attach A-101.pdf A-101.plannotation.json -o A-101.plannotated.pdf
+plannotation validate A-101.plannotated.pdf
 ```
 
 Keeping the Revit side free of Python dependencies is the point: the add-in writes

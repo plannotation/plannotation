@@ -518,8 +518,8 @@ class TestTheSampleSets:
                 "model.ifc",
                 "sheet.svg",
                 "sheet.pdf",
-                "sheet.labelled.pdf",
-                "labels.json",
+                "sheet.plannotated.pdf",
+                "plannotations.json",
                 "groundtruth.jsonl",
             }
 
@@ -565,7 +565,7 @@ class TestTheSampleSets:
         self._build(tmp_path)
         for name in ("floorplan", "positionsplan", "section"):
             assert_same_appearance(
-                tmp_path / name / "sheet.pdf", tmp_path / name / "sheet.labelled.pdf"
+                tmp_path / name / "sheet.pdf", tmp_path / name / "sheet.plannotated.pdf"
             )
 
     def test_the_ground_truth_answers_come_from_the_model(self, tmp_path: Path) -> None:
@@ -590,7 +590,7 @@ class TestTheSampleSets:
         self._build(tmp_path)
         targets = {}
         for name in ("floorplan", "positionsplan", "section"):
-            label = json_module.loads((tmp_path / name / "labels.json").read_text("utf-8"))
+            label = json_module.loads((tmp_path / name / "plannotations.json").read_text("utf-8"))
             callout = next(a for a in label["annotations"] if a["type"] == "callout")
             targets[label["sheet"]["id"]] = callout["target"]["sheetId"]
         assert targets == {"ARC-101": "TWP-201", "TWP-201": "ARC-301", "ARC-301": "ARC-101"}
@@ -624,7 +624,7 @@ class TestTheSampleSets:
 SAMPLES = Path(__file__).parent.parent / "samples"
 
 needs_samples = pytest.mark.skipif(
-    not (SAMPLES / "section" / "labels.json").is_file(),
+    not (SAMPLES / "section" / "plannotations.json").is_file(),
     reason="samples are not built; run make samples",
 )
 
@@ -638,7 +638,7 @@ def _sample(name: str) -> dict[str, Any]:
     Returns:
         Its label.
     """
-    return json.loads((SAMPLES / name / "labels.json").read_text("utf-8"))
+    return json.loads((SAMPLES / name / "plannotations.json").read_text("utf-8"))
 
 
 class TestLevelText:

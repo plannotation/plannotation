@@ -54,8 +54,8 @@ __all__ = [
     "check_version",
     "detect_kind",
     "json_pointer",
-    "page_labels_of",
     "parse_json",
+    "plannotations_of",
     "read_json_file",
 ]
 
@@ -76,7 +76,7 @@ MAX_QUOTED_CHARS: Final = 200
 class DocumentKind(StrEnum):
     """Which of the three Plannotation schemas a document is held to.
 
-    ``LABELS`` is not a schema of its own: it is an array of page labels, which is a
+    ``PLANNOTATIONS`` is not a schema of its own: it is an array of page labels, which is a
     shape a person reasonably has on disk and which the ``attach`` verb already
     accepts. Each member is held to the page-label schema.
     """
@@ -84,7 +84,7 @@ class DocumentKind(StrEnum):
     PAGE = "page"
     INDEX = "index"
     SIDECAR = "sidecar"
-    LABELS = "labels"
+    PLANNOTATIONS = "plannotations"
 
 
 _SCHEMAS: Final = {
@@ -98,13 +98,13 @@ def _validator(kind: DocumentKind) -> Draft202012Validator:
     """Build a validator for one of the three schemas.
 
     Args:
-        kind: Which schema. ``LABELS`` is held to the page-label schema, member by
+        kind: Which schema. ``PLANNOTATIONS`` is held to the page-label schema, member by
             member.
 
     Returns:
         A draft 2020-12 validator.
     """
-    lookup = DocumentKind.PAGE if kind is DocumentKind.LABELS else kind
+    lookup = DocumentKind.PAGE if kind is DocumentKind.PLANNOTATIONS else kind
     return Draft202012Validator(_SCHEMAS[lookup]())
 
 
@@ -158,7 +158,7 @@ def detect_kind(document: object) -> DocumentKind | None:
         The kind, or None when the value is not a Plannotation document at all.
     """
     if isinstance(document, list):
-        return DocumentKind.LABELS
+        return DocumentKind.PLANNOTATIONS
     if not isinstance(document, dict):
         return None
     if "index" in document and "pages" in document:
@@ -209,7 +209,7 @@ def check_schema(document: object, kind: DocumentKind, *, source: str) -> list[F
 
     Args:
         document: The parsed JSON.
-        kind: Which schema to hold it to. ``LABELS`` is not used here; validate each
+        kind: Which schema to hold it to. ``PLANNOTATIONS`` is not used here; validate each
             member of the array as a ``PAGE`` instead.
         source: Which document it is, for the findings.
 
@@ -312,12 +312,12 @@ def read_json_file(path: Path, *, limit: int = MAX_DOCUMENT_BYTES) -> bytes:
     return path.read_bytes()
 
 
-def page_labels_of(document: object) -> Sequence[object]:
+def plannotations_of(document: object) -> Sequence[object]:
     """Return the page-label members of a parsed array of labels.
 
     Args:
         document: The parsed JSON, which the caller has decided is
-            :attr:`DocumentKind.LABELS`.
+            :attr:`DocumentKind.PLANNOTATIONS`.
 
     Returns:
         The array's members, or an empty sequence when it is not an array.

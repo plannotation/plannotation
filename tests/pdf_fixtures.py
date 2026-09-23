@@ -54,15 +54,15 @@ from typing import TYPE_CHECKING, Final
 import pikepdf
 from pikepdf import Array, Dictionary, Name, Object, Pdf, String
 
-from plannotation.constants import page_label_filename
+from plannotation.constants import plannotation_filename
 from plannotation.model import (
     Annotation,
     Element,
     Generator,
     Model,
     Page,
-    PageLabel,
     Plane,
+    Plannotation,
     Project,
     Provenance,
     Sheet,
@@ -97,17 +97,17 @@ __all__ = [
     "build_damaged_metadata",
     "build_drawing_set",
     "build_encrypted",
-    "build_filtered_label",
+    "build_filtered_plannotation",
     "build_geometry_set",
-    "build_label_bomb",
     "build_metadata_bomb",
     "build_pdfa",
+    "build_plannotation_bomb",
     "build_signed",
     "build_unspliceable_metadata",
     "build_with_xmp",
-    "drawing_set_labels",
+    "drawing_set_plannotations",
     "flate_bomb_bytes",
-    "page_label",
+    "plannotation",
     "png_encode",
     "raw_pdf",
     "run_length_encode",
@@ -1017,7 +1017,7 @@ def build_pdfa(part: int, *, with_extension_schema: bool = False) -> bytes:
     return build_with_xmp(packet)
 
 
-#: How large :func:`build_label_bomb` inflates to by default, in mebibytes. Comfortably
+#: How large :func:`build_plannotation_bomb` inflates to by default, in mebibytes. Comfortably
 #: over any bound a reader should accept, and small enough that a test which runs
 #: *without* the bound -- which is what a regression test must do once -- costs about a
 #: tenth of a second and 64 MB, rather than the 2 GB the original report measured.
@@ -1028,10 +1028,10 @@ BOMB_MEGABYTES: Final = 64
 _BOMB_CHUNK: Final = bytes(1024 * 1024)
 
 #: The name the bomb is filed under, which is what makes a reader open it at all.
-_BOMB_FILENAME: Final = page_label_filename(0)
+_BOMB_FILENAME: Final = plannotation_filename(0)
 
 
-def build_label_bomb(*, megabytes: int = BOMB_MEGABYTES, honest_size: bool = True) -> bytes:
+def build_plannotation_bomb(*, megabytes: int = BOMB_MEGABYTES, honest_size: bool = True) -> bytes:
     """Build a small document carrying a Flate decompression bomb as a page label.
 
     The bomb is registered both in the ``EmbeddedFiles`` name tree and on page 0's
@@ -1189,7 +1189,7 @@ def run_length_encode(data: bytes) -> bytes:
     return bytes(out)
 
 
-def build_filtered_label(
+def build_filtered_plannotation(
     raw: bytes,
     *,
     filters: Object | None = None,
@@ -1473,7 +1473,7 @@ _GENERATOR: Final = Generator(
 )
 
 
-def page_label(
+def plannotation(
     *,
     page_index: int,
     width_mm: float,
@@ -1481,7 +1481,7 @@ def page_label(
     rotation: Rotation = 0,
     sheet_id: str = "A-101",
     level: str = "L1",
-) -> PageLabel:
+) -> Plannotation:
     """Build a valid page label at a chosen conformance level.
 
     Args:
@@ -1552,7 +1552,7 @@ def page_label(
         if level == "L3"
         else None
     )
-    return PageLabel(
+    return Plannotation(
         plannotation="0.1",
         generator=_GENERATOR,
         provenance=Provenance.AUTHORED,
@@ -1577,7 +1577,7 @@ def page_label(
     )
 
 
-def drawing_set_labels() -> list[PageLabel]:
+def drawing_set_plannotations() -> list[Plannotation]:
     """Build one label per page of :func:`build_drawing_set`.
 
     Returns:
@@ -1585,7 +1585,7 @@ def drawing_set_labels() -> list[PageLabel]:
         unrotated size and the rotation of the page it belongs to.
     """
     return [
-        page_label(
+        plannotation(
             page_index=0,
             width_mm=A3_WIDTH_MM,
             height_mm=A3_HEIGHT_MM,
@@ -1593,7 +1593,7 @@ def drawing_set_labels() -> list[PageLabel]:
             sheet_id="A-101",
             level="L3",
         ),
-        page_label(
+        plannotation(
             page_index=1,
             width_mm=A4_WIDTH_MM,
             height_mm=A4_HEIGHT_MM,

@@ -20,7 +20,7 @@ from plannotation.constants import (
     SCHEMA_ID,
     SCHEMA_VERSION,
     SPEC_URI,
-    page_label_filename,
+    plannotation_filename,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -104,12 +104,12 @@ class TestConstants:
     )
     def test_page_label_filename(self, page_index: int, expected: str) -> None:
         """Page attachment names are zero-padded so listings sort in page order."""
-        assert page_label_filename(page_index) == expected
+        assert plannotation_filename(page_index) == expected
 
     def test_page_label_filename_rejects_negative(self) -> None:
         """A negative page index is a programming error, not a silent oddity."""
         with pytest.raises(ValueError, match="non-negative"):
-            page_label_filename(-1)
+            plannotation_filename(-1)
 
 
 def _tracked_python_files() -> list[Path]:

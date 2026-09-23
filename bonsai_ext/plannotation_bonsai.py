@@ -7,7 +7,7 @@ This operator reads those from the sheet SVG, takes the units and marks from the
 model Bonsai has open, and attaches the resulting page label to the sheet's PDF. The
 PDF looks and prints exactly as before; the label is an attachment.
 
-All of the work is done by ``plannotation.svg.label``, which is tested in Plannotation's own
+All of the work is done by ``plannotation.svg.derive``, which is tested in Plannotation's own
 CI against the serializer's output. This file is only the Blender side: two operators,
 a menu entry, and a best-effort guess at the active sheet's files. It cannot be tested
 in CI; ``docs/bonsai.md`` is its manual test protocol.
@@ -38,7 +38,7 @@ bl_info = {
 logger = logging.getLogger(__name__)
 
 #: Suffix of the labelled copy written beside the sheet PDF.
-LABELLED_SUFFIX = ".labelled.pdf"
+PLANNOTATED_SUFFIX = ".plannotated.pdf"
 
 
 # ---------------------------------------------------------------------------
@@ -121,26 +121,26 @@ def sheet_files(model_path, identification):
         matches = [
             path
             for path in folder.glob(pattern)
-            if path.is_file() and not path.name.endswith(LABELLED_SUFFIX)
+            if path.is_file() and not path.name.endswith(PLANNOTATED_SUFFIX)
         ]
         return max(matches, key=lambda path: path.stat().st_mtime, default=None)
 
     return newest(f"{identification}*.svg"), newest(f"{identification}*.pdf")
 
 
-def labelled_path(pdf):
+def plannotated_path(pdf):
     """Return where the labelled copy of a PDF goes.
 
     Args:
         pdf: The sheet PDF.
 
     Returns:
-        ``<name>.labelled.pdf`` beside it.
+        ``<name>.plannotated.pdf`` beside it.
     """
-    return pdf.with_name(pdf.stem + LABELLED_SUFFIX)
+    return pdf.with_name(pdf.stem + PLANNOTATED_SUFFIX)
 
 
-def label_sheet(svg, pdf, out, *, sheet_id, title, model):
+def plannotate_sheet(svg, pdf, out, *, sheet_id, title, model):
     """Attach a label to one sheet PDF. The only place Plannotation is called.
 
     Args:
@@ -154,7 +154,7 @@ def label_sheet(svg, pdf, out, *, sheet_id, title, model):
     Returns:
         The label that was attached.
     """
-    from plannotation.svg.label import attach_from_svg, source_from_model  # noqa: PLC0415
+    from plannotation.svg.derive import attach_from_svg, source_from_model  # noqa: PLC0415
 
     path = bonsai_model_path()
     source = source_from_model(
@@ -178,7 +178,7 @@ class PLANNOTATION_OT_attach_to_sheet(bpy.types.Operator):  # noqa: N801 -- Blen
     out_path: bpy.props.StringProperty(
         name="Labelled PDF",
         subtype="FILE_PATH",
-        description="Leave blank to write <sheet>.labelled.pdf beside the sheet PDF",
+        description="Leave blank to write <sheet>.plannotated.pdf beside the sheet PDF",
     )
     sheet_id: bpy.props.StringProperty(name="Sheet Number")
     title: bpy.props.StringProperty(name="Title")
@@ -229,9 +229,9 @@ class PLANNOTATION_OT_attach_to_sheet(bpy.types.Operator):  # noqa: N801 -- Blen
             return {"CANCELLED"}
         svg = Path(bpy.path.abspath(self.svg_path))
         pdf = Path(bpy.path.abspath(self.pdf_path))
-        out = Path(bpy.path.abspath(self.out_path)) if self.out_path else labelled_path(pdf)
+        out = Path(bpy.path.abspath(self.out_path)) if self.out_path else plannotated_path(pdf)
         try:
-            label = label_sheet(
+            label = plannotate_sheet(
                 svg, pdf, out, sheet_id=self.sheet_id, title=self.title, model=model
             )
         except (PlannotationError, OSError, ValueError) as error:

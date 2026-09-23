@@ -140,7 +140,7 @@ class Record:
         expected: The key.
         given: The model's answer, or None when it gave none.
         correct: Whether the answer matched the key.
-        requires_label: Whether only the label carries the answer.
+        requires_plannotation: Whether only the label carries the answer.
         stop_reason: Why generation stopped.
         usage: The request's token counts.
         cost_usd: Its estimated cost, or None when the model's price is unknown.
@@ -156,7 +156,7 @@ class Record:
     expected: Answer
     given: str | None
     correct: bool
-    requires_label: bool
+    requires_plannotation: bool
     stop_reason: str | None
     usage: Usage
     cost_usd: float | None
@@ -386,7 +386,7 @@ def _record(
         expected=question.answer,
         given=given,
         correct=score(question.answer, given, unit=question.unit),
-        requires_label=question.requires_label,
+        requires_plannotation=question.requires_plannotation,
         stop_reason=reply.stop_reason,
         usage=reply.usage,
         cost_usd=cost(config.model, reply.usage),

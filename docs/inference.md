@@ -4,8 +4,8 @@ A drawing office has decades of PDFs and none of them has a label. `plannotation
 reads what is printed on each page and writes a labelled copy.
 
 ```bash
-plannotation infer old-drawing.pdf -o old-drawing.labelled.pdf
-plannotation infer old-drawing.pdf -o old-drawing.labelled.pdf --ifc model.ifc
+plannotation infer old-drawing.pdf -o old-drawing.plannotated.pdf
+plannotation infer old-drawing.pdf -o old-drawing.plannotated.pdf --ifc model.ifc
 ```
 
 The input is never modified.

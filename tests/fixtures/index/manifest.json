@@ -1,6 +1,6 @@
 {
   "canonicalJson": "UTF-8 without escapes, sorted keys, 2-space indent, LF, one trailing newline, numbers to at most three decimals",
-  "description": "Fixtures for the Plannotation 0.1 document-level index schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided -- the index schema carries no $ref, so the two agree. Every index here describes the page labels in tests/fixtures/labels: each entry's sheetId, title, revision and pageIndex are copied from that sheet's label fixture, its level is the level conformance_level() computes for that label, and its file is the attachment name page_label_filename() produces for that page index.",
+  "description": "Fixtures for the Plannotation 0.1 document-level index schema. Every document under valid/ must validate against schema; every document under invalid/ must fail with exactly one error, of the stated keyword, at the stated errorPath (python-jsonschema json_path syntax). schemaPointer is a JSON Pointer that dereferences to the failing keyword in the schema file; validatorSchemaPath is the same rule as python-jsonschema renders it, with $ref hops elided -- the index schema carries no $ref, so the two agree. Every index here describes the page labels in tests/fixtures/plannotations: each entry's sheetId, title, revision and pageIndex are copied from that sheet's label fixture, its level is the level conformance_level() computes for that label, and its file is the attachment name plannotation_filename() produces for that page index.",
   "invalid": [
     {
       "derivedFrom": "valid/02-architecture-package-full.json",
@@ -55,7 +55,7 @@
         "model sha256 as 64 lowercase hex",
         "extensions with two x- keys",
         "page entries with title, revision and file",
-        "file names as page_label_filename produces them",
+        "file names as plannotation_filename produces them",
         "levels L1, L2 and L3 one per page",
         "unlabelled pages absent, so pageIndex 0, 2, 6",
         "describes labels/valid/07, /09 and /12 (ARC-100, ARC-201, ARC-301)"

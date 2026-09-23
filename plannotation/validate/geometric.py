@@ -52,8 +52,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Final
 
-from plannotation.errors import LabelMismatchError
-from plannotation.pdf.embed import PAGE_DIMENSION_TOLERANCE_MM, check_labels_against
+from plannotation.errors import PlannotationMismatchError
+from plannotation.pdf.embed import PAGE_DIMENSION_TOLERANCE_MM, check_plannotations_against
 from plannotation.validate.codes import finding
 from plannotation.validate.geometry import (
     contains,
@@ -72,7 +72,7 @@ if TYPE_CHECKING:
 
     from pikepdf import Pdf
 
-    from plannotation.model import Annotation, Element, PageLabel, Viewport
+    from plannotation.model import Annotation, Element, Plannotation, Viewport
     from plannotation.validate.report import Finding
 
 __all__ = [
@@ -129,7 +129,7 @@ METRES_PER_MODEL_UNIT: Final = {"m": 1.0, "cm": 0.01, "mm": 0.001}
 _METRES_PER_MEASURE: Final = {"mm": 0.001, "cm": 0.01, "m": 1.0}
 
 
-def check_geometry(label: PageLabel, *, source: str) -> list[Finding]:
+def check_geometry(label: Plannotation, *, source: str) -> list[Finding]:
     """Run every geometric rule that needs only the label itself.
 
     The page dimensions are not checked here: that rule needs the document, and lives
@@ -153,10 +153,10 @@ def check_geometry(label: PageLabel, *, source: str) -> list[Finding]:
     ]
 
 
-def check_page_against_document(pdf: Pdf, label: PageLabel, *, source: str) -> list[Finding]:
+def check_page_against_document(pdf: Pdf, label: Plannotation, *, source: str) -> list[Finding]:
     """Check a label's ``page`` block against the page it describes.
 
-    The comparison is delegated to :func:`plannotation.pdf.embed.check_labels_against`,
+    The comparison is delegated to :func:`plannotation.pdf.embed.check_plannotations_against`,
     which is the same check ``attach`` makes before it writes anything. That is
     deliberate: a validator that disagreed with the writer about whether a label fits a
     page would be worse than either being wrong on its own. One code covers dimensions
@@ -176,8 +176,8 @@ def check_page_against_document(pdf: Pdf, label: PageLabel, *, source: str) -> l
         not.
     """
     try:
-        check_labels_against(pdf, [label])
-    except LabelMismatchError as exc:
+        check_plannotations_against(pdf, [label])
+    except PlannotationMismatchError as exc:
         return [finding("PL-GEO-001", message=str(exc), path="/page", source=source)]
     return []
 
@@ -185,7 +185,7 @@ def check_page_against_document(pdf: Pdf, label: PageLabel, *, source: str) -> l
 # ---------------------------------------------------------------------------
 # Bounding boxes
 # ---------------------------------------------------------------------------
-def _named_bboxes(label: PageLabel) -> Iterator[tuple[str, str, Sequence[float]]]:
+def _named_bboxes(label: Plannotation) -> Iterator[tuple[str, str, Sequence[float]]]:
     """Yield every bbox in a label with a name and a JSON Pointer for it.
 
     Args:
@@ -207,7 +207,7 @@ def _named_bboxes(label: PageLabel) -> Iterator[tuple[str, str, Sequence[float]]
         yield (name, json_pointer(["annotations", position, "paperBBox"]), annotation.paper_bbox)
 
 
-def _check_bboxes(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_bboxes(label: Plannotation, *, source: str) -> list[Finding]:
     """Check that every bbox is ordered and lies on the page the label declares.
 
     Args:
@@ -251,7 +251,7 @@ def _check_bboxes(label: PageLabel, *, source: str) -> list[Finding]:
     return found
 
 
-def _check_drawn_geometry(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_drawn_geometry(label: Plannotation, *, source: str) -> list[Finding]:
     """Check that drawn geometry stays inside the bbox of the item carrying it.
 
     Args:
@@ -299,7 +299,7 @@ def _check_drawn_geometry(label: PageLabel, *, source: str) -> list[Finding]:
     return found
 
 
-def _check_viewport_containment(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_viewport_containment(label: Plannotation, *, source: str) -> list[Finding]:
     """Check that items sit inside the viewport they name.
 
     Args:
@@ -342,7 +342,7 @@ def _check_viewport_containment(label: PageLabel, *, source: str) -> list[Findin
 # ---------------------------------------------------------------------------
 # Transforms and planes
 # ---------------------------------------------------------------------------
-def _check_transforms(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_transforms(label: Plannotation, *, source: str) -> list[Finding]:
     """Check every ``paperToPlane`` for invertibility, handedness and scale.
 
     Args:
@@ -459,7 +459,7 @@ def _check_scale(
     ]
 
 
-def _check_plane_axes(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_plane_axes(label: Plannotation, *, source: str) -> list[Finding]:
     """Check that every plane's axes are unit vectors and mutually orthogonal.
 
     Args:
@@ -509,7 +509,7 @@ def _check_plane_axes(label: PageLabel, *, source: str) -> list[Finding]:
     return found
 
 
-def _check_cut_heights(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_cut_heights(label: Plannotation, *, source: str) -> list[Finding]:
     """Check the cut-height convention on every viewport that states one.
 
     For a cut view the drawing plane is the cutting plane, and ``cutHeight`` is the
@@ -607,7 +607,7 @@ def measured_length_mm(annotation: Annotation) -> float | None:
     return annotation.value * _METRES_PER_MEASURE[annotation.unit] * 1000.0
 
 
-def _check_dimensions(label: PageLabel, *, source: str) -> list[Finding]:
+def _check_dimensions(label: Plannotation, *, source: str) -> list[Finding]:
     """Check that a dimension's value matches the length it is drawn at.
 
     The drawn model length is the **path length** of the annotation's geometry in paper

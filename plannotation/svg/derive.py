@@ -23,7 +23,7 @@ import pikepdf
 
 from plannotation import __version__
 from plannotation.constants import SCHEMA_VERSION
-from plannotation.errors import CarrierError, LabelMismatchError
+from plannotation.errors import CarrierError, PlannotationMismatchError
 from plannotation.export.geometry import union_box
 from plannotation.export.paper import Affine, plane_from_ifc_plane, scale_denominator
 from plannotation.model import (
@@ -33,8 +33,8 @@ from plannotation.model import (
     LengthUnit,
     Model,
     Page,
-    PageLabel,
     Plane,
+    Plannotation,
     Provenance,
     Viewport,
     ViewportKind,
@@ -102,7 +102,9 @@ class SheetSource:
     ifc_schema: str | None = None
 
 
-def derive_label(sheet: SvgSheet, source: SheetSource, *, page_index: int = 0) -> PageLabel:
+def derive_plannotation(
+    sheet: SvgSheet, source: SheetSource, *, page_index: int = 0
+) -> Plannotation:
     """Describe a sheet SVG as a page label.
 
     Args:
@@ -137,7 +139,7 @@ def derive_label(sheet: SvgSheet, source: SheetSource, *, page_index: int = 0) -
         if any(element.viewport == _viewport_id(view.index) for element in elements)
     ]
     scales = {viewport.scale for viewport in viewports}
-    return PageLabel(
+    return Plannotation(
         plannotation=SCHEMA_VERSION,
         generator=Generator(name="plannotation", version=__version__),
         provenance=Provenance.AUTHORED,
@@ -225,7 +227,7 @@ def attach_from_svg(
     source: SheetSource,
     *,
     mod_date: datetime,
-) -> PageLabel:
+) -> Plannotation:
     """Label a one-sheet PDF from the SVG it was drawn from.
 
     Args:
@@ -239,7 +241,7 @@ def attach_from_svg(
         The label that was attached.
 
     Raises:
-        LabelMismatchError: If the PDF's first page is not the SVG's page size, which
+        PlannotationMismatchError: If the PDF's first page is not the SVG's page size, which
             means it is not a rendering of this SVG and the label would misplace
             everything on it.
     """
@@ -255,8 +257,8 @@ def attach_from_svg(
             f"but {svg.name} is {sheet.width_mm:.1f} x {sheet.height_mm:.1f} mm: the PDF is "
             "not a rendering of this SVG"
         )
-        raise LabelMismatchError(msg)
-    label = derive_label(sheet, source)
+        raise PlannotationMismatchError(msg)
+    label = derive_plannotation(sheet, source)
     embed.attach(pdf_in, [label], embed.build_index([label]), pdf_out, mod_date=mod_date)
     return label
 

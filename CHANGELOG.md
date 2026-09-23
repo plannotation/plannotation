@@ -24,7 +24,7 @@ lives in [`spec/SPEC.md`](spec/SPEC.md).
   notes for Revit, AutoCAD and Tekla adapters in `docs/adapters/`.
 - **Benchmark.** `plannotation-bench` asks one model the same questions about each
   sample sheet with and without its label, the label supplied as the result of a
-  `get_page_label` tool call; numbers are scored within 1 %, everything else exactly.
+  `get_plannotation` tool call; numbers are scored within 1 %, everything else exactly.
   Responses are cached on condition, model, question and a digest of the request, so
   a re-run asks nothing. The key is read from the environment or a git-ignored
   `.env`, and the tests drive the real SDK only against an in-process mock. 59

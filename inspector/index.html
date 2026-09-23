@@ -168,7 +168,7 @@ el("file").addEventListener("change", async (event) => {
   const lib = await library();
   const data = new Uint8Array(await file.arrayBuffer());
   state.doc = await lib.getDocument({ data }).promise;
-  state.labels = await readLabels(state.doc);
+  state.labels = await readPlannotations(state.doc);
   state.page = 1;
   await render();
 });
@@ -176,7 +176,7 @@ el("file").addEventListener("change", async (event) => {
 // A page label travels as an attachment named plannotation-pNNNN.json. pdf.js exposes
 // the EmbeddedFiles name tree through getAttachments(), which is why Plannotation
 // registers every file there as well as on the page's /AF.
-async function readLabels(doc) {
+async function readPlannotations(doc) {
   const found = new Map();
   const attachments = (await doc.getAttachments()) || {};
   for (const [name, entry] of Object.entries(attachments)) {

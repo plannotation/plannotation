@@ -34,7 +34,7 @@ II. No one document raises peak resident memory by more than
     how the last three defects survived review.
 III. No single operation takes longer than :data:`OPERATION_TIME_BUDGET`, because a
     bound on bytes is not a bound on time.
-IV. ``read(strict=False)`` never raises :class:`~plannotation.errors.InvalidLabelError`.
+IV. ``read(strict=False)`` never raises :class:`~plannotation.errors.InvalidPlannotationError`.
     Section 4.3 (2) says a label a reader will not accept is a label that is absent, and
     absence is a return value.
 V.  ``attach`` and ``strip`` either complete or refuse. A refusal leaves no output file
@@ -89,8 +89,8 @@ from typing import TYPE_CHECKING, Final, cast
 import pikepdf
 import pytest
 
-from plannotation.constants import INDEX_FILENAME, SPEC_URI, page_label_filename
-from plannotation.errors import InvalidLabelError, PlannotationError
+from plannotation.constants import INDEX_FILENAME, SPEC_URI, plannotation_filename
+from plannotation.errors import InvalidPlannotationError, PlannotationError
 from plannotation.model import canonical_bytes
 from plannotation.pdf import embed
 from tests import pdf_fixtures as fx
@@ -121,7 +121,7 @@ SEED: Final = 20_260_922
 #: one document was processed. A document that allocates less than an earlier one already
 #: did shows nothing -- which is why the whole-sweep budgets below are kept as a backstop
 #: and why the two corpora are swept separately.
-PEAK_MEMORY_BUDGET: Final = 8 * embed._MAX_LABEL_BYTES
+PEAK_MEMORY_BUDGET: Final = 8 * embed._MAX_PLANNOTATION_BYTES
 
 #: How much more resident memory the malformed corpus may reach than it started with.
 #:
@@ -179,13 +179,13 @@ _CONTENT: Final = b"0.5 w 56.7 56.7 481.9 728.5 re S\n"
 _MEDIA_BOX: Final = "[0 0 595.2756 841.8898]"
 
 #: The name Plannotation owns, and a name it does not.
-_OWNED_NAME: Final = page_label_filename(0)
+_OWNED_NAME: Final = plannotation_filename(0)
 _FOREIGN_NAME: Final = "site-notes.txt"
 
 #: A page label that agrees with the page above, so that a well-formed document really is
 #: one and :func:`plannotation.pdf.embed.attach` has something it can write.
-LABEL: Final = fx.page_label(page_index=0, width_mm=210.0, height_mm=297.0)
-LABEL_BYTES: Final = canonical_bytes(LABEL)
+PLANNOTATION: Final = fx.plannotation(page_index=0, width_mm=210.0, height_mm=297.0)
+PLANNOTATION_BYTES: Final = canonical_bytes(PLANNOTATION)
 
 
 #: The names Plannotation owns, spelled out here rather than asked of the module.
@@ -196,7 +196,7 @@ LABEL_BYTES: Final = canonical_bytes(LABEL)
 #: Plannotation's would agree with the module about a name ending in a newline and would
 #: watch it delete somebody else's file without noticing -- measured: with this predicate
 #: taken from the module, reverting that defect broke no invariant at all.
-_PAGE_LABEL_NAME: Final = re.compile(r"plannotation-p\d{4}\.json")
+_PLANNOTATION_NAME: Final = re.compile(r"plannotation-p\d{4}\.json")
 
 
 def owns(name: str) -> bool:
@@ -208,7 +208,7 @@ def owns(name: str) -> bool:
     Returns:
         True for the index and for a page label's zero-padded name, and for nothing else.
     """
-    return name == INDEX_FILENAME or bool(_PAGE_LABEL_NAME.fullmatch(name))
+    return name == INDEX_FILENAME or bool(_PLANNOTATION_NAME.fullmatch(name))
 
 
 #: The two spans of an XML document whose contents are text rather than markup.
@@ -285,7 +285,9 @@ def embedded_file(
     """
     entries = ["/Type /EmbeddedFile", "/Subtype /application#2Fjson"]
     if params is None:
-        entries.append(f"/Params << /Size {len(LABEL_BYTES)} /ModDate ({fx.FIXED_PDF_DATE}) >>")
+        entries.append(
+            f"/Params << /Size {len(PLANNOTATION_BYTES)} /ModDate ({fx.FIXED_PDF_DATE}) >>"
+        )
     elif params:
         entries.append(f"/Params {params}")
     if filters is not None:
@@ -351,7 +353,7 @@ def hostile(
     caller adds.
 
     Args:
-        embedded: Object 6's body, or None for a Flate-compressed copy of :data:`LABEL`.
+        embedded: Object 6's body, or None for a Flate-compressed copy of :data:`PLANNOTATION`.
         spec: Object 5's body, or None for a well-formed specification.
         metadata: Object 7's body, or None to leave the document without XMP. Object 7 is
             written as ``null`` in that case, so the numbering never shifts.
@@ -386,7 +388,7 @@ def hostile(
         ("<< " + " ".join(page) + " >>").encode(),
         pdf_stream("", _CONTENT),
         (filespec(_OWNED_NAME) if spec is None else spec).encode(),
-        embedded_file(zlib.compress(LABEL_BYTES, 9)) if embedded is None else embedded,
+        embedded_file(zlib.compress(PLANNOTATION_BYTES, 9)) if embedded is None else embedded,
         b"null" if metadata is None else metadata,
         *extra,
     ]
@@ -489,13 +491,13 @@ def _filter_cases() -> Iterator[Case]:
         varies is what the document says it is stored under -- which is the whole point:
         the reader must answer for the declaration, not for the bytes.
     """
-    stored = zlib.compress(LABEL_BYTES, 9)
+    stored = zlib.compress(PLANNOTATION_BYTES, 9)
     for index, written in enumerate((*FILTER_NAMES, *FILTER_CHAINS)):
         slug = written.strip("[]()<>").replace("/", "").replace(" ", "-") or "empty"
         yield Case(
             f"filter-{index:02d}-{slug}", hostile(embedded=embedded_file(stored, filters=written))
         )
-    yield Case("filter-absent", hostile(embedded=embedded_file(LABEL_BYTES, filters=None)))
+    yield Case("filter-absent", hostile(embedded=embedded_file(PLANNOTATION_BYTES, filters=None)))
 
 
 #: Every value each predictor parameter is given, absurd and ordinary alike. Three of
@@ -676,7 +678,7 @@ def _size_and_length_cases() -> Iterator[Case]:
         where trusting the claim or measuring it the expensive way has already gone wrong
         once.
     """
-    stored = zlib.compress(LABEL_BYTES, 9)
+    stored = zlib.compress(PLANNOTATION_BYTES, 9)
     for index, params in enumerate(PARAMS_SIZES):
         yield Case(f"params-{index:02d}", hostile(embedded=embedded_file(stored, params=params)))
     for index, value in enumerate(LENGTH_VALUES):
@@ -693,9 +695,9 @@ def _deflate_cases() -> Iterator[Case]:
         The cases. What neither zlib nor raw deflate reads is damage, and section 4.3 (2)
         makes damage absence rather than something to repair.
     """
-    stored = zlib.compress(LABEL_BYTES, 9)
+    stored = zlib.compress(PLANNOTATION_BYTES, 9)
     raw = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
-    headerless = raw.compress(LABEL_BYTES) + raw.flush()
+    headerless = raw.compress(PLANNOTATION_BYTES) + raw.flush()
     flipped = bytearray(stored)
     flipped[len(flipped) // 2] ^= 0xFF
     variants = {
@@ -706,7 +708,7 @@ def _deflate_cases() -> Iterator[Case]:
         "headerless": headerless,
         "garbage": b"\xde\xad\xbe\xef" * 64,
         "zeros": bytes(512),
-        "stored-blocks": zlib.compress(LABEL_BYTES, 0),
+        "stored-blocks": zlib.compress(PLANNOTATION_BYTES, 0),
         "empty-inflate": zlib.compress(b"", 9),
     }
     for name, payload in variants.items():
@@ -962,7 +964,7 @@ TREES: Final = (
     ("leading-space", name_tree((" " + _OWNED_NAME, "5 0 R"))),
     ("uppercase", name_tree(("PLANNOTATION-P0000.JSON", "5 0 R"))),
     ("look-alike", name_tree(("plan\\154abel-p0000.json", "5 0 R"))),
-    ("cyrillic", name_tree(("\\320\\260lanlabel-p0000.json", "5 0 R"))),
+    ("cyrillic", name_tree(("\\320\\260lannotation-p0000.json", "5 0 R"))),
     ("five-digits", name_tree(("plannotation-p00000.json", "5 0 R"))),
     ("three-digits", name_tree(("plannotation-p000.json", "5 0 R"))),
     ("odd-length", "<< /EmbeddedFiles << /Names [(plannotation-p0000.json)] >> >>"),
@@ -1289,7 +1291,7 @@ class Probe:
             None when it refused.
         peak_growth: How much this document raised the process's peak resident memory,
             in bytes.
-        labelled_packet: The XMP packet of the copy :func:`plannotation.pdf.embed.attach`
+        plannotated_packet: The XMP packet of the copy :func:`plannotation.pdf.embed.attach`
             wrote, or None where it wrote none or the packet could not be read here.
         round_tripped_packet: The packet of that copy after it has been stripped again.
     """
@@ -1297,7 +1299,7 @@ class Probe:
     case: Case
     size: int
     peak_growth: int = 0
-    labelled_packet: bytes | None = None
+    plannotated_packet: bytes | None = None
     round_tripped_packet: bytes | None = None
     attempts: list[Attempt] = field(default_factory=list)
     foreign_before: dict[str, bytes] | None = None
@@ -1618,12 +1620,12 @@ def probe(case: Case, directory: Path) -> Probe:
     found.attempts.append(
         _written(
             "attach()",
-            lambda: embed.attach(source, [LABEL], None, attached, mod_date=MOD_DATE),
+            lambda: embed.attach(source, [PLANNOTATION], None, attached, mod_date=MOD_DATE),
             attached,
         )
     )
     if found.attempts[-1].error is None:
-        found.labelled_packet = decoded_packet(attached)
+        found.plannotated_packet = decoded_packet(attached)
         returned = directory / f"{case.name}-round-tripped.pdf"
         found.attempts.append(
             _written("strip(attach())", lambda: embed.strip(attached, returned), returned)
@@ -1880,13 +1882,13 @@ class TestTheInvariants:
         A document can still be damaged in ways that are not about a label at all -- a
         catalog that is not a dictionary, an ``/AF`` that is not an array -- and those are
         a :class:`~plannotation.errors.CarrierError` either way. What must never happen is an
-        :class:`~plannotation.errors.InvalidLabelError` from a reader that was asked to be
+        :class:`~plannotation.errors.InvalidPlannotationError` from a reader that was asked to be
         lenient.
         """
         offenders = [
             describe(found, found.attempt("read(strict=False)"))
             for found in corpus.probes
-            if isinstance(found.attempt("read(strict=False)").error, InvalidLabelError)
+            if isinstance(found.attempt("read(strict=False)").error, InvalidPlannotationError)
         ]
         assert offenders == [], (
             f"{len(offenders)} lenient read(s) raised rather than reporting absence:\n"
@@ -2050,9 +2052,9 @@ class TestALabelledDocumentSaysSo:
         """
         offenders: list[str] = []
         for found in sweep.probes:
-            if found.attempt("attach()").error is not None or found.labelled_packet is None:
+            if found.attempt("attach()").error is not None or found.plannotated_packet is None:
                 continue
-            masked = visible(found.labelled_packet)
+            masked = visible(found.plannotated_packet)
             at = masked.find(SPEC_URI.encode())
             closed = masked.rfind(b"</rdf:RDF>")
             if at < 0:
@@ -2090,6 +2092,6 @@ class TestALabelledDocumentSaysSo:
 
     def test_the_corpus_reaches_this_at_all(self, sweep: Sweep) -> None:
         """An invariant nothing satisfies is an invariant nothing tests."""
-        labelled = [found for found in sweep.probes if found.labelled_packet is not None]
+        labelled = [found for found in sweep.probes if found.plannotated_packet is not None]
         assert len(labelled) >= 10
         assert sum(1 for found in labelled if found.round_tripped_packet is not None) >= 10

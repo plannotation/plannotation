@@ -35,7 +35,7 @@ Restart Claude Desktop, and the tools appear.
 | Tool | What it does | Writes? |
 | --- | --- | --- |
 | `list_sheets` | Every labelled sheet in a PDF, a sidecar, or a folder, with its level. | no |
-| `get_label` | One page's label in full. | no |
+| `get_plannotation` | One page's label in full. | no |
 | `find_elements` | Elements whose IFC class, tag or name contains a query. | no |
 | `measure` | Paper and model distance between two items on a page. | no |
 | `validate` | The validator's report, optionally against an IFC model. | no |

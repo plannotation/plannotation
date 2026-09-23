@@ -28,7 +28,7 @@ What this module cannot police
 Rendering is not the whole promise. Rewriting a content stream into a different
 encoding changes no pixels at all, so a comparison of renders would pass; only a
 comparison of the streams themselves catches it. That is why
-:func:`plannotation.pdf.embed.save_labelled` pins ``normalize_content=False`` rather
+:func:`plannotation.pdf.embed.save_plannotated` pins ``normalize_content=False`` rather
 than relying on this test to notice.
 
 Memory

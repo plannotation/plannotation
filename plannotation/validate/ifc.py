@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from plannotation.model import Annotation, Element, PageLabel
+    from plannotation.model import Annotation, Element, Plannotation
     from plannotation.validate.report import Finding
 
 __all__ = [
@@ -245,7 +245,7 @@ def _module(name: str) -> Any:  # noqa: ANN401 - the whole point is that it is u
         raise MissingExtraError(msg) from exc
 
 
-def check_against_model(label: PageLabel, model: IfcModel, *, source: str) -> list[Finding]:
+def check_against_model(label: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
     """Cross-check one page label against an IFC model.
 
     Args:
@@ -262,7 +262,7 @@ def check_against_model(label: PageLabel, model: IfcModel, *, source: str) -> li
     return found
 
 
-def _check_guids(label: PageLabel, model: IfcModel, *, source: str) -> list[Finding]:
+def _check_guids(label: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
     """Check every GlobalId a label carries against the model.
 
     Args:
@@ -304,7 +304,7 @@ def _check_guids(label: PageLabel, model: IfcModel, *, source: str) -> list[Find
     return found
 
 
-def _guids(label: PageLabel) -> list[tuple[str, str, str, str | None]]:
+def _guids(label: Plannotation) -> list[tuple[str, str, str, str | None]]:
     """Collect every GlobalId in a label with a name, a pointer and a claimed class.
 
     Args:
@@ -353,7 +353,7 @@ def _guids(label: PageLabel) -> list[tuple[str, str, str, str | None]]:
     return collected
 
 
-def _check_dimensions(label: PageLabel, model: IfcModel, *, source: str) -> list[Finding]:
+def _check_dimensions(label: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
     """Re-measure every dimension that runs between two elements with geometry.
 
     Args:
@@ -438,7 +438,7 @@ def _remeasure(
     return distance * MM_PER_MODEL_UNIT[unit]
 
 
-def remeasurable(label: PageLabel) -> int:
+def remeasurable(label: Plannotation) -> int:
     """Count the dimensions a model cross-check could re-measure.
 
     Args:

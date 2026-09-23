@@ -30,13 +30,13 @@ SPEC_URI: Final = f"{BASE_URL}/spec/{SCHEMA_VERSION}"
 INDEX_FILENAME: Final = "plannotation-index.json"
 
 #: MIME type recorded as ``/Subtype`` on every embedded Plannotation file.
-LABEL_MIME_TYPE: Final = "application/json"
+PLANNOTATION_MIME_TYPE: Final = "application/json"
 
 #: Suffix of the sidecar twin written for consumers that cannot read attachments.
 SIDECAR_SUFFIX: Final = ".plannotation.json"
 
 
-def page_label_filename(page_index: int) -> str:
+def plannotation_filename(page_index: int) -> str:
     """Return the embedded filename for a page label.
 
     Args:
@@ -50,9 +50,9 @@ def page_label_filename(page_index: int) -> str:
         ValueError: If ``page_index`` is negative.
 
     Examples:
-        >>> page_label_filename(0)
+        >>> plannotation_filename(0)
         'plannotation-p0000.json'
-        >>> page_label_filename(42)
+        >>> plannotation_filename(42)
         'plannotation-p0042.json'
     """
     if page_index < 0:

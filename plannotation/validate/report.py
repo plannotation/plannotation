@@ -143,7 +143,7 @@ class Finding:
         path: A JSON Pointer (RFC 6901) into the document named by ``source``. The
             empty string points at the document itself.
         source: Which document the pointer is into -- ``"page 4"``, ``"index"``,
-            ``"sidecar"``, ``"labels.json"``.
+            ``"sidecar"``, ``"plannotations.json"``.
         rule: The rule in one line, as :mod:`plannotation.validate.codes` states it.
         reference: The clause of the specification the rule comes from.
     """
@@ -205,7 +205,7 @@ class Report:
 
     Attributes:
         source: The file validated.
-        carrier: ``"pdf"``, ``"sidecar"`` or ``"labels"`` -- the last being a bare page
+        carrier: ``"pdf"``, ``"sidecar"`` or ``"plannotations"`` -- the last being a bare page
             label or array of page labels, which is a payload with no carrier at all.
         pages: One summary per page label examined, ascending by page.
         findings: Every violation found, in :attr:`Finding.sort_key` order.

@@ -3,7 +3,7 @@
 **PASS** -- 0 error(s), 0 warning(s); exit code 0.
 
 - Source: `<path>`
-- Carrier: labels
+- Carrier: plannotations
 - Page labels examined: 1
 
 ## Pages

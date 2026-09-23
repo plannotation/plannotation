@@ -46,8 +46,8 @@ from plannotation.model import (
     Generator,
     Model,
     Page,
-    PageLabel,
     Plane,
+    Plannotation,
     Project,
     Provenance,
     Representation,
@@ -176,7 +176,7 @@ class ExportedSheet:
     """
 
     svg: str
-    label: PageLabel
+    label: Plannotation
     ground_truth: tuple[Question, ...]
 
 
@@ -332,7 +332,7 @@ def export_sheet(
             else None
         ),
     )
-    label = PageLabel(
+    label = Plannotation(
         plannotation=SCHEMA_VERSION,
         generator=Generator(name="plannotation", version=generator_version),
         provenance=Provenance.AUTHORED,
@@ -1141,13 +1141,15 @@ def _draw_title_block(
 # ---------------------------------------------------------------------------
 # Ground truth
 # ---------------------------------------------------------------------------
-def _ground_truth(label: PageLabel, sheet_id: str, grids: tuple[GridAxis, ...]) -> list[Question]:
+def _ground_truth(
+    label: Plannotation, sheet_id: str, grids: tuple[GridAxis, ...]
+) -> list[Question]:
     """Derive questions whose answers come from the model, not from the drawing.
 
     Every question but one kind is about what the sheet shows, so a reader of the
     page alone can in principle answer it; the label is meant to make that easier,
     not possible. The exception is the GlobalId of a marked element: only the label
-    carries it, and those questions say so with ``requiresLabel``.
+    carries it, and those questions say so with ``requiresPlannotation``.
 
     Args:
         label: The page label.
@@ -1234,7 +1236,7 @@ def _ground_truth(label: PageLabel, sheet_id: str, grids: tuple[GridAxis, ...]) 
                     f"on sheet {sheet_id}?"
                 ),
                 "answer": tagged[0].ifc_guid,
-                "requiresLabel": True,
+                "requiresPlannotation": True,
             }
         )
     return questions
@@ -1365,8 +1367,8 @@ def write_sample(
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "sheet.svg").write_text(exported.svg, encoding="utf-8")
-    labels_path = out_dir / "labels.json"
-    labels_path.write_text(canonical_json(exported.label), encoding="utf-8")
+    plannotations_path = out_dir / "plannotations.json"
+    plannotations_path.write_text(canonical_json(exported.label), encoding="utf-8")
 
     width = exported.label.page.width_mm
     height = exported.label.page.height_mm
@@ -1378,7 +1380,7 @@ def write_sample(
         mod_date=mod_date,
         inkscape_fallback=inkscape_fallback,
     )
-    labelled = out_dir / "sheet.labelled.pdf"
+    labelled = out_dir / "sheet.plannotated.pdf"
     index = embed.build_index([exported.label])
     embed.attach(plain, [exported.label], index, labelled, mod_date=mod_date)
 

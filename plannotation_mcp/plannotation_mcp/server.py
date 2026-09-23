@@ -34,7 +34,7 @@ from plannotation.model import canonical_json, conformance_level, page_schema
 from plannotation.pdf import embed
 
 if TYPE_CHECKING:
-    from plannotation.model import PageLabel
+    from plannotation.model import Plannotation
 
 #: The largest number of PDFs a folder listing will look inside. A folder is the
 #: caller's to choose and may be enormous; a listing that reads every file in it is a
@@ -108,7 +108,7 @@ class ServerConfig:
             raise WriteNotAllowedError(msg)
 
 
-def _label_summary(page_index: int, label: PageLabel) -> dict[str, Any]:
+def _plannotation_summary(page_index: int, label: Plannotation) -> dict[str, Any]:
     """Summarise a page label for a listing.
 
     Args:
@@ -155,12 +155,15 @@ def list_sheets(config: ServerConfig, path: str) -> dict[str, Any]:
             continue
         for page_index, label in sorted(found.pages.items()):
             sheets.append(
-                {"document": _relative(config, document), **_label_summary(page_index, label)}
+                {
+                    "document": _relative(config, document),
+                    **_plannotation_summary(page_index, label),
+                }
             )
     return {"sheets": sheets, "unreadable": unreadable}
 
 
-def get_label(config: ServerConfig, pdf: str, page: int) -> dict[str, Any]:
+def get_plannotation(config: ServerConfig, pdf: str, page: int) -> dict[str, Any]:
     """Return one page's label in full.
 
     Args:
@@ -174,7 +177,7 @@ def get_label(config: ServerConfig, pdf: str, page: int) -> dict[str, Any]:
     Raises:
         PlannotationError: If the page carries no label.
     """
-    label = _page_label(config, pdf, page)
+    label = _plannotation(config, pdf, page)
     return {"page": page, "label": json.loads(canonical_json(label))}
 
 
@@ -185,7 +188,7 @@ def find_elements(
 
     Matching is a case-insensitive substring, on the three fields a person would search
     by. It is deliberately not a query language: a caller that wants more has the whole
-    label from get_label.
+    label from get_plannotation.
 
     Args:
         config: The server's confinement.
@@ -246,7 +249,7 @@ def measure(config: ServerConfig, pdf: str, page: int, id_a: str, id_b: str) -> 
     Raises:
         PlannotationError: If either id is not on the page.
     """
-    label = _page_label(config, pdf, page)
+    label = _plannotation(config, pdf, page)
     items = {
         item.local_id: item
         for collection in (label.elements or [], label.annotations or [])
@@ -301,13 +304,15 @@ def validate_document(config: ServerConfig, pdf: str, ifc: str | None = None) ->
     return render_json(report)
 
 
-def attach_labels(config: ServerConfig, pdf: str, labels_json: str, out: str) -> dict[str, Any]:
+def attach_plannotations(
+    config: ServerConfig, pdf: str, plannotations_json: str, out: str
+) -> dict[str, Any]:
     """Attach labels to a document, writing a new one.
 
     Args:
         config: The server's confinement.
         pdf: The document to label.
-        labels_json: A file holding the page labels.
+        plannotations_json: A file holding the page labels.
         out: Where to write the labelled document.
 
     Returns:
@@ -316,13 +321,13 @@ def attach_labels(config: ServerConfig, pdf: str, labels_json: str, out: str) ->
     config.require_write("attach")
     from datetime import UTC, datetime  # noqa: PLC0415
 
-    from plannotation.model import load_page_label  # noqa: PLC0415
+    from plannotation.model import load_plannotation  # noqa: PLC0415
 
     source = config.resolve(pdf)
     target = config.resolve(out)
-    document = json.loads(config.resolve(labels_json).read_text("utf-8"))
+    document = json.loads(config.resolve(plannotations_json).read_text("utf-8"))
     entries = document if isinstance(document, list) else [document]
-    labels = [load_page_label(json.dumps(entry)) for entry in entries]
+    labels = [load_plannotation(json.dumps(entry)) for entry in entries]
     embed.attach(
         source,
         labels,
@@ -333,7 +338,7 @@ def attach_labels(config: ServerConfig, pdf: str, labels_json: str, out: str) ->
     return {"written": _relative(config, target), "pages": [label.page.index for label in labels]}
 
 
-def infer_labels(
+def infer_plannotations(
     config: ServerConfig, pdf: str, out: str, ifc: str | None = None
 ) -> dict[str, Any]:
     """Reconstruct labels for a document that has none, writing a labelled copy.
@@ -370,7 +375,7 @@ def folder_index(config: ServerConfig) -> dict[str, Any]:
     return list_sheets(config, str(config.root))
 
 
-def _page_label(config: ServerConfig, pdf: str, page: int) -> PageLabel:
+def _plannotation(config: ServerConfig, pdf: str, page: int) -> Plannotation:
     """Read one page's label.
 
     Args:
@@ -449,9 +454,11 @@ def build_server(config: ServerConfig) -> Any:  # noqa: ANN401 - the MCP SDK's s
     def list_sheets_tool(path: str = ".") -> dict[str, Any]:
         return list_sheets(config, path)
 
-    @server.tool(name="get_label", description="Return one page's Plannotation label in full.")
-    def get_label_tool(pdf: str, page: int = 0) -> dict[str, Any]:
-        return get_label(config, pdf, page)
+    @server.tool(
+        name="get_plannotation", description="Return one page's Plannotation label in full."
+    )
+    def get_plannotation_tool(pdf: str, page: int = 0) -> dict[str, Any]:
+        return get_plannotation(config, pdf, page)
 
     @server.tool(
         name="find_elements",
@@ -478,15 +485,15 @@ def build_server(config: ServerConfig) -> Any:  # noqa: ANN401 - the MCP SDK's s
         name="attach",
         description="Attach page labels to a PDF, writing a new file. Needs --allow-write.",
     )
-    def attach_tool(pdf: str, labels_json: str, out: str) -> dict[str, Any]:
-        return attach_labels(config, pdf, labels_json, out)
+    def attach_tool(pdf: str, plannotations_json: str, out: str) -> dict[str, Any]:
+        return attach_plannotations(config, pdf, plannotations_json, out)
 
     @server.tool(
         name="infer",
         description="Infer labels for an unlabelled PDF, writing a copy. Needs --allow-write.",
     )
     def infer_tool(pdf: str, out: str, ifc: str | None = None) -> dict[str, Any]:
-        return infer_labels(config, pdf, out, ifc)
+        return infer_plannotations(config, pdf, out, ifc)
 
     @server.resource(
         "plannotation://schema/page", name="page-schema", mime_type="application/schema+json"

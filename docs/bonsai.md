@@ -29,7 +29,7 @@ the label written from the model, element for element. The add-on is only the Bl
 side. The same step runs outside Blender as
 
 ```bash
-plannotation from-svg sheet.svg sheet.pdf -o sheet.labelled.pdf --sheet-id A-101 --ifc model.ifc
+plannotation from-svg sheet.svg sheet.pdf -o sheet.plannotated.pdf --sheet-id A-101 --ifc model.ifc
 ```
 
 ## Installing
@@ -52,7 +52,7 @@ plannotation from-svg sheet.svg sheet.pdf -o sheet.labelled.pdf --sheet-id A-101
   sheet selected in Bonsai's sheet list: its number and title, and the newest
   `<number>*.svg` and `<number>*.pdf` in the `sheets` folder beside the IFC file.
   Correct anything it guessed wrong. The labelled copy is written beside the PDF as
-  `<name>.labelled.pdf` unless another path is given; the PDF itself is not modified.
+  `<name>.plannotated.pdf` unless another path is given; the PDF itself is not modified.
 - **Create Sheet and Attach Plannotation** (search for it with F3) runs Bonsai's own
   *Create Sheets* first, then opens the same dialog.
 
@@ -70,13 +70,13 @@ and a project with at least one sheet that has a plan view with walls on it.
 2. **It is prefilled.** Select the sheet in Bonsai's sheet list, create it with Bonsai,
    then open the operator. Expect the sheet number and title filled in, and the SVG
    and PDF paths pointing into the project's `sheets` folder.
-3. **It labels.** Confirm. Expect *Labelled <name>.labelled.pdf: N element(s)* in the
+3. **It labels.** Confirm. Expect *Labelled <name>.plannotated.pdf: N element(s)* in the
    status bar, where N is the number of model elements on the sheet.
 4. **The label is right.** In a terminal:
 
    ```bash
-   plannotation validate "<name>.labelled.pdf"     # expect: no errors, level L2
-   plannotation inspect "<name>.labelled.pdf"      # expect: every element, its class and GlobalId
+   plannotation validate "<name>.plannotated.pdf"     # expect: no errors, level L2
+   plannotation inspect "<name>.plannotated.pdf"      # expect: every element, its class and GlobalId
    ```
 
    Open the labelled PDF in `inspector/index.html` and check that each outline sits on
@@ -84,7 +84,7 @@ and a project with at least one sheet that has a plan view with walls on it.
 5. **The page is untouched.** Expect both files to render identically:
 
    ```bash
-   python -c "from plannotation.pdf.render import assert_same_appearance as a; a('<name>.pdf', '<name>.labelled.pdf')"
+   python -c "from plannotation.pdf.render import assert_same_appearance as a; a('<name>.pdf', '<name>.plannotated.pdf')"
    ```
 
 6. **The transform is right.** Pick a wall corner in the inspector, note its paper

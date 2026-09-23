@@ -39,12 +39,12 @@ from plannotation.validate.schema import json_pointer
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from plannotation.model import LabelIndex, PageLabel, Sidecar
+    from plannotation.model import Plannotation, PlannotationIndex, Sidecar
     from plannotation.validate.report import Finding
 
 __all__ = [
     "check_declaration",
-    "check_index_against_labels",
+    "check_index_against_plannotations",
     "check_page_identity",
     "check_pairing",
     "check_sidecar_consistency",
@@ -200,9 +200,9 @@ def _check_sidecar_order(sidecar: Sidecar, *, source: str) -> list[Finding]:
     ]
 
 
-def check_index_against_labels(
-    index: LabelIndex,
-    labels: Sequence[tuple[int, PageLabel]],
+def check_index_against_plannotations(
+    index: PlannotationIndex,
+    labels: Sequence[tuple[int, Plannotation]],
     *,
     source: str,
 ) -> list[Finding]:
@@ -293,7 +293,7 @@ def _check_entry_text(
 
 
 def check_page_identity(
-    label: PageLabel,
+    label: Plannotation,
     *,
     page_count: int,
     attached_to: int | None = None,
@@ -349,7 +349,7 @@ def check_page_identity(
 
 
 def check_pairing(
-    labels: Sequence[tuple[int, PageLabel]],
+    labels: Sequence[tuple[int, Plannotation]],
     *,
     page_count: int,
     source: str,

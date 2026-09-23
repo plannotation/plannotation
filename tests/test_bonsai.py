@@ -188,12 +188,17 @@ class TestGuesses:
         sheets.mkdir()
         old = sheets / "A-101 - Plan.pdf"
         new = sheets / "A-101 - Plan v2.pdf"
-        for path in (old, sheets / "A-101 - Plan.svg", new, sheets / "A-101 - Plan.labelled.pdf"):
+        for path in (
+            old,
+            sheets / "A-101 - Plan.svg",
+            new,
+            sheets / "A-101 - Plan.plannotated.pdf",
+        ):
             path.write_bytes(b"x")
         stamp = time.time()
         os.utime(old, (stamp - 100, stamp - 100))
         os.utime(new, (stamp, stamp))
-        os.utime(sheets / "A-101 - Plan.labelled.pdf", (stamp + 100, stamp + 100))
+        os.utime(sheets / "A-101 - Plan.plannotated.pdf", (stamp + 100, stamp + 100))
         svg, pdf = addon.sheet_files(tmp_path / "model.ifc", "A-101")
         assert svg == sheets / "A-101 - Plan.svg"
         assert pdf == new
@@ -205,7 +210,7 @@ class TestGuesses:
 
     def test_the_labelled_copy_sits_beside_the_pdf(self, addon: types.ModuleType) -> None:
         """Named so it is never taken for the sheet next time."""
-        assert addon.labelled_path(Path("s/A-101.pdf")) == Path("s/A-101.labelled.pdf")
+        assert addon.plannotated_path(Path("s/A-101.pdf")) == Path("s/A-101.plannotated.pdf")
 
     def test_without_bonsai_there_is_no_model(self, addon: types.ModuleType) -> None:
         """And no exception either."""
@@ -282,12 +287,12 @@ class TestExecute:
         """A file that is not an SVG ends the run with the reason."""
         fake_bonsai(monkeypatch, object(), None)
         (tmp_path / "s.svg").write_text("<html/>", encoding="utf-8")
-        import plannotation.svg.label as label_module
+        import plannotation.svg.derive as derive_module
 
         monkeypatch.setattr(
-            label_module,
+            derive_module,
             "source_from_model",
-            lambda model, **kw: label_module.SheetSource(  # noqa: ARG005
+            lambda model, **kw: derive_module.SheetSource(  # noqa: ARG005
                 sheet_id=kw["sheet_id"], unit_scale_to_m=1.0, length_unit="m"
             ),
         )
@@ -334,6 +339,6 @@ class TestExecute:
         assert operator.title == "Grundriss Erdgeschoss"
         assert operator.pdf_path.endswith("ARC-101 - Grundriss.pdf")
         assert operator.execute(None) == {"FINISHED"}, operator.reports
-        out = tmp_path / "sheets" / "ARC-101 - Grundriss.labelled.pdf"
+        out = tmp_path / "sheets" / "ARC-101 - Grundriss.plannotated.pdf"
         assert "9 element(s)" in operator.reports[0][1]
         assert validate(out).error_count == 0

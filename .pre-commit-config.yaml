@@ -61,7 +61,7 @@ repos:
       # fail for the one reason their manifest claims.
       - id: check-jsonschema
         name: valid label fixtures conform to plannotation-0.1
-        files: ^tests/fixtures/labels/valid/.*\.json$
+        files: ^tests/fixtures/plannotations/valid/.*\.json$
         args: [--schemafile, plannotation/schema/plannotation-0.1.json]
       - id: check-jsonschema
         name: valid index fixtures conform to plannotation-index-0.1

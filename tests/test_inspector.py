@@ -18,7 +18,7 @@ import pytest
 from typer.testing import CliRunner
 
 from plannotation.cli import app
-from plannotation.constants import page_label_filename
+from plannotation.constants import plannotation_filename
 
 INSPECTOR = Path(__file__).parent.parent / "inspector" / "index.html"
 SAMPLES = Path(__file__).parent.parent / "samples"
@@ -71,13 +71,13 @@ class TestItReadsWhatThisProjectWrites:
         assert "getAttachments" in html()
 
     def test_its_filename_pattern_matches_the_one_we_write(self) -> None:
-        """A pattern that drifted from page_label_filename would find nothing at all."""
+        """A pattern that drifted from plannotation_filename would find nothing at all."""
         assert r"/^plannotation-p(\d+)\.json$/" in html(), (
             "the inspector's filename pattern has changed shape"
         )
         compiled = re.compile(r"^plannotation-p(\d+)\.json$")
         for index in (0, 7, 1234):
-            assert compiled.match(page_label_filename(index))
+            assert compiled.match(plannotation_filename(index))
 
     def test_it_flips_paper_coordinates(self) -> None:
         """SPEC 3.3: paper is y-up from the bottom left, a canvas is y-down."""
@@ -126,22 +126,22 @@ class TestTheInspectCommand:
         return CliRunner().invoke(app, ["inspect", *args])
 
     @pytest.mark.skipif(
-        not (SAMPLES / "floorplan" / "sheet.labelled.pdf").exists(),
+        not (SAMPLES / "floorplan" / "sheet.plannotated.pdf").exists(),
         reason="samples are not built; run make samples",
     )
     def test_it_prints_a_table_for_a_sample(self) -> None:
         """The sheet, its viewports, its elements and its annotations."""
-        result = self._run(str(SAMPLES / "floorplan" / "sheet.labelled.pdf"))
+        result = self._run(str(SAMPLES / "floorplan" / "sheet.plannotated.pdf"))
         assert result.exit_code == 0
         assert "ARC-101" in result.stdout
 
     @pytest.mark.skipif(
-        not (SAMPLES / "floorplan" / "sheet.labelled.pdf").exists(),
+        not (SAMPLES / "floorplan" / "sheet.plannotated.pdf").exists(),
         reason="samples are not built; run make samples",
     )
     def test_json_output_parses(self) -> None:
         """--json is for a pipe, so it must be JSON and nothing else."""
-        result = self._run("--json", str(SAMPLES / "floorplan" / "sheet.labelled.pdf"))
+        result = self._run("--json", str(SAMPLES / "floorplan" / "sheet.plannotated.pdf"))
         assert result.exit_code == 0
         payload = json.loads(result.stdout)
         assert payload["pages"]["0"]["sheet"]["id"] == "ARC-101"

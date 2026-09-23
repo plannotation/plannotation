@@ -3,7 +3,7 @@
 
 Both conditions send the same system prompt, the same page picture, the same
 extracted text, and the same question block. ``labelled`` differs only in that the
-conversation also holds a ``get_page_label`` call and its result -- the label as
+conversation also holds a ``get_plannotation`` call and its result -- the label as
 canonical JSON -- before the question, which is how an MCP host hands a label over.
 
 The prompt cache breakpoint sits after the page material and before the question, so
@@ -31,7 +31,7 @@ PROMPT_VERSION: Final = "1"
 MAX_TOKENS: Final = 16000
 
 #: The synthetic tool call's id. Any id is valid; a fixed one keeps requests stable.
-LABEL_TOOL_USE_ID: Final = "toolu_plannotation_page_label"
+PLANNOTATION_TOOL_USE_ID: Final = "toolu_get_plannotation"
 
 SYSTEM_PROMPT: Final = (
     "You answer questions about one sheet of a set of construction drawings. You are "
@@ -46,8 +46,8 @@ ANSWER_INSTRUCTIONS: Final = (
     "If the sheet does not tell you, answer `unknown`."
 )
 
-LABEL_TOOL: Final[dict[str, object]] = {
-    "name": "get_page_label",
+PLANNOTATION_TOOL: Final[dict[str, object]] = {
+    "name": "get_plannotation",
     "description": (
         "Return the Plannotation page label for a page of the open drawing: a JSON "
         "document naming the sheet, its viewports and how paper maps to model "
@@ -138,7 +138,7 @@ def build_request(
         if page.label is None:
             msg = f"{question.document} page {question.page} has no label to supply"
             raise ValueError(msg)
-        request["tools"] = [LABEL_TOOL]
+        request["tools"] = [PLANNOTATION_TOOL]
         messages = [
             {"role": "user", "content": [picture, {"type": "text", "text": extracted}]},
             {
@@ -146,8 +146,8 @@ def build_request(
                 "content": [
                     {
                         "type": "tool_use",
-                        "id": LABEL_TOOL_USE_ID,
-                        "name": LABEL_TOOL["name"],
+                        "id": PLANNOTATION_TOOL_USE_ID,
+                        "name": PLANNOTATION_TOOL["name"],
                         "input": {"page": question.page},
                     }
                 ],
@@ -157,7 +157,7 @@ def build_request(
                 "content": [
                     {
                         "type": "tool_result",
-                        "tool_use_id": LABEL_TOOL_USE_ID,
+                        "tool_use_id": PLANNOTATION_TOOL_USE_ID,
                         "content": page.label,
                         "cache_control": _CACHE,
                     },

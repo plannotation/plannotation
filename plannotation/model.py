@@ -18,7 +18,7 @@ What lives here
   properties over them: :func:`aggregate_provenance`, :func:`conformance_level`,
   :func:`annotation_has_link`, :func:`local_ids`.
 * Canonical serialisation, :func:`canonical_json`, and its inverses
-  :func:`load_page_label`, :func:`load_label_index` and :func:`load_sidecar`.
+  :func:`load_plannotation`, :func:`load_plannotation_index` and :func:`load_sidecar`.
 * Access to the packaged schemas through :mod:`importlib.resources`, so that
   :func:`page_schema`, :func:`index_schema` and :func:`sidecar_schema` work from an
   installed wheel.
@@ -32,7 +32,7 @@ trailing newline, and every number rounded to at most
 without a fractional part, so a page width of 841 mm is ``841`` and never ``841.0``.
 Rounding is Python's round-half-to-even on the binary value, so ``0.8125`` is
 written ``0.812``; the tie-break matters less than that it is the same everywhere.
-Round-tripping a canonical document through :func:`load_page_label` and
+Round-tripping a canonical document through :func:`load_plannotation` and
 :func:`canonical_json` reproduces it byte for byte. The reverse trip is lossy by
 design: a model holding more than three decimals loses them on the way out.
 
@@ -115,7 +115,6 @@ __all__ = [
     "IfcClass",
     "IfcGuid",
     "IndexPage",
-    "LabelIndex",
     "LengthUnit",
     "LocalId",
     "MeasureUnit",
@@ -124,8 +123,9 @@ __all__ = [
     "Number",
     "Page",
     "PageIndex",
-    "PageLabel",
     "Plane",
+    "Plannotation",
+    "PlannotationIndex",
     "Point",
     "Polyline",
     "PositiveNumber",
@@ -149,8 +149,8 @@ __all__ = [
     "canonical_json",
     "conformance_level",
     "index_schema",
-    "load_label_index",
-    "load_page_label",
+    "load_plannotation",
+    "load_plannotation_index",
     "load_sidecar",
     "local_ids",
     "page_schema",
@@ -370,7 +370,7 @@ being accepted as ``0``, since ``False == 0`` in Python."""
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
-class _LabelModel(BaseModel):
+class _PlannotationModel(BaseModel):
     """Configuration shared by every Plannotation model.
 
     Both schemas set ``"additionalProperties": false`` on every object they define
@@ -393,7 +393,7 @@ class _LabelModel(BaseModel):
     )
 
 
-class Generator(_LabelModel):
+class Generator(_PlannotationModel):
     """The tool that wrote a label. Mirrors the ``generator`` object of both schemas.
 
     ``created`` is a date-time string. It stays a string rather than becoming a
@@ -408,7 +408,7 @@ class Generator(_LabelModel):
     created: str | None = None
 
 
-class Page(_LabelModel):
+class Page(_PlannotationModel):
     """The PDF page a label describes. Mirrors the root ``page`` object.
 
     The page is the leading document: these three required numbers say which page and
@@ -430,14 +430,14 @@ class Page(_LabelModel):
         return 0 if self.rotation is None else self.rotation
 
 
-class Project(_LabelModel):
+class Project(_PlannotationModel):
     """The project a sheet belongs to. Mirrors ``sheet.project``."""
 
     name: str | None = None
     number: str | None = None
 
 
-class Sheet(_LabelModel):
+class Sheet(_PlannotationModel):
     """The sheet printed on the page. Mirrors the root ``sheet`` object.
 
     ``date`` is a date string for the same reason :attr:`Generator.created` is.
@@ -458,7 +458,7 @@ class Sheet(_LabelModel):
     title_block_bbox: BBox | None = Field(default=None, alias="titleBlockBBox")
 
 
-class Model(_LabelModel):
+class Model(_PlannotationModel):
     """The source model the label was written from. Mirrors the ``model`` object.
 
     The same shape appears in the page-label schema and in the index schema, which is
@@ -471,7 +471,7 @@ class Model(_LabelModel):
     length_unit: LengthUnit | None = Field(default=None, alias="lengthUnit")
 
 
-class Plane(_LabelModel):
+class Plane(_PlannotationModel):
     """The model-space plane of a view. Mirrors ``viewport.plane``.
 
     The view direction is ``xAxis`` cross ``yAxis``.
@@ -482,7 +482,7 @@ class Plane(_LabelModel):
     y_axis: Vec3 = Field(alias="yAxis")
 
 
-class Storey(_LabelModel):
+class Storey(_PlannotationModel):
     """The building storey a viewport shows. Mirrors ``viewport.storey``."""
 
     ifc_guid: IfcGuid | None = Field(default=None, alias="ifcGuid")
@@ -490,7 +490,7 @@ class Storey(_LabelModel):
     elevation: Number | None = None
 
 
-class Viewport(_LabelModel):
+class Viewport(_PlannotationModel):
     """One view placed on the sheet. Mirrors ``#/$defs/viewport``.
 
     A viewport is what ties paper to model: ``paperBBox`` says where it sits on the
@@ -509,7 +509,7 @@ class Viewport(_LabelModel):
     storey: Storey | None = None
 
 
-class _ProvenancedItem(_LabelModel):
+class _ProvenancedItem(_PlannotationModel):
     """The five properties an element and an annotation define identically.
 
     Both carry ``id``, ``viewport``, ``paperBBox``, ``provenance`` and ``confidence``
@@ -590,7 +590,7 @@ class Element(_ProvenancedItem):
         return value if isinstance(value, dict) else None
 
 
-class Shows(_LabelModel):
+class Shows(_PlannotationModel):
     """What a tag displays. Mirrors ``annotation.shows``.
 
     ``property`` is renamed to :attr:`property_name` because ``property`` is a
@@ -601,7 +601,7 @@ class Shows(_LabelModel):
     property_name: str | None = Field(default=None, alias="property")
 
 
-class Target(_LabelModel):
+class Target(_PlannotationModel):
     """Where a callout or a section mark points. Mirrors ``annotation.target``.
 
     This is the only cross-page reference in the format: ``localId`` values are
@@ -636,7 +636,7 @@ class Annotation(_ProvenancedItem):
     ifc_guid: IfcGuid | None = Field(default=None, alias="ifcGuid")
 
 
-class PageLabel(_LabelModel):
+class Plannotation(_PlannotationModel):
     """The label of one drawing page: the root of ``plannotation-0.1.json``.
 
     The PDF page stays the leading document; this object is auxiliary and may be
@@ -718,7 +718,7 @@ class PageLabel(_LabelModel):
         return conformance_level(self)
 
 
-class IndexPage(_LabelModel):
+class IndexPage(_PlannotationModel):
     """One labelled page as the document index lists it.
 
     Mirrors ``pages.items`` of ``plannotation-index-0.1.json``. Unlabelled pages are
@@ -733,7 +733,7 @@ class IndexPage(_LabelModel):
     file: str | None = None
 
 
-class LabelIndex(_LabelModel):
+class PlannotationIndex(_PlannotationModel):
     """The document-level index: the root of ``plannotation-index-0.1.json``.
 
     It exists so that a reader can see what is labelled, and at which level, without
@@ -748,7 +748,7 @@ class LabelIndex(_LabelModel):
     extensions: Extensions | None = None
 
 
-class Sidecar(_LabelModel):
+class Sidecar(_PlannotationModel):
     """A whole document's labels in one file: the root of ``plannotation-sidecar-0.1.json``.
 
     The sidecar is the third carrier. It holds exactly what a labelled PDF holds --
@@ -769,12 +769,12 @@ class Sidecar(_LabelModel):
 
     plannotation: Literal["0.1"]
     generator: Generator | None = None
-    index: LabelIndex
-    pages: list[PageLabel]
+    index: PlannotationIndex
+    pages: list[Plannotation]
     extensions: Extensions | None = None
 
     @model_validator(mode="after")
-    def _one_label_per_page(self) -> Self:
+    def _one_plannotation_per_page(self) -> Self:
         """Enforce that no two page labels claim the same page.
 
         Returns:
@@ -915,7 +915,7 @@ def annotation_has_link(annotation: Annotation) -> bool:
     )
 
 
-def local_ids(label: PageLabel) -> list[str]:
+def local_ids(label: Plannotation) -> list[str]:
     """Collect every ``localId`` declared on a page, in document order.
 
     Viewports, elements and annotations share one identifier space. They must,
@@ -924,7 +924,7 @@ def local_ids(label: PageLabel) -> list[str]:
     looking in one collection. Per-collection uniqueness would make a reference to a
     name used by both an element and an annotation ambiguous; page-wide uniqueness
     makes every reference resolvable by a single lookup. That is what
-    :class:`PageLabel` enforces.
+    :class:`Plannotation` enforces.
 
     Args:
         label: The page label to read.
@@ -939,7 +939,7 @@ def local_ids(label: PageLabel) -> list[str]:
     return collected
 
 
-def conformance_level(label: PageLabel) -> ConformanceLevel:
+def conformance_level(label: Plannotation) -> ConformanceLevel:
     """Return the conformance level a page label reaches.
 
     ``L1`` is page and sheet, plus viewports when there are any. Both are required by
@@ -1036,8 +1036,8 @@ def canonical_json(model: BaseModel) -> str:
     written without a fractional part.
 
     Args:
-        model: Any Plannotation model, normally a :class:`PageLabel` or a
-            :class:`LabelIndex`.
+        model: Any Plannotation model, normally a :class:`Plannotation` or a
+            :class:`PlannotationIndex`.
 
     Returns:
         The canonical text, ending in exactly one newline.
@@ -1100,11 +1100,11 @@ def _loads(text: str | bytes) -> object:
     return json.loads(text, parse_constant=_reject_json_constant)
 
 
-def load_page_label(text: str | bytes) -> PageLabel:
+def load_plannotation(text: str | bytes) -> Plannotation:
     """Parse and validate the label of one page.
 
     The inverse of :func:`canonical_json` for a page label: for canonical text,
-    ``canonical_json(load_page_label(text)) == text``, byte for byte.
+    ``canonical_json(load_plannotation(text)) == text``, byte for byte.
 
     Args:
         text: The label document, as text or as UTF-8 bytes.
@@ -1116,14 +1116,14 @@ def load_page_label(text: str | bytes) -> PageLabel:
         ValueError: If the text is not valid JSON.
         pydantic.ValidationError: If the document does not match the schema.
     """
-    return PageLabel.model_validate(_loads(text))
+    return Plannotation.model_validate(_loads(text))
 
 
-def load_label_index(text: str | bytes) -> LabelIndex:
+def load_plannotation_index(text: str | bytes) -> PlannotationIndex:
     """Parse and validate a document-level index.
 
     The inverse of :func:`canonical_json` for an index, on the same terms as
-    :func:`load_page_label`.
+    :func:`load_plannotation`.
 
     Args:
         text: The index document, as text or as UTF-8 bytes.
@@ -1135,14 +1135,14 @@ def load_label_index(text: str | bytes) -> LabelIndex:
         ValueError: If the text is not valid JSON.
         pydantic.ValidationError: If the document does not match the schema.
     """
-    return LabelIndex.model_validate(_loads(text))
+    return PlannotationIndex.model_validate(_loads(text))
 
 
 def load_sidecar(text: str | bytes) -> Sidecar:
     """Parse and validate a sidecar document.
 
     The inverse of :func:`canonical_json` for a sidecar, on the same terms as
-    :func:`load_page_label`.
+    :func:`load_plannotation`.
 
     Args:
         text: The sidecar document, as text or as UTF-8 bytes.

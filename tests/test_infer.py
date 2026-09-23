@@ -4,7 +4,7 @@
 The gate is recall on the three sample drawings with their labels stripped: at least
 90% of tags, 80% of dimensions and every grid, with precision reported. It is measured
 here against the *unlabelled* PDFs, so that nothing can be read off an attached label;
-the authored ``labels.json`` beside each is only the answer key.
+the authored ``plannotations.json`` beside each is only the answer key.
 
 Recall alone is easy to game -- call every word a tag and every tag is found -- so
 precision is asserted too, and the patterns are tested on their own so that a regression
@@ -152,14 +152,14 @@ class TestTheGate:
         Returns:
             ``[expected, found, correct]`` for each category.
         """
-        from plannotation.infer import infer_labels
+        from plannotation.infer import infer_plannotations
         from plannotation.infer.evaluate import score
-        from plannotation.model import load_page_label
+        from plannotation.model import load_plannotation
 
         totals: dict[str, list[int]] = {}
         for name in NAMES:
-            authored = load_page_label((SAMPLES / name / "labels.json").read_text("utf-8"))
-            [inferred], _ = infer_labels(SAMPLES / name / "sheet.pdf")
+            authored = load_plannotation((SAMPLES / name / "plannotations.json").read_text("utf-8"))
+            [inferred], _ = infer_plannotations(SAMPLES / name / "sheet.pdf")
             for item in score(authored, inferred):
                 total = totals.setdefault(item.category, [0, 0, 0])
                 total[0] += item.expected
@@ -194,9 +194,9 @@ class TestTheGate:
         Reading it as this sheet's own number named the wrong drawing, on the floor
         plan, and that is the defect this guards.
         """
-        from plannotation.infer import infer_labels
+        from plannotation.infer import infer_plannotations
 
-        [inferred], _ = infer_labels(SAMPLES / "floorplan" / "sheet.pdf")
+        [inferred], _ = infer_plannotations(SAMPLES / "floorplan" / "sheet.pdf")
         assert inferred.sheet.sheet_id == "ARC-101"
 
 
@@ -214,9 +214,9 @@ class TestWhatInferenceWrites:
         Returns:
             The inferred label.
         """
-        from plannotation.infer import infer_labels
+        from plannotation.infer import infer_plannotations
 
-        [label], _ = infer_labels(SAMPLES / name / "sheet.pdf")
+        [label], _ = infer_plannotations(SAMPLES / name / "sheet.pdf")
         return label
 
     def test_the_label_is_inferred(self) -> None:
@@ -317,14 +317,14 @@ class TestMatchingToTheModel:
     @pytest.mark.parametrize("name", NAMES)
     def test_every_mark_recovers_its_global_id(self, name: str) -> None:
         """Checked against the authored label, which the exporter wrote from the model."""
-        from plannotation.infer import infer_labels
-        from plannotation.model import load_page_label
+        from plannotation.infer import infer_plannotations
+        from plannotation.model import load_plannotation
 
-        authored = load_page_label((SAMPLES / name / "labels.json").read_text("utf-8"))
+        authored = load_plannotation((SAMPLES / name / "plannotations.json").read_text("utf-8"))
         truth = {
             normalise_mark(e.tag or ""): (e.ifc_guid, e.ifc_class) for e in authored.elements or []
         }
-        [inferred], matched = infer_labels(
+        [inferred], matched = infer_plannotations(
             SAMPLES / name / "sheet.pdf", ifc_model=SAMPLES / name / "model.ifc"
         )
         assert matched == len(truth)
@@ -333,9 +333,9 @@ class TestMatchingToTheModel:
 
     def test_a_match_stays_inferred(self) -> None:
         """SPEC 4.6.6: however confident, reconstructed data is never promoted to authored."""
-        from plannotation.infer import infer_labels
+        from plannotation.infer import infer_plannotations
 
-        [inferred], _ = infer_labels(
+        [inferred], _ = infer_plannotations(
             SAMPLES / "floorplan" / "sheet.pdf", ifc_model=SAMPLES / "floorplan" / "model.ifc"
         )
         for element in inferred.elements or []:
@@ -348,10 +348,10 @@ class TestMatchingToTheModel:
 )
 def test_real_world_drawings_do_not_crash_it() -> None:
     """Design brief section 12: no crash on real drawings, which are never committed."""
-    from plannotation.infer import infer_labels
+    from plannotation.infer import infer_plannotations
 
     documents = sorted((Path(__file__).parent / "fixtures" / "realworld").glob("*.pdf"))
     if not documents:
         pytest.skip("tests/fixtures/realworld holds no PDFs")
     for document in documents:
-        infer_labels(document)
+        infer_plannotations(document)

@@ -7,7 +7,7 @@ elements and annotations share a single ``localId`` namespace -- they must, beca
 which -- and ``target`` is the only member through which a label may name another page.
 
 Two of these rules run on the parsed JSON rather than on the loaded model, and the
-reason is worth stating because it looks like an inconsistency. :class:`PageLabel`
+reason is worth stating because it looks like an inconsistency. :class:`Plannotation`
 already refuses to load a label with a repeated ``localId``; so does the schema refuse
 several other things. A rule whose violation stops the model loading cannot be checked
 after the model has loaded, and reporting it as "the model would not load" would tell a
@@ -28,7 +28,7 @@ from plannotation.validate.schema import json_pointer
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from plannotation.model import Annotation, Element, PageLabel, Viewport
+    from plannotation.model import Annotation, Element, Plannotation, Viewport
     from plannotation.validate.report import Finding
 
 __all__ = [
@@ -105,7 +105,7 @@ def check_duplicate_ids(document: Mapping[str, object], *, source: str) -> list[
 
 
 def check_references(
-    label: PageLabel,
+    label: Plannotation,
     *,
     source: str,
     page_count: int | None = None,
@@ -157,7 +157,7 @@ def check_references(
 
 
 def _check_viewport_refs(
-    label: PageLabel,
+    label: Plannotation,
     viewports: Mapping[str, Viewport],
     *,
     source: str,
@@ -424,7 +424,7 @@ def _check_target(
     return found
 
 
-def check_sheet_ids(labels: Sequence[tuple[int, PageLabel]]) -> list[Finding]:
+def check_sheet_ids(labels: Sequence[tuple[int, Plannotation]]) -> list[Finding]:
     """Check that no two labelled pages of one document print the same sheet number.
 
     Args:
