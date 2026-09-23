@@ -715,13 +715,15 @@ class TestCarrierRules:
         assert findings == [], [f"{f.code}: {f.message}" for f in findings]
 
     def test_stripping_the_declaration_is_reported(self, tmp_path: Path) -> None:
-        """PL-CAR-008: a plannotated document should carry the claim it is entitled to."""
+        """PL-CAR-008: SPEC 6.3.8 makes a payload without its declaration an error."""
         plannotated = self._plannotated(tmp_path)
         with pikepdf.open(plannotated, allow_overwriting_input=True) as pdf:
             embed.remove_declaration(pdf)
             pdf.save(plannotated)
-        codes = [f.code for f in validate(plannotated).findings]
-        assert "PL-CAR-008" in codes
+        report = validate(plannotated)
+        missing = [f for f in report.findings if f.code == "PL-CAR-008"]
+        assert [f.severity for f in missing] == [Severity.ERROR]
+        assert report.failed
 
     def test_the_validator_does_not_modify_a_pdf(self, tmp_path: Path) -> None:
         """SPEC 4.4, checked by bytes."""

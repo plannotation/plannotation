@@ -452,12 +452,12 @@ _CATALOGUE: Final = (
     ),
     _rule(
         "PL-CAR-008",
-        _WARNING,
+        _ERROR,
         "a plannotated PDF carries the XMP PDF Declaration",
-        "SPEC 6.2, 6.3",
-        "Warning: the declaration is a claim and never evidence -- 9.2 forbids a reader "
-        "from treating it as validity -- so its absence costs discoverability, not "
-        "meaning, and the payload reads perfectly without it.",
+        "SPEC 6.3.1, 6.3.8",
+        "MUST, and 6.3.8 says a validator MUST report it as an error. That the "
+        "declaration is never evidence of validity (9.2) binds a reader that finds one; "
+        "it does not excuse a writer that failed to make it.",
     ),
     # -- Rule 4: the IFC cross-check -------------------------------------------
     _rule(

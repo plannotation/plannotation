@@ -2,8 +2,8 @@
 """Carrier consistency: the rules of section 6 that a validator must report.
 
 Sections 1 to 4 define the payload and section 6 defines the ways it travels. Most of
-section 6 binds writers and readers, but three passages bind a validator in terms, and
-this module is those three:
+section 6 binds writers and readers, but four passages bind a validator in terms, and
+this module is those four:
 
 * **6.5.1** -- a sidecar's ``plannotation`` must match its index's and every
   plannotation's, its ``pages`` must correspond one to one with ``index.pages``, and
@@ -20,11 +20,10 @@ this module is those three:
   index's claim true, and an index whose whole purpose is to save a reader from opening
   every attachment is worth nothing if it may misreport the two things it carries that
   the attachment also carries.
-
-The declaration is deliberately only a warning. 9.2 forbids a reader from treating a
-PDF Declaration as evidence that a payload is valid -- the declaration is a claim and
-the schema is the check -- so its absence costs discoverability and not meaning, and
-every plannotation in the document reads perfectly without it.
+* **6.3.8** -- a payload with no declaration is a writer's failure to make the claim
+  6.3.1 requires. "A validator MUST report it as an error", even though a reader still
+  reads the payload (6.2.12) and must never take a declaration it does find as
+  evidence that the payload is valid (9.2).
 """
 
 from __future__ import annotations
@@ -401,7 +400,7 @@ def check_declaration(*, present: bool, plannotated: bool, source: str) -> list[
         source: Which document it is, for the finding.
 
     Returns:
-        A single warning when a plannotated document carries no declaration.
+        A single error when a plannotated document carries no declaration.
     """
     if present or not plannotated:
         return []
@@ -410,9 +409,9 @@ def check_declaration(*, present: bool, plannotated: bool, source: str) -> list[
             "PL-CAR-008",
             message=(
                 f"the document carries Plannotation data but no XMP PDF Declaration naming "
-                f"the specification. The declaration is how a reader discovers that "
-                f"there is something to read; it is never evidence that what it finds "
-                f"is valid, which is why this is a warning and not an error "
+                f"the specification, which every plannotated PDF must carry. The "
+                f"declaration is how a reader discovers that there is something to read; "
+                f"the payload is still read without it "
                 f"(plannotation {SCHEMA_VERSION})"
             ),
             path="",
