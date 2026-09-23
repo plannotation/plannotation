@@ -10,6 +10,7 @@ tested against numbers whose answer is known independently, not against itself.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import re
@@ -673,6 +674,18 @@ class TestWhatEachSampleSheetCarries:
         model = ifcopenshell.open(str(SAMPLES / name / "model.ifc"))
         stated = _sample(name)["model"]["lengthUnit"]
         assert stated == length_unit_for(calculate_unit_scale(model))
+
+    @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
+    def test_the_plannotation_and_the_index_record_the_model_s_hash(self, name: str) -> None:
+        """SPEC 7.1.4: the exporter read the model from a file, so it records the file's hash."""
+        from plannotation.pdf import embed
+
+        digest = hashlib.sha256((SAMPLES / name / "model.ifc").read_bytes()).hexdigest()
+        assert _sample(name)["model"]["sha256"] == digest
+        index = embed.read(SAMPLES / name / "sheet.plannotated.pdf").index
+        assert index is not None
+        assert index.source_model is not None
+        assert index.source_model.sha256 == digest
 
     @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
     def test_at_least_six_dimensions_per_sheet(self, name: str) -> None:

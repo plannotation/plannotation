@@ -1874,7 +1874,8 @@ payload is unverified.
 
 **6.5.5 Binding a sidecar to its document.** Nothing in a filename proves that a
 sidecar was written for the document beside it. The payload's `index` may carry the
-hash of the *model* the plannotations came from, which says nothing about the PDF.
+hash of the *model* the plannotations came from (7.1.4), which says nothing about the
+PDF.
 
 Plannotation 0.1 does not add a member for this. The binding is the naming rule of
 6.5.4, checked against what the payload already states about the document's pages.
@@ -2045,6 +2046,21 @@ and a writer MAY decode it (6.4.5).
 `MILLI` — and a writer MUST read it from the model rather than assume it. Plannotation
 0.1 names no other unit; a model in a conversion-based unit (feet, inches) cannot be
 described with a `paperToPlane`, and a writer MUST NOT write one for it.
+
+**7.1.4 The source model.** `model` names the model a plannotation was written
+from, and `model.sha256` is what lets a reader holding a model tell whether it is
+that model or a later revision of it, the distinction 7.3 turns on. A writer that
+read the model from a file SHOULD record in `model.sha256` the SHA-256 of that
+file's bytes. It MUST NOT record the hash of a file that does not hold the model it
+wrote from: an authoring tool drawing a model with unsaved edits has no such file,
+and omits the member. An index SHOULD carry `model`, hash included, where every
+plannotation it lists records the same one, and MUST NOT carry one where they
+differ, since a document drawn from two models has no single source.
+
+This is a SHOULD and the member stays optional because 0.1 does not require a
+writer to have a model at all (7), and because only the writer knows whether the
+file it could hash is the model it drew. The hash identifies the model and never
+the document (6.5.5).
 
 ### 7.2 Correspondence *(informative)*
 

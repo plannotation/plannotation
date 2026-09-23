@@ -157,6 +157,8 @@ def plannotate_sheet(svg, pdf, out, *, sheet_id, title, model):
     from plannotation.svg.derive import attach_from_svg, source_from_model  # noqa: PLC0415
 
     path = bonsai_model_path()
+    # No model_sha256: the model Bonsai holds may have edits the file on disk has not
+    # saved, and SPEC 7.1.4 forbids hashing a file that is not the model drawn.
     source = source_from_model(
         model, sheet_id=sheet_id, title=title or None, model_file=path.name if path else None
     )

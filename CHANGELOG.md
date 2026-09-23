@@ -117,5 +117,10 @@ Ambiguities in the format, resolved and written into `spec/SPEC.md`:
 - **`element.properties` is typed exactly as permissively as the schema.** A reader
   stricter than the format would reject conforming third-party plannotations;
   ergonomics live in `Element.pset()` instead.
+- **A writer that read its model from a file records the file's SHA-256** in
+  `model.sha256`, and the index repeats it where every page shares that model. It is
+  how a reader holding a model tells the one drawn from a later revision. It stays a
+  SHOULD: a writer need not have a model, and a tool drawing unsaved edits has no file
+  that holds what it drew.
 
 [Unreleased]: https://github.com/plannotation/plannotation/commits/main

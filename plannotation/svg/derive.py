@@ -14,6 +14,7 @@ them, and guessing them from line work is inference's job, not a carrier's.
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import logging
 from dataclasses import dataclass
@@ -90,6 +91,8 @@ class SheetSource:
         title: The sheet's title.
         tags: Each product's ``Tag`` by GlobalId, when the model is at hand.
         model_file: The IFC file's name.
+        model_sha256: The SHA-256 of that file's bytes, only where the model was read
+            from it (SPEC 7.1.4).
         ifc_schema: The IFC schema, such as ``IFC4``.
     """
 
@@ -99,6 +102,7 @@ class SheetSource:
     title: str | None = None
     tags: Mapping[str, str] | None = None
     model_file: str | None = None
+    model_sha256: str | None = None
     ifc_schema: str | None = None
 
 
@@ -151,7 +155,10 @@ def derive_plannotation(
             drawingType=_drawing_type(viewports),
         ),
         model=Model(
-            file=source.model_file, lengthUnit=source.length_unit, schema=source.ifc_schema
+            file=source.model_file,
+            sha256=source.model_sha256,
+            lengthUnit=source.length_unit,
+            schema=source.ifc_schema,
         ),
         viewports=viewports or None,
         elements=elements or None,
@@ -164,6 +171,7 @@ def source_from_model(
     sheet_id: str,
     title: str | None = None,
     model_file: str | None = None,
+    model_sha256: str | None = None,
 ) -> SheetSource:
     """Take what an SVG does not say from the model it was drawn from.
 
@@ -172,6 +180,8 @@ def source_from_model(
         sheet_id: The sheet number.
         title: The sheet title.
         model_file: The model's file name.
+        model_sha256: The SHA-256 of the file the model was read from. None for a model
+            held in memory, since a saved file does not record the edits made since.
 
     Returns:
         The source: units, schema, and every product's ``Tag``.
@@ -193,6 +203,7 @@ def source_from_model(
         title=title,
         tags=tags,
         model_file=model_file,
+        model_sha256=model_sha256,
         ifc_schema=str(model.schema),
     )
 
@@ -217,7 +228,13 @@ def source_from_ifc(path: Path, *, sheet_id: str, title: str | None = None) -> S
         msg = "reading the model needs the ifc extra: pip install 'plannotation[ifc]'"
         raise CarrierError(msg) from error
     model = ifcopenshell.open(str(path))
-    return source_from_model(model, sheet_id=sheet_id, title=title, model_file=Path(path).name)
+    return source_from_model(
+        model,
+        sheet_id=sheet_id,
+        title=title,
+        model_file=Path(path).name,
+        model_sha256=hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+    )
 
 
 def attach_from_svg(

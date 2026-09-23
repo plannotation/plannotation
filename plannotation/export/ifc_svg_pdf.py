@@ -24,6 +24,7 @@ exercise nothing beyond L2.
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import re
@@ -186,6 +187,7 @@ class ModelFacts:
 
     Attributes:
         unit_scale: The model's length unit in metres.
+        sha256: The SHA-256 of the model file's bytes, which ``model.sha256`` records.
         classes: Each building element's IFC class and name, by GlobalId.
         tags: Each product's ``Tag``, by GlobalId.
         properties: Each product's common property sets, by GlobalId.
@@ -193,6 +195,7 @@ class ModelFacts:
     """
 
     unit_scale: float
+    sha256: str
     classes: dict[str, tuple[str, str | None]] = field(default_factory=dict)
     tags: dict[str, str] = field(default_factory=dict)
     properties: dict[str, dict[str, dict[str, object]]] = field(default_factory=dict)
@@ -349,6 +352,7 @@ def export_sheet(
         ),
         model=Model(
             file=built.path.name,
+            sha256=facts.sha256,
             lengthUnit=length_unit_for(facts.unit_scale),
             schema="IFC4",
         ),
@@ -367,7 +371,7 @@ def export_sheet(
 # The model
 # ---------------------------------------------------------------------------
 def read_model_facts(model_path: Path) -> ModelFacts:
-    """Read the unit, marks, common property sets and extents out of a model.
+    """Read the unit, hash, marks, common property sets and extents out of a model.
 
     Args:
         model_path: The IFC file.
@@ -398,6 +402,7 @@ def read_model_facts(model_path: Path) -> ModelFacts:
             properties[guid] = common
     return ModelFacts(
         unit_scale=float(unit.calculate_unit_scale(model)),
+        sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
         classes=classes,
         tags=tags,
         properties=properties,

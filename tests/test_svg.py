@@ -13,8 +13,10 @@ SVG must agree with the plannotation the exporter wrote from the model itself.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -525,6 +527,16 @@ class TestPlannotation:
         assert data["viewports"][0]["kind"] == "plan"
         assert data["viewports"][0]["paperBBox"] == [95, 130, 105, 135]
 
+    def test_the_model_s_hash_is_recorded_only_when_the_source_has_one(self) -> None:
+        """SPEC 7.1.4: the hash of the file read, and none for a model held in memory."""
+        sheet = parse_svg(svg(view(product())))
+        digest = "0123456789abcdef" * 4
+        read_from_file = replace(SOURCE, model_file="model.ifc", model_sha256=digest)
+        data = json.loads(canonical_json(derive_plannotation(sheet, read_from_file)))
+        assert data["model"] == {"file": "model.ifc", "sha256": digest, "lengthUnit": "m"}
+        data = json.loads(canonical_json(derive_plannotation(sheet, SOURCE)))
+        assert "sha256" not in data["model"]
+
     def test_a_vertical_plane_is_a_section(self) -> None:
         """A view whose axes leave the horizontal is not a plan."""
         vertical = "[[1,0,0,0],[0,0,1,0],[0,-1,0,5],[0,0,0,1]]"
@@ -729,6 +741,8 @@ class TestFromSvgCommand:
         plannotation = next(iter(read_pdf_plannotations(out).values()))
         assert plannotation.source_model is not None
         assert plannotation.source_model.ifc_schema == "IFC4"
+        model_bytes = (SAMPLES / "floorplan" / "model.ifc").read_bytes()
+        assert plannotation.source_model.sha256 == hashlib.sha256(model_bytes).hexdigest()
         marks = {e.tag for e in plannotation.elements or []}
         assert marks == {f"Pos. {n}" for n in range(1, 6)} | {"T1", "T2", "W1", "W2"}
 
