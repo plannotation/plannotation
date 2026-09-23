@@ -522,9 +522,10 @@ def from_svg(  # noqa: PLR0913, PLR0917 -- one option per fact the SVG does not 
     read from the markers IfcOpenShell's serializer already writes into the SVG, so the
     plannotation is authored, at level L2. This is what the Bonsai operator runs.
 
+    \f
     Raises:
         typer.Exit: With 1 when the SVG cannot be read or does not match the PDF.
-    """
+    """  # noqa: D301 -- the form feed ends the --help text
     from plannotation.svg.derive import (  # noqa: PLC0415 -- only this command needs it
         SheetSource,
         attach_from_svg,
@@ -851,10 +852,11 @@ def samples_build(
     from the code that makes them. The output is reproducible: rebuild it tomorrow and
     the bytes are the same.
 
+    \f
     Raises:
         typer.Exit: With 2 when a sample cannot be built, which includes the optional
             extras being absent.
-    """
+    """  # noqa: D301 -- the form feed ends the --help text
     # Imported here: the exporter needs the ifc and svg extras, and importing it
     # at module scope would make every other command depend on them too.
     from plannotation.export.samples import build_samples  # noqa: PLC0415
@@ -898,9 +900,10 @@ def inspect(
     The same information the single-file inspector draws over the page, for a terminal
     and for a pipe. Where the browser shows where things are, this shows what they are.
 
+    \f
     Raises:
         typer.Exit: With 2 when the document cannot be read.
-    """
+    """  # noqa: D301 -- the form feed ends the --help text
     # Read leniently, so that one unreadable plannotation among several does not hide
     # the rest (SPEC 4.3 (2)). But a document that yields nothing at all may be a
     # document with no plannotations or one this reader could not parse, and those are
@@ -1057,13 +1060,14 @@ def infer(
     """Reconstruct plannotations for a legacy PDF and write a plannotated copy.
 
     Reads what is printed on each page -- the title block, grid bubbles, dimensions,
-    marks and callouts -- and records what it finds as ``inferred``, each item with a
+    marks and callouts -- and records what it finds as inferred, each item with a
     confidence. The input is never modified. With --ifc, every mark the model also holds
     is matched back to its element, adding the GlobalId and the model's own class.
 
+    \f
     Raises:
         typer.Exit: With 2 when the document cannot be read or written.
-    """
+    """  # noqa: D301 -- the form feed ends the --help text
     from plannotation.infer import infer_document  # noqa: PLC0415 - optional, and heavy
 
     if llm:
