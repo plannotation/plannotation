@@ -55,7 +55,9 @@ Code    Meaning
 ``2``   The input could not be validated at all. It does not exist, cannot be
         read, is not a Plannotation document, carries no Plannotation data, or a
         check the caller explicitly asked for could not be made -- ``--ifc``
-        without ifcopenshell, ``--verapdf`` without a runnable veraPDF.
+        without ifcopenshell, ``--verapdf`` without a runnable veraPDF. A PDF
+        whose XMP declares a payload it does not carry is not one of these:
+        6.3.8 makes that an error, so it is validated and exits ``1``.
 ======  =======================================================================
 
 The third code is the one that earns its keep. Without it, a missing optional

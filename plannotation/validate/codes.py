@@ -459,6 +459,34 @@ _CATALOGUE: Final = (
         "declaration is never evidence of validity (9.2) binds a reader that finds one; "
         "it does not excuse a writer that failed to make it.",
     ),
+    _rule(
+        "PL-CAR-009",
+        _ERROR,
+        "a PDF carries no more than one Plannotation declaration",
+        "SPEC 6.3.1",
+        "MUST, and 6.3.1 says a validator MUST report more than one as an error. A "
+        "reader treats two as one, which is a rule for surviving the defect and not "
+        "permission to ship it.",
+    ),
+    _rule(
+        "PL-CAR-010",
+        _ERROR,
+        "every pdfd:declarations property is an rdf:Bag of structures",
+        "SPEC 6.3.3",
+        "MUST, and 6.3.3 says a validator MUST report it as an error rather than "
+        "interpret it: an rdf:Seq or a plain-text member is not a declaration. The array "
+        "is shared with other producers' claims, so it is reported whoever wrote it, and "
+        "nothing in it counts towards PL-CAR-008 or PL-CAR-009.",
+    ),
+    _rule(
+        "PL-CAR-011",
+        _ERROR,
+        "a PDF that declares a Plannotation payload carries one",
+        "SPEC 6.3.8",
+        "MUST, and 6.3.8 says a validator MUST report it as an error: the declaration is a "
+        "claim the document does not support. Such a PDF is validated and fails, rather "
+        "than being turned away as a document that was never plannotated.",
+    ),
     # -- Rule 4: the IFC cross-check -------------------------------------------
     _rule(
         "PL-IFC-001",

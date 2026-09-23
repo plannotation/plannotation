@@ -20,17 +20,23 @@ this module is those four:
   index's claim true, and an index whose whole purpose is to save a reader from opening
   every attachment is worth nothing if it may misreport the two things it carries that
   the attachment also carries.
-* **6.3.8** -- a payload with no declaration is a writer's failure to make the claim
-  6.3.1 requires. "A validator MUST report it as an error", even though a reader still
-  reads the payload (6.2.12) and must never take a declaration it does find as
-  evidence that the payload is valid (9.2).
+* **6.3** -- the XMP PDF Declaration, which binds a validator three times over. A
+  payload with no declaration is a writer's failure to make the claim 6.3.1 requires,
+  and a declaration with no payload is a claim the document does not support; 6.3.8
+  says "a validator MUST report it as an error" of each, even though a reader still
+  reads the payload (6.2.12) and must never take a declaration it does find as evidence
+  that the payload is valid (9.2). 6.3.1 adds that a validator must report more than
+  one declaration, and 6.3.3 that it must report a ``pdfd:declarations`` property that
+  is an ``rdf:Seq``, or whose members are plain text, "rather than interpret it". What
+  the packet holds is counted by :func:`plannotation.pdf.embed.carrier_report`, with
+  the scan the writer uses; this module only decides what the count means.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plannotation.constants import SCHEMA_VERSION
+from plannotation.constants import SCHEMA_VERSION, SPEC_URI
 from plannotation.model import conformance_level
 from plannotation.validate.codes import finding
 from plannotation.validate.schema import json_pointer
@@ -391,30 +397,87 @@ def check_pairing(
     ]
 
 
-def check_declaration(*, present: bool, plannotated: bool, source: str) -> list[Finding]:
-    """Check that a plannotated PDF carries the XMP PDF Declaration.
+def check_declaration(
+    *,
+    count: int,
+    defects: Sequence[str],
+    plannotated: bool,
+    source: str,
+) -> list[Finding]:
+    """Check a PDF's XMP PDF Declaration against the payload it carries.
 
     Args:
-        present: Whether a declaration naming the Plannotation specification was found.
-        plannotated: Whether the document carries any Plannotation payload at all.
-        source: Which document it is, for the finding.
+        count: How many declarations naming the Plannotation specification the catalog's
+            XMP packet holds, in well-formed ``pdfd:declarations`` arrays.
+        defects: One line for each ``pdfd:declarations`` property that is not an
+            ``rdf:Bag`` of structures.
+        plannotated: Whether the document carries a Plannotation payload -- a
+            plannotation or an index, valid or not. One the schema refused is still
+            there, and still what the declaration is a claim about.
+        source: Which document it is, for the findings.
 
     Returns:
-        A single error when a plannotated document carries no declaration.
+        PL-CAR-008 when a payload has no declaration, PL-CAR-009 when there is more than
+        one, PL-CAR-010 for each malformed declarations property, and PL-CAR-011 when a
+        declaration has no payload.
     """
-    if present or not plannotated:
-        return []
-    return [
+    found: list[Finding] = []
+    if plannotated and count == 0:
+        also = (
+            "; a claim inside a malformed declarations array is not a declaration (PL-CAR-010)"
+            if defects
+            else ""
+        )
+        found.append(
+            finding(
+                "PL-CAR-008",
+                message=(
+                    f"the document carries Plannotation data but no XMP PDF Declaration "
+                    f"naming the specification, which every plannotated PDF must carry. "
+                    f"The declaration is how a reader discovers that there is something to "
+                    f"read; the payload is still read without it "
+                    f"(plannotation {SCHEMA_VERSION}){also}"
+                ),
+                path="",
+                source=source,
+            )
+        )
+    if count > 1:
+        found.append(
+            finding(
+                "PL-CAR-009",
+                message=(
+                    f"the XMP packet holds {count} PDF Declarations naming {SPEC_URI}; a "
+                    f"plannotated PDF carries exactly one, and a reader treats the document "
+                    f"as carrying one"
+                ),
+                path="",
+                source=source,
+            )
+        )
+    found += [
         finding(
-            "PL-CAR-008",
+            "PL-CAR-010",
             message=(
-                f"the document carries Plannotation data but no XMP PDF Declaration naming "
-                f"the specification, which every plannotated PDF must carry. The "
-                f"declaration is how a reader discovers that there is something to read; "
-                f"the payload is still read without it "
-                f"(plannotation {SCHEMA_VERSION})"
+                f"{defect}. Section 6.3.3 says such a property is not a declaration, so "
+                f"nothing in it was read as one"
             ),
             path="",
             source=source,
         )
+        for defect in defects
     ]
+    if count > 0 and not plannotated:
+        found.append(
+            finding(
+                "PL-CAR-011",
+                message=(
+                    f"the XMP packet declares that the document carries a Plannotation "
+                    f"{SCHEMA_VERSION} payload, and it carries none: no plannotation and no "
+                    f"index. A declaration is a claim, and this document does not support it"
+                ),
+                path="",
+                source=source,
+            )
+        )
+    return found

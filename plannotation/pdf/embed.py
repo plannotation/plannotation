@@ -1757,7 +1757,12 @@ _RDF_CLOSE: Final = re.compile(rb"</([A-Za-z_][\w.\-]*:)?RDF\s*>")
 
 #: The opening tag of a ``declarations`` property, whatever prefix it carries. Group 3
 #: is ``/`` for the self-closing form, which is a property that is not an array at all.
-_DECLARATIONS_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?declarations(\s[^>]*?)?(/?)>")
+#:
+#: This and every other opening-tag pattern the declaration census runs stop at the next
+#: ``<``, which XML forbids inside an attribute value, so a well-formed tag matches as it
+#: always did. Stopping only at ``>`` let each ``<declarations`` in a packet with no
+#: ``>`` after it scan to the end, and a megabyte of them took minutes to search.
+_DECLARATIONS_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?declarations(\s[^<>]*?)?(/?)>")
 
 #: The closing tag of a ``declarations`` property, which bounds the search for its Bag:
 #: without it, a packet whose declarations property holds no array would have a member
@@ -1766,7 +1771,7 @@ _DECLARATIONS_CLOSE: Final = re.compile(rb"</([A-Za-z_][\w.\-]*:)?declarations\s
 
 #: The opening tag of an ``rdf:Bag``. Group 3 is ``/`` for the self-closing, and
 #: therefore empty, form.
-_BAG_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?Bag(\s[^>]*?)?(/?)>")
+_BAG_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?Bag(\s[^<>]*?)?(/?)>")
 
 #: The closing tag of an ``rdf:Bag``.
 _BAG_CLOSE: Final = re.compile(rb"</([A-Za-z_][\w.\-]*:)?Bag\s*>")
@@ -1777,6 +1782,42 @@ _DESCRIPTION_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?Description(\s[^>
 #: An ``rdf:about`` attribute inside such a tag, with the quoted literal as group 1 so
 #: that the value can be reused exactly as the packet spells it, quotes and all.
 _ABOUT_ATTRIBUTE: Final = re.compile(rb"(?:[A-Za-z_][\w.\-]*:)?about\s*=\s*(\"[^\"]*\"|'[^']*')")
+
+#: The opening tag of any element: its prefix as group 1, its local name as group 2, its
+#: attributes as group 3, and ``/`` for the self-closing form as group 4. A processing
+#: instruction, a declaration and a closing tag do not match.
+_ELEMENT_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?([A-Za-z_][\w.\-]*)(\s[^<>]*?)?(/?)>")
+
+#: The opening tag of an ``rdf:li``, laid out like :data:`_BAG_OPEN`: attributes as
+#: group 2 and ``/`` for the self-closing form as group 3.
+_LI_OPEN: Final = re.compile(rb"<([A-Za-z_][\w.\-]*:)?li(\s[^<>]*?)?(/?)>")
+
+#: The closing tag of an ``rdf:li``.
+_LI_CLOSE: Final = re.compile(rb"</([A-Za-z_][\w.\-]*:)?li\s*>")
+
+#: An ``rdf:parseType`` attribute, with its value as group 1. The lookbehind lets a
+#: match begin only where a name does, so that a long run of name characters is scanned
+#: once rather than once from every byte in it.
+_PARSE_TYPE: Final = re.compile(
+    rb"(?<![\w.\-])(?:[A-Za-z_][\w.\-]*:)?parseType\s*=\s*[\"']([^\"']*)[\"']"
+)
+
+#: A quoted attribute value, removed before attribute names are read so that a value
+#: which happens to look like ``a:b=`` is not taken for an attribute.
+_QUOTED_VALUE: Final = re.compile(rb"\"[^\"]*\"|'[^']*'")
+
+#: A qualified attribute name, with its prefix as group 1 and its local name as group 2,
+#: beginning only where a name does, for the reason :data:`_PARSE_TYPE` gives.
+_QUALIFIED_ATTRIBUTE: Final = re.compile(
+    rb"(?<![\w.\-])([A-Za-z_][\w.\-]*):([A-Za-z_][\w.\-]*)\s*="
+)
+
+#: The local names of the attributes RDF/XML reads as syntax, or as a note on a literal,
+#: rather than as a field of a structure. Any other qualified attribute on an ``rdf:li``
+#: is the shorthand in which a structure's fields are written as attributes.
+_RDF_SYNTAX_ATTRIBUTES: Final = frozenset(
+    {b"about", b"datatype", b"ID", b"lang", b"nodeID", b"parseType", b"resource", b"space"}
+)
 
 #: An expanded self-closing Bag holding nothing but Plannotation's claim, which is what
 #: :func:`remove_declaration` collapses back to ``<rdf:Bag/>``. Group 1 is the original
@@ -2083,25 +2124,58 @@ def _bag_splice(visible: bytes, start: int, end: int) -> tuple[int, int, bytes]:
         prefix = opened.group(1) or b""
         expanded = tag[:-2] + b">" + _SOLE_DECLARATION_LI + b"</" + prefix + b"Bag>"
         return opened.start(), opened.end(), expanded
+    closed = _closing_tag(visible, opened.end(), end, opening=_BAG_OPEN, closing=_BAG_CLOSE)
+    if closed is None:
+        msg = (
+            "the document's XMP metadata opens an rdf:Bag inside its declarations "
+            "property and never closes it, so the file is damaged"
+        )
+        raise DeclarationError(msg)
+    return closed.start(), closed.start(), _DECLARATION_LI
+
+
+def _closing_tag(
+    visible: bytes,
+    at: int,
+    end: int,
+    *,
+    opening: re.Pattern[bytes],
+    closing: re.Pattern[bytes],
+) -> re.Match[bytes] | None:
+    """Find the closing tag that matches an opening tag, skipping nested ones.
+
+    Args:
+        visible: The packet, masked by :func:`_visible`.
+        at: The offset just after the opening tag.
+        end: The offset no search passes.
+        opening: The opening tag of the element, with ``/`` for the self-closing form
+            as group 3, as :data:`_BAG_OPEN` and :data:`_LI_OPEN` have it.
+        closing: Its closing tag.
+
+    Returns:
+        The matching closing tag, or None when the element is never closed before
+        ``end``. Nesting is tracked because a ``pdfd:claimData`` inside a declaration
+        is itself an ``rdf:Bag`` of ``rdf:li`` members.
+
+        Each search resumes where the last of its kind stopped, so the walk reads the
+        span once. Searching both again from each tag it passed read the span once per
+        nested element, which a packet of ten thousand nested members makes quadratic.
+    """
     depth = 1
-    at = opened.end()
-    while True:
-        closed = _BAG_CLOSE.search(visible, at, end)
-        if closed is None:
-            msg = (
-                "the document's XMP metadata opens an rdf:Bag inside its declarations "
-                "property and never closes it, so the file is damaged"
-            )
-            raise DeclarationError(msg)
-        nested = _BAG_OPEN.search(visible, at, end)
+    nested = opening.search(visible, at, end)
+    closed = closing.search(visible, at, end)
+    while closed is not None:
         if nested is not None and nested.start() < closed.start():
             depth += 0 if nested.group(3) else 1
-            at = nested.end()
+            if closed.start() < nested.end():
+                closed = closing.search(visible, nested.end(), end)
+            nested = opening.search(visible, nested.end(), end)
             continue
         depth -= 1
         if depth == 0:
-            return closed.start(), closed.start(), _DECLARATION_LI
-        at = closed.end()
+            return closed
+        closed = closing.search(visible, closed.end(), end)
+    return None
 
 
 def _declaration_splice(packet: bytes) -> tuple[int, int, bytes]:
@@ -2247,6 +2321,176 @@ def has_declaration(pdf: Pdf) -> bool:
         :data:`plannotation.constants.SPEC_URI`.
     """
     return _declared(_read_packet(pdf))
+
+
+def _declaration_census(packet: _Packet) -> tuple[int, tuple[str, ...]]:
+    """Count Plannotation's declarations in a packet, and say which arrays are malformed.
+
+    :func:`has_declaration` answers a writer's question -- is the claim already there,
+    so that it is not written twice -- and answers it tolerantly. A validator has two
+    stricter ones. Section 6.3.1 requires it to report more than one Plannotation
+    declaration, so it needs a count. Section 6.3.3 says that a ``declarations``
+    property serialised as an ``rdf:Seq``, or whose members are plain text rather than
+    structures, is not a declaration and is to be reported rather than interpreted, so
+    it needs to know which arrays are well formed, and must count only inside those.
+
+    The scan is the writer's: over the masked packet, so that nothing in a comment or a
+    CDATA section counts, prefix-blind, and without parsing the packet as XML, because
+    the packet is attacker-controlled (section 9).
+
+    Args:
+        packet: The packet, as :func:`_read_packet` returned it.
+
+    Returns:
+        How many Declaration structures name :data:`plannotation.constants.SPEC_URI`,
+        counted only in well-formed ``declarations`` properties; and one line for each
+        property that is not well formed, in packet order. A packet that was not read
+        declares nothing, and nothing can be said about its arrays.
+    """
+    data = packet.data
+    if data is None:
+        return 0, ()
+    visible = _visible(data)
+    if NS_PDFD.encode() not in visible:
+        return 0, ()
+    count = 0
+    defects: list[str] = []
+    at = 0
+    while (opened := _DECLARATIONS_OPEN.search(visible, at)) is not None:
+        where = f"the declarations property at byte {opened.start()} of the XMP packet"
+        if opened.group(3):
+            defects.append(f"{where} is self-closing, so it holds no rdf:Bag")
+            at = opened.end()
+            continue
+        closed = _DECLARATIONS_CLOSE.search(visible, opened.end())
+        if closed is None:
+            defects.append(f"{where} is never closed")
+            break
+        found, defect = _census_of_property(visible, opened.end(), closed.start())
+        if defect is None:
+            count += found
+        else:
+            defects.append(f"{where} {defect}")
+        at = closed.end()
+    return count, tuple(defects)
+
+
+def _census_of_property(visible: bytes, start: int, end: int) -> tuple[int, str | None]:
+    """Examine the value of one ``declarations`` property.
+
+    Args:
+        visible: The packet, masked by :func:`_visible`.
+        start: The offset just after the property's opening tag.
+        end: The offset of its closing tag.
+
+    Returns:
+        How many of its members are Declaration structures naming the specification,
+        and None when the property is an ``rdf:Bag`` of structures. Otherwise zero,
+        because a malformed property is not a declaration and nothing in it is
+        counted, and what is wrong with it, worded to follow "the declarations property
+        ...". A self-closing ``rdf:Bag`` is an empty array, which is well formed.
+    """
+    array = _ELEMENT_OPEN.search(visible, start, end)
+    if array is None:
+        return 0, "holds no rdf:Bag"
+    if array.group(2) != b"Bag":
+        written = ((array.group(1) or b"") + array.group(2)).decode("ascii", "replace")
+        return 0, f"is serialised as {_clip(written)} rather than rdf:Bag"
+    if array.group(4):
+        return 0, None
+    return _census_of_bag(visible, array.end(), end)
+
+
+def _census_of_bag(visible: bytes, start: int, end: int) -> tuple[int, str | None]:
+    """Examine the ``rdf:Bag`` a ``declarations`` property holds.
+
+    Args:
+        visible: The packet, masked by :func:`_visible`.
+        start: The offset just after the Bag's opening tag.
+        end: The offset of the property's closing tag, which the Bag must close before.
+
+    Returns:
+        As :func:`_census_of_property`.
+    """
+    closed = _closing_tag(visible, start, end, opening=_BAG_OPEN, closing=_BAG_CLOSE)
+    if closed is None:
+        return 0, "opens an rdf:Bag and never closes it"
+    members = _bag_members(visible, start, closed.start())
+    if members is None:
+        return 0, "opens a member of its rdf:Bag and never closes it"
+    plain = [
+        str(position)
+        for position, (tag, begin, stop) in enumerate(members, start=1)
+        if not _is_structure(visible, tag, begin, stop)
+    ]
+    if plain:
+        listed = ", ".join(plain[:_MAX_REPORTED_ERRORS])
+        if len(plain) > _MAX_REPORTED_ERRORS:
+            listed += f" and {len(plain) - _MAX_REPORTED_ERRORS} more"
+        return 0, f"has plain text rather than a structure as rdf:Bag member {listed}"
+    return sum(1 for _, begin, stop in members if _CONFORMS_TO.search(visible, begin, stop)), None
+
+
+def _bag_members(
+    visible: bytes, start: int, end: int
+) -> list[tuple[re.Match[bytes], int, int]] | None:
+    """Return the members of an ``rdf:Bag``.
+
+    Args:
+        visible: The packet, masked by :func:`_visible`.
+        start: The offset just after the Bag's opening tag.
+        end: The offset of its closing tag.
+
+    Returns:
+        One entry per ``rdf:li`` directly inside the Bag, in order: its opening tag and
+        the span of its content, which is empty for a self-closing member. The members
+        of a ``pdfd:claimData`` inside a declaration are that declaration's content, not
+        members of their own. None when a member is never closed.
+    """
+    members: list[tuple[re.Match[bytes], int, int]] = []
+    at = start
+    while (opened := _LI_OPEN.search(visible, at, end)) is not None:
+        if opened.group(3):
+            members.append((opened, opened.end(), opened.end()))
+            at = opened.end()
+            continue
+        closed = _closing_tag(visible, opened.end(), end, opening=_LI_OPEN, closing=_LI_CLOSE)
+        if closed is None:
+            return None
+        members.append((opened, opened.end(), closed.start()))
+        at = closed.end()
+    return members
+
+
+def _is_structure(visible: bytes, tag: re.Match[bytes], start: int, end: int) -> bool:
+    """Report whether an ``rdf:li`` holds a structure rather than plain text.
+
+    RDF/XML has three ways to write a structure as an array member, and a packet that
+    another tool has re-serialised may use any of them: ``rdf:parseType="Resource"``,
+    which section 6.3.3 asks a writer for; a nested ``rdf:Description``; and the
+    shorthand that writes the fields as attributes of the ``rdf:li`` itself. Anything
+    else -- text, a URI in ``rdf:resource``, an XML literal -- is a simple value.
+
+    Args:
+        visible: The packet, masked by :func:`_visible`.
+        tag: The member's opening tag, from :data:`_LI_OPEN`.
+        start: The offset just after it.
+        end: The offset of the member's closing tag, or ``start`` for a self-closing
+            member.
+
+    Returns:
+        True for a structure.
+    """
+    attributes = tag.group(2) or b""
+    parse_type = _PARSE_TYPE.search(attributes)
+    if parse_type is not None:
+        return parse_type.group(1) == b"Resource"
+    if _ELEMENT_OPEN.search(visible, start, end) is not None:
+        return True
+    names = _QUALIFIED_ATTRIBUTE.findall(_QUOTED_VALUE.sub(b"", attributes))
+    return any(
+        prefix != b"xmlns" and local not in _RDF_SYNTAX_ATTRIBUTES for prefix, local in names
+    )
 
 
 def add_declaration(pdf: Pdf) -> bool:
@@ -3695,8 +3939,15 @@ class CarrierReport:
         source: The file read.
         carrier: ``"pdf"`` or ``"sidecar"``.
         plannotations: The index and plannotations found.
-        declaration: Whether a PDF Declaration naming the Plannotation specification is
-            present. Only a PDF can carry one.
+        declaration_count: How many PDF Declarations naming the Plannotation
+            specification the catalog's XMP packet holds, counted only in
+            ``pdfd:declarations`` arrays that are well formed: section 6.3.3 says a
+            malformed one is not a declaration. One in a document that is as it should
+            be, since 6.3.1 allows no more. Always 0 for a sidecar, which cannot carry
+            one.
+        declaration_defects: One line for each ``pdfd:declarations`` property that is
+            not an ``rdf:Bag`` of structures, saying what is wrong with it. Empty when
+            every declarations array in the packet is well formed.
         signature: What the document says about being signed, or None for a sidecar.
         page_count: How many pages the document has, or None for a sidecar, which
             does not know.
@@ -3706,10 +3957,23 @@ class CarrierReport:
     source: Path
     carrier: Literal["pdf", "sidecar"]
     plannotations: PlannotationSet
-    declaration: bool
+    declaration_count: int
+    declaration_defects: tuple[str, ...]
     signature: SignatureReport | None
     page_count: int | None
     filenames: tuple[str, ...]
+
+    @property
+    def declaration(self) -> bool:
+        """Report whether the document declares that it carries a Plannotation payload.
+
+        Returns:
+            True when the packet holds at least one well-formed declaration naming the
+            specification. A reader that finds two treats the document as carrying one
+            (6.3.1), so this is the question a reader asks; a validator asks
+            :attr:`declaration_count`.
+        """
+        return self.declaration_count > 0
 
 
 def carrier_report(
@@ -3741,19 +4005,22 @@ def carrier_report(
             source=path,
             carrier="sidecar",
             plannotations=plannotations,
-            declaration=False,
+            declaration_count=0,
+            declaration_defects=(),
             signature=None,
             page_count=None,
             filenames=(path.name,),
         )
     with _opened(path) as pdf:
+        declaration_count, declaration_defects = _declaration_census(_read_packet(pdf))
         return CarrierReport(
             source=path,
             carrier="pdf",
             plannotations=read_pdf(
                 pdf, strict=strict, max_plannotation_bytes=max_plannotation_bytes
             ),
-            declaration=has_declaration(pdf),
+            declaration_count=declaration_count,
+            declaration_defects=declaration_defects,
             signature=signature_report(pdf),
             page_count=len(pdf.pages),
             filenames=tuple(

@@ -725,6 +725,85 @@ class TestCarrierRules:
         assert [f.severity for f in missing] == [Severity.ERROR]
         assert report.failed
 
+    def _with_packet(self, tmp_path: Path, packet: bytes) -> Path:
+        """Build a plannotated PDF and replace its XMP packet.
+
+        Args:
+            tmp_path: Directory to write into.
+            packet: The exact bytes the catalog's ``/Metadata`` stream is to hold.
+
+        Returns:
+            The document's path.
+        """
+        plannotated = self._plannotated(tmp_path)
+        with pikepdf.open(plannotated, allow_overwriting_input=True) as pdf:
+            pdf.Root[pikepdf.Name.Metadata].write(packet)
+            pdf.save(plannotated, fix_metadata_version=False)
+        return plannotated
+
+    def test_a_second_declaration_is_reported(self, tmp_path: Path) -> None:
+        """PL-CAR-009: SPEC 6.3.1 allows one Plannotation declaration and says to report more."""
+        report = validate(self._with_packet(tmp_path, fx.DOUBLE_DECLARATION_PACKET))
+        assert [(f.code, f.severity) for f in report.findings] == [("PL-CAR-009", Severity.ERROR)]
+        assert "holds 2 PDF Declarations" in report.findings[0].message
+
+    def test_a_declarations_seq_is_reported_and_not_read(self, tmp_path: Path) -> None:
+        """PL-CAR-010: SPEC 6.3.3 says to report an rdf:Seq rather than interpret it.
+
+        So the claim inside it is not counted, and the payload has no declaration either.
+        """
+        report = validate(self._with_packet(tmp_path, fx.SEQ_DECLARATIONS_PACKET))
+        assert sorted(f.code for f in report.findings) == ["PL-CAR-008", "PL-CAR-010"]
+        malformed = next(f for f in report.findings if f.code == "PL-CAR-010")
+        assert malformed.severity is Severity.ERROR
+        assert "rdf:Seq rather than rdf:Bag" in malformed.message
+
+    def test_a_plain_text_declaration_is_reported_and_not_read(self, tmp_path: Path) -> None:
+        """PL-CAR-010: the other shape 6.3.3 names, a member that is not a structure."""
+        report = validate(self._with_packet(tmp_path, fx.PLAIN_TEXT_DECLARATIONS_PACKET))
+        assert sorted(f.code for f in report.findings) == ["PL-CAR-008", "PL-CAR-010"]
+        malformed = next(f for f in report.findings if f.code == "PL-CAR-010")
+        assert "plain text rather than a structure as rdf:Bag member 1" in malformed.message
+
+    def test_a_reserialised_declaration_is_one_well_formed_declaration(
+        self, tmp_path: Path
+    ) -> None:
+        """The clean control for the three rules above.
+
+        RDF/XML spells a structure three ways, another tool may bind another prefix, and
+        a comment is not markup. A validator that miscounted any of them would report a
+        declaration that another tool had only reformatted.
+        """
+        plannotated = self._with_packet(tmp_path, fx.RESERIALISED_DECLARATION_PACKET)
+        read = embed.carrier_report(plannotated)
+        assert (read.declaration_count, read.declaration_defects) == (1, ())
+        findings = list(validate(plannotated).findings)
+        assert findings == [], [f"{f.code}: {f.message}" for f in findings]
+
+    def test_a_declaration_without_a_payload_is_reported(self, tmp_path: Path) -> None:
+        """PL-CAR-011: SPEC 6.3.8 makes it an error, so the document is validated and fails.
+
+        Exit 2 would say there was nothing to validate. There is: a claim that the
+        document carries a payload, which it does not.
+        """
+        declared = tmp_path / "declared.pdf"
+        declared.write_bytes(fx.build_bare())
+        with pikepdf.open(declared, allow_overwriting_input=True) as pdf:
+            assert embed.add_declaration(pdf)
+            pdf.save(declared, fix_metadata_version=False)
+        report = validate(declared)
+        assert [(f.code, f.severity) for f in report.findings] == [("PL-CAR-011", Severity.ERROR)]
+        assert report.pages == ()
+        assert CliRunner().invoke(app, ["validate", str(declared)]).exit_code == 1
+
+    def test_a_document_with_neither_payload_nor_declaration_is_not_validated(
+        self, tmp_path: Path
+    ) -> None:
+        """Exit 2 still means a document that was never plannotated."""
+        bare = tmp_path / "bare.pdf"
+        bare.write_bytes(fx.build_bare())
+        assert CliRunner().invoke(app, ["validate", str(bare)]).exit_code == 2
+
     def test_the_validator_does_not_modify_a_pdf(self, tmp_path: Path) -> None:
         """SPEC 4.4, checked by bytes."""
         plannotated = self._plannotated(tmp_path)

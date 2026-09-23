@@ -103,7 +103,8 @@ def validate(
 
     Raises:
         InputNotValidatableError: If the file does not exist, cannot be read, is not a
-            Plannotation document, or carries no Plannotation data.
+            Plannotation document, or carries no Plannotation data -- neither a payload
+            nor, in a PDF, a declaration that it carries one.
         MissingExtraError: If ``ifc_model`` is given and ifcopenshell is not installed.
         ExternalToolError: If ``run_verapdf`` is set and veraPDF is absent or unusable.
     """
@@ -314,8 +315,10 @@ def _validate_pdf(
         The report.
 
     Raises:
-        InputNotValidatableError: If the document cannot be read, or carries no
-            Plannotation data at all and nothing went wrong that could be reported.
+        InputNotValidatableError: If the document cannot be read, or carries neither a
+            Plannotation payload nor a declaration that it does. A declaration alone is
+            not refused: 6.3.8 makes it an error to report, so the document is
+            validated, and fails.
     """
     findings: list[Finding] = []
     try:
@@ -326,7 +329,10 @@ def _validate_pdf(
     except (CarrierError, OSError) as exc:
         msg = f"{path} could not be read as a PDF: {exc}"
         raise InputNotValidatableError(msg) from exc
-    if read.plannotations.is_empty and not findings:
+    # A payload the strict read refused is still a payload. A reader treats it as absent
+    # (4.3 (2)) and PL-SCH-001 says why, but it is what the declaration is a claim about.
+    plannotated = bool(findings) or not read.plannotations.is_empty
+    if not plannotated and not read.declaration:
         msg = (
             f"{path} carries no Plannotation data. `plannotation attach` puts some there; a "
             f"document that was never plannotated is not invalid, only unplannotated"
@@ -343,7 +349,10 @@ def _validate_pdf(
         findings += check_plannotation(plannotation, source=source, page_count=page_count)
     findings += referential.check_sheet_ids(pairs)
     findings += carrier.check_declaration(
-        present=read.declaration, plannotated=not read.plannotations.is_empty, source=path.name
+        count=read.declaration_count,
+        defects=read.declaration_defects,
+        plannotated=plannotated,
+        source=path.name,
     )
     findings += _check_index(read.plannotations.index, pairs, source="index")
     findings += _check_model(pairs, model, notes)

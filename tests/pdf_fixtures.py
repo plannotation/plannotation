@@ -54,7 +54,7 @@ from typing import TYPE_CHECKING, Final
 import pikepdf
 from pikepdf import Array, Dictionary, Name, Object, Pdf, String
 
-from plannotation.constants import plannotation_filename
+from plannotation.constants import SPEC_URI, plannotation_filename
 from plannotation.model import (
     Annotation,
     Element,
@@ -83,13 +83,17 @@ __all__ = [
     "BOMB_MEGABYTES",
     "CDATA_DECLARATIONS_PACKET",
     "COMMENTED_DECLARATIONS_PACKET",
+    "DOUBLE_DECLARATION_PACKET",
     "FIXED_PDF_DATE",
     "FOREIGN_DOC_FILENAME",
     "FOREIGN_PAGE_FILENAME",
     "FOREIGN_SPEC_URI",
     "NAMED_SUBJECT",
     "NAMED_SUBJECT_PACKET",
+    "PLAIN_TEXT_DECLARATIONS_PACKET",
+    "RESERIALISED_DECLARATION_PACKET",
     "SELF_CLOSING_DECLARATIONS_PACKET",
+    "SEQ_DECLARATIONS_PACKET",
     "TRAILING_COMMENT_PACKET",
     "XMP_PACKET",
     "build_aliased_attachment",
@@ -613,6 +617,78 @@ NAMED_SUBJECT_PACKET: Final = (
     "</x:xmpmeta>\n"
     '<?xpacket end="w"?>\n'
 ).encode()
+
+
+def _declarations_packet(prefix: str, value: str) -> bytes:
+    """Wrap one ``declarations`` property in an otherwise empty packet.
+
+    Args:
+        prefix: The prefix the PDF Declarations namespace is bound to. ``pdfd`` is only
+            the preferred one.
+        value: The property's value, verbatim: whatever array, or not, a test needs.
+
+    Returns:
+        The packet's bytes.
+    """
+    return (
+        '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n'
+        '<x:xmpmeta xmlns:x="adobe:ns:meta/">\n'
+        ' <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n'
+        f'  <rdf:Description xmlns:{prefix}="http://pdfa.org/declarations/" rdf:about="">\n'
+        f"   <{prefix}:declarations>{value}</{prefix}:declarations>\n"
+        "  </rdf:Description>\n"
+        " </rdf:RDF>\n"
+        "</x:xmpmeta>\n"
+        '<?xpacket end="w"?>\n'
+    ).encode()
+
+
+#: One ``pdfd:declarations`` array holding Plannotation's claim twice, with a foreign
+#: claim between the two. The second copy carries a ``pdfd:claimData``, whose own
+#: ``rdf:Bag`` of ``rdf:li`` is what a count that did not track nesting would miscount.
+DOUBLE_DECLARATION_PACKET: Final = _declarations_packet(
+    "pdfd",
+    "<rdf:Bag>"
+    f'<rdf:li rdf:parseType="Resource"><pdfd:conformsTo>{SPEC_URI}</pdfd:conformsTo></rdf:li>'
+    '<rdf:li rdf:parseType="Resource">'
+    f"<pdfd:conformsTo>{FOREIGN_SPEC_URI}</pdfd:conformsTo></rdf:li>"
+    f'<rdf:li rdf:parseType="Resource"><pdfd:conformsTo>{SPEC_URI}</pdfd:conformsTo>'
+    '<pdfd:claimData><rdf:Bag><rdf:li rdf:parseType="Resource">'
+    "<pdfd:claimBy>Another writer</pdfd:claimBy>"
+    "</rdf:li></rdf:Bag></pdfd:claimData></rdf:li>"
+    "</rdf:Bag>",
+)
+
+#: Plannotation's claim in a ``pdfd:declarations`` serialised as an ``rdf:Seq``, which
+#: section 6.3.3 says is not a declaration at all.
+SEQ_DECLARATIONS_PACKET: Final = _declarations_packet(
+    "pdfd",
+    "<rdf:Seq>"
+    f'<rdf:li rdf:parseType="Resource"><pdfd:conformsTo>{SPEC_URI}</pdfd:conformsTo></rdf:li>'
+    "</rdf:Seq>",
+)
+
+#: Plannotation's URI as a plain-text member of the right array: the other shape 6.3.3
+#: says is not a declaration.
+PLAIN_TEXT_DECLARATIONS_PACKET: Final = _declarations_packet(
+    "pdfd", f"<rdf:Bag><rdf:li>{SPEC_URI}</rdf:li></rdf:Bag>"
+)
+
+#: One Plannotation declaration as another tool might re-serialise it: under another
+#: prefix, as a nested ``rdf:Description`` rather than ``rdf:parseType="Resource"``,
+#: beside a foreign claim written in the attribute shorthand. All three are structures
+#: in RDF/XML. The commented-out second copy is text, not a claim, so the packet holds
+#: exactly one declaration and nothing is malformed.
+RESERIALISED_DECLARATION_PACKET: Final = _declarations_packet(
+    "decl",
+    "<rdf:Bag>"
+    f"<rdf:li><rdf:Description><decl:conformsTo>{SPEC_URI}</decl:conformsTo>"
+    "</rdf:Description></rdf:li>"
+    f'<rdf:li decl:conformsTo="{FOREIGN_SPEC_URI}"/>'
+    f'<!-- <rdf:li rdf:parseType="Resource"><decl:conformsTo>{SPEC_URI}</decl:conformsTo>'
+    "</rdf:li> -->"
+    "</rdf:Bag>",
+)
 
 
 def build_with_xmp(packet: bytes) -> bytes:

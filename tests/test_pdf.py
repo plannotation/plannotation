@@ -2986,6 +2986,47 @@ class TestTheMetadataPacketIsBounded:
         """An XMP packet is smaller than a plannotation, and its bound says so."""
         assert embed._MAX_XMP_BYTES < embed._MAX_PLANNOTATION_BYTES
 
+    @pytest.mark.parametrize(
+        "body",
+        [
+            pytest.param(b"<pdfd:declarations " * 40_000, id="tags-never-closed"),
+            pytest.param(
+                b"<pdfd:declarations><rdf:Bag>"
+                + b"<rdf:li>" * 40_000
+                + b"</rdf:li>" * 40_000
+                + b"</rdf:Bag></pdfd:declarations>",
+                id="members-nested-deep",
+            ),
+            pytest.param(
+                b"<pdfd:declarations><rdf:Bag><rdf:li " + b"a" * 900_000 + b"/></rdf:Bag>",
+                id="one-long-attribute",
+            ),
+        ],
+    )
+    def test_counting_declarations_is_bounded_in_time_as_well(
+        self, tmp_path: Path, body: bytes
+    ) -> None:
+        """A packet inside the byte bound is read in one pass, whatever its shape.
+
+        The validator counts declarations on every PDF it reads. Before each scan
+        resumed where the last stopped, and before a tag pattern stopped at the next
+        ``<``, each of these packets took from seconds to minutes to count.
+        """
+        packet = (
+            b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="'
+            + embed.NS_RDF.encode()
+            + b'"><rdf:Description xmlns:pdfd="'
+            + embed.NS_PDFD.encode()
+            + b'" rdf:about="">'
+            + body
+        )
+        assert len(packet) <= embed._MAX_XMP_BYTES
+        source = write_bytes(tmp_path / "slow.pdf", fx.build_with_xmp(packet))
+        started = time.perf_counter()
+        report = embed.carrier_report(source)
+        assert time.perf_counter() - started < 1.0
+        assert report.declaration_count == 0
+
     def test_attach_refuses_rather_than_writing_a_document_with_no_declaration(
         self, metadata_bomb: Path, tmp_path: Path
     ) -> None:
