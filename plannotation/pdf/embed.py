@@ -2564,10 +2564,9 @@ def _page_description(page_index: int) -> str:
     """Return the ``/Desc`` of the embedded file holding a page's plannotation.
 
     The page number is the zero-based PDF page index, the same number that appears in
-    the filename and in the plannotation's own ``page.index``. The design brief does not
-    say which counting to use; one of the two has to be chosen, and a description that
-    disagreed with the filename beside it in the attachment pane would be worse than
-    one that counts from zero.
+    the filename and in the plannotation's own ``page.index``. Section 6.2.3 fixes
+    this text and counts from zero, so that the description agrees with the filename a
+    viewer shows beside it in the attachment pane.
 
     Args:
         page_index: The zero-based page index.
@@ -3283,8 +3282,8 @@ def attach(
 class PlannotationSet:
     """Everything a carrier holds: the index, and the plannotations keyed by page.
 
-    It unpacks as a two-tuple, so the reading functions can be used exactly as the
-    design brief writes them, while a caller that wants either half by name -- or the
+    It unpacks as a two-tuple, so the reading functions can be used as a plain pair
+    of index and pages, while a caller that wants either half by name -- or the
     levels -- can ask for it instead::
 
         index, pages = read("drawings/TWP-101.pdf")

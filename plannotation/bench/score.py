@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from plannotation.bench.questions import Answer
 
-#: Relative tolerance for a numeric answer (design brief section 13).
+#: Relative tolerance for a numeric answer.
 NUMERIC_TOLERANCE = 0.01
 
 #: ``1:50``, ``1 : 50``, ``M 1:50``: the scale's denominator is the number wanted.

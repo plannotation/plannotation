@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The MCP server, exercised through the MCP interface on the samples.
 
-Design brief section 11's gate is "pytest with the mcp client exercising every tool on the
-samples", so every tool is called here the way a host calls it -- by name, with JSON
+Every tool is exercised on the samples the way a host calls it -- by name, with JSON
 arguments, through the server -- rather than by calling the Python function underneath.
 
 Two properties matter more than any single tool and are tested hardest. The server is
@@ -89,10 +88,10 @@ def call(config: ServerConfig, tool: str, **arguments: Any) -> Any:  # noqa: ANN
 
 
 class TestTheToolSurface:
-    """The tools and resources design brief section 11 names, and nothing else."""
+    """The tools and resources ``docs/mcp.md`` documents, and nothing else."""
 
     def test_every_named_tool_is_registered(self, root: Path) -> None:
-        """Under the names the design brief gives them."""
+        """Under the names ``docs/mcp.md`` gives them."""
         server = build_server(ServerConfig(root=root))
         assert {tool.name for tool in asyncio.run(server.list_tools())} == TOOLS
 
@@ -103,7 +102,7 @@ class TestTheToolSurface:
             assert tool.description
 
     def test_the_resources_are_the_schema_the_spec_and_an_index(self, root: Path) -> None:
-        """Section 11: the schema, the specification, and the index of a folder."""
+        """The schema, the specification, and the index of a folder."""
         server = build_server(ServerConfig(root=root))
         uris = {str(resource.uri) for resource in asyncio.run(server.list_resources())}
         assert uris == {"plannotation://schema/page", "plannotation://spec", "plannotation://index"}

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Inference, measured against the gate of design brief section 12.
+"""Inference, measured against its gate.
 
 The gate is recall on the three sample drawings with their plannotations stripped: at
 least 90% of tags, 80% of dimensions and every grid, with precision reported. It is
@@ -144,7 +144,7 @@ class TestTheVocabulary:
 
 @needs_samples
 class TestTheGate:
-    """Design brief section 12: recall on the stripped samples, and precision beside it."""
+    """Recall on the stripped samples, and precision beside it."""
 
     @staticmethod
     def _scores() -> dict[str, list[int]]:
@@ -294,7 +294,7 @@ class TestWhatInferenceWrites:
         assert list(validate(out).findings) == []
 
     def test_it_never_modifies_its_input(self, tmp_path: Path) -> None:
-        """Design brief section 12. A tool that edits the only copy is untriable."""
+        """The input is never modified: a tool that edits the only copy is untriable."""
         from plannotation.infer import infer_document
 
         source = SAMPLES / "floorplan" / "sheet.pdf"
@@ -350,7 +350,7 @@ class TestMatchingToTheModel:
     reason="no real-world PDFs in tests/fixtures/realworld (git-ignored by design)",
 )
 def test_real_world_drawings_do_not_crash_it() -> None:
-    """Design brief section 12: no crash on real drawings, which are never committed."""
+    """No crash on real drawings, which are never committed."""
     from plannotation.infer import infer_plannotations
 
     documents = sorted((Path(__file__).parent / "fixtures" / "realworld").glob("*.pdf"))

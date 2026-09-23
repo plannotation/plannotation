@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Measure how much of an authored plannotation inference recovers.
 
-Design brief section 12's gate is stated as recall -- at least 90% of tags, 80% of
-dimensions and every grid -- against the authored ``plannotations.json``, with precision
-reported alongside. Recall alone is easy to game: report everything as a tag and every
-tag is found. Precision is what says the recovered items are real.
+The gate for inference is stated as recall -- at least 90% of tags, 80% of dimensions
+and every grid -- against the authored ``plannotations.json``, with precision reported
+alongside. Recall alone is easy to game: report everything as a tag and every tag is
+found. Precision is what says the recovered items are real.
 
 Items are matched by what a reader would recognise them by, not by id: a tag by its
 mark, a dimension by its value, a grid by its axis. Inferred ids are the inferencer's
@@ -22,7 +22,7 @@ from plannotation.infer.match_ifc import normalise_mark
 if TYPE_CHECKING:
     from plannotation.model import Plannotation
 
-#: The gate of design brief section 12, as recall per category.
+#: The gate inference must pass, as the least recall per category.
 GATE: dict[str, float] = {"tag": 0.90, "dimension": 0.80, "grid": 1.00}
 
 
@@ -54,7 +54,7 @@ class Score:
 
     @property
     def passes(self) -> bool:
-        """Report whether this category meets the design brief's gate, where it has one."""
+        """Report whether this category meets the gate, where it has one."""
         return self.recall >= GATE.get(self.category, 0.0)
 
 

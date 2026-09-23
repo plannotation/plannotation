@@ -120,8 +120,8 @@ fix(units): flip SVG y-axis before computing paper bbox
 docs(spec): define conformance levels L1-L3
 ```
 
-Development proceeds in numbered phases (see the project design brief). One phase is
-one or more commits, and history is never squashed across a phase boundary.
+Development proceeds in numbered phases. One phase is one or more commits, and
+history is never squashed across a phase boundary.
 
 Before opening a pull request: `make check` is green, new behaviour has tests, and
 anything normative is reflected in `spec/SPEC.md`.

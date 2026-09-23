@@ -79,7 +79,7 @@ fixtures: ## Check the fixture corpus for geometric and canonical coherence
 check: fmt-check lint typecheck test fixtures ## The gate: format, lint, types, tests, fixtures
 	@printf '\nmake check: green\n'
 
-cov: ## Tests with the two coverage thresholds of the design brief section 15
+cov: ## Tests with separate coverage floors for the core and for infer/
 	$(RUN) coverage erase
 	$(RUN) pytest -q --cov=$(PKG) --cov=$(MCP_PKG) --cov-report=term-missing --cov-report=xml
 	@printf '\ncore (>= $(COV_MIN_CORE)%%, plannotation excluding infer/):\n'

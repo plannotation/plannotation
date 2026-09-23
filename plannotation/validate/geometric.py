@@ -11,16 +11,15 @@ where the reasoning has to be right.
 
 Which box is "the page"
 -----------------------
-Section 8 of the design brief says a bbox must be inside the page **media box**; section
-3.1 of the specification says the page is the **CropBox**, falling back to the MediaBox
-where there is none. They disagree, and the specification wins -- it is normative and
-the design brief is not, and 1.2's governing principle decides it on the merits anyway:
+A bbox must lie inside the page, and the obvious reading of "the page" in a PDF is the
+**media box**. Section 3.1 of the specification says the page is the **CropBox**,
+falling back to the MediaBox where there is none, and 1.2's governing principle is why:
 the CropBox is the page as displayed and printed, so a plannotation measures the page a
 person measures. Taking the media box instead would let a plannotation place a bounding
 box in the margin a viewer crops away, where nothing is drawn and nobody can find it.
 
-In practice the rule is checked in two halves, which is what makes the disagreement
-moot for most documents:
+In practice the rule is checked in two halves, which is what makes the difference
+between the two boxes moot for most documents:
 
 * **PL-GEO-003** holds every bounding box to the page the *plannotation declares*,
   the rectangle from ``(0, 0)`` to ``(page.widthMm, page.heightMm)``. This is the half

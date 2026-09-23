@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
 
-#: The resolution the page is shown at (design brief section 13).
+#: The resolution the page is shown at, the same in both conditions.
 BENCH_DPI: Final = 150.0
 
 _PNG_SIGNATURE: Final = b"\x89PNG\r\n\x1a\n"

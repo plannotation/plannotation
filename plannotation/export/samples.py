@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """The three reference sample sets, and how to build them.
 
-Design brief section 9 asks for three: an architectural floor plan, a structural position
-plan and a section through two storeys. They exist so that every later phase has
-something real to point at -- the inspector renders them, the MCP server serves them,
-the inference pass is measured against them with their plannotations stripped, and the
-benchmark asks questions whose answers came from the models rather than from anyone
-reading the drawings.
+There are three: an architectural floor plan, a structural position plan and a section
+through two storeys. They exist so that every later phase has something real to point
+at -- the inspector renders them, the MCP server serves them, the inference pass is
+measured against them with their plannotations stripped, and the benchmark asks
+questions whose answers came from the models rather than from anyone reading the
+drawings.
 
 They are built from source and never committed, because a generated artefact in a
-repository drifts from the code that generates it, and because the design brief's limit
-on committed binaries is 200 kB.
+repository drifts from the code that generates it, and because the repository admits
+no committed binary over 200 kB.
 """
 
 from __future__ import annotations

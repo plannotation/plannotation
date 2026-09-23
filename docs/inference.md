@@ -38,11 +38,11 @@ SPEC 4.6.6 forbids promoting reconstructed data to `authored` however good the m
 ## How well it works
 
 Measured on the three sample drawings with their plannotations stripped, against the
-authored plannotations written from the models (design brief section 12). The drawings
-carry 32 marks, 21 dimensions, 18 grid lines and 3 levels between them. A dimension
-counts as found only when its value is right *and* it measures the same two grids or
-levels the authored one does: the right number linked to the wrong grids states a false
-distance.
+authored plannotations written from the models. The gate is the least recall a
+category must reach for inference to count as working. The drawings carry 32 marks,
+21 dimensions, 18 grid lines and 3 levels between them. A dimension counts as found
+only when its value is right *and* it measures the same two grids or levels the
+authored one does: the right number linked to the wrong grids states a false distance.
 
 | Category | Recall | Precision | Gate |
 | --- | ---: | ---: | --- |

@@ -4,7 +4,7 @@
 A drawing office has decades of PDFs and none of them has a plannotation. This package
 reads what is printed on each page -- the title block, grid bubbles, dimensions, marks
 and callouts -- and writes a plannotation saying what it found. It never modifies the
-input: the output is a plannotated copy (design brief section 12).
+input: the output is a plannotated copy.
 
 Everything produced here carries ``provenance: inferred`` and a ``confidence``
 (SPEC 4.6), and SPEC 4.6.6 forbids promoting any of it to ``authored``, however good
@@ -66,8 +66,8 @@ def infer_document(
 ) -> dict[str, object]:
     """Infer plannotations for a document and write a plannotated copy.
 
-    The input is never modified: the design brief is explicit, and a tool that edits the
-    only copy of a legacy drawing is a tool nobody can afford to try.
+    The input is never modified: a tool that edits the only copy of a legacy drawing is
+    a tool nobody can afford to try.
 
     Args:
         pdf: The document to read.

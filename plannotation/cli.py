@@ -20,11 +20,11 @@ document on standard output, in Plannotation's canonical form, with every log li
 standard error -- so that ``plannotation read x.pdf --json | jq`` works and keeps
 working.
 
-``validate`` spells the same distinction ``--report md|json``, because that is what
-the design brief names it and because its human output is a Markdown document rather
-than a table. Both formats go to standard output as plain text, unrendered: a
-validation report is something people redirect into a file, attach to a pull request
-or pipe to ``jq``, and ANSI escapes in a file called ``report.md`` help nobody.
+``validate`` spells the same distinction ``--report md|json``, because its human
+output is a Markdown document rather than a table. Both formats go to standard output
+as plain text, unrendered: a validation report is something people redirect into a
+file, attach to a pull request or pipe to ``jq``, and ANSI escapes in a file called
+``report.md`` help nobody.
 
 Exit codes are part of the contract for ``validate`` and are documented in
 :mod:`plannotation.validate`: 0 clean, 1 errors found, 2 could not validate.

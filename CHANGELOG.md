@@ -68,7 +68,7 @@ lives in [`spec/SPEC.md`](spec/SPEC.md).
   schema. Both ship inside the wheel as package data, so a validator works from an
   installed package with no network and no checkout. Pydantic v2 models mirror them
   exactly, with a canonical serialiser — sorted keys, two-space indent, LF, at most
-  three decimals — that round-trips byte for byte. The rules of the design brief are
+  three decimals — that round-trips byte for byte. The rules of SPEC 4.1 and 4.6 are
   encoded as pure functions the Phase 3 validator can call rather than reimplement:
   conformance level, provenance aggregation, and link detection. 24 plannotation
   fixtures (12 valid, 12 invalid) and 6 index fixtures, each negative failing for

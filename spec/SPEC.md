@@ -1007,9 +1007,9 @@ has no meaning there, and its presence would invite a reader to discount a value
 is not in doubt. A validator MUST report a missing `confidence` on an inferred object
 as an error, and SHOULD report a `confidence` on an authored object as a warning.
 
-The asymmetry is deliberate. The design brief requires the first — an inferred value
+The asymmetry is deliberate. The first is a loss of meaning — an inferred value
 that does not say how sure it is has withheld the thing that makes it safe to use
-— and the schema cannot express it, so the validator must. The second is
+— and the schema cannot express it, so the validator must check it. The second is
 untidiness rather than a loss of meaning, and rejecting a plannotation over it
 would serve nobody.
 

@@ -14,9 +14,10 @@ millimetre. An A3 sheet that comes out 396 mm wide is not an A3 sheet, and every
 coordinate in the plannotation would then describe a page that does not exist. The size
 is asserted after conversion rather than assumed.
 
-**The output must be reproducible.** The design brief requires it, and it is what makes a
-plannotated drawing diffable. CairoSVG stamps a creation date into the PDF; the date is
-replaced with a supplied one, so two runs over the same inputs produce the same bytes.
+**The output must be reproducible.** It is what makes a plannotated drawing diffable,
+and a writer's determinism (SPEC 6.2.14) is worth nothing if the page under it changes
+from run to run. CairoSVG stamps a creation date into the PDF; the date is replaced
+with a supplied one, so two runs over the same inputs produce the same bytes.
 
 Where CairoSVG cannot run and the caller asks for it, the Inkscape command line does the
 conversion instead. Inkscape is GPL and is only ever run as a separate program, never

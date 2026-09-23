@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The pydantic models, the canonical serialiser, and the rules of design brief §6.
+"""The pydantic models, the canonical serialiser, and the rules of SPEC §4.1, §4.5, §4.6.
 
 These tests use documents built in the test rather than fixture files, so that a
 rule and its counter-example sit next to each other and a failure names the rule.
@@ -214,7 +214,7 @@ class TestSchemaFidelity:
 
 
 class TestProvenanceRules:
-    """Design brief §6: the aggregation rule and the confidence obligation."""
+    """SPEC §4.6: the aggregation rule and the confidence obligation."""
 
     def test_explicit_inferred_requires_a_confidence(self) -> None:
         """An inferred value that will not say how sure it is withholds the point."""
@@ -271,7 +271,7 @@ class TestProvenanceRules:
 
 
 class TestConformanceLevels:
-    """Design brief §6: L1 page+sheet, L2 adds elements, L3 adds a linked annotation."""
+    """SPEC §4.1: L1 page+sheet, L2 adds elements, L3 adds a linked annotation."""
 
     def test_minimal_plannotation_is_l1(self) -> None:
         """``page`` and ``sheet`` are schema-required, so every valid plannotation reaches L1."""
@@ -305,7 +305,7 @@ class TestConformanceLevels:
         ],
     )
     def test_any_one_link_reaches_l3(self, link: dict[str, Any]) -> None:
-        """The design brief lists five link kinds and any one of them counts."""
+        """SPEC §4.1 lists five link kinds and any one of them counts."""
         doc = plannotation(
             elements=[element()],
             annotations=[{"id": "a1", "type": "dimension", "paperBBox": [0, 0, 10, 10], **link}],

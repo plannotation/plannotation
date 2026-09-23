@@ -137,10 +137,10 @@ class TestSchemaIdentity:
 
 
 class TestPageSchemaShape:
-    """Spot-checks on the page schema, pinned against the design brief."""
+    """Spot-checks on the page schema, pinned so that none of them changes by accident."""
 
     def test_required_top_level_keys(self) -> None:
-        """The four keys the design brief makes mandatory."""
+        """The four keys every plannotation must carry."""
         assert load_schema("plannotation-0.1.json")["required"] == [
             "plannotation",
             "provenance",
@@ -201,7 +201,7 @@ class TestIndexSchemaShape:
         assert level["enum"] == ["L1", "L2", "L3"]
 
     def test_carries_the_model_hash(self) -> None:
-        """The design brief requires the index to record the source model's hash."""
+        """The index can record the hash of the model its plannotations came from."""
         schema = load_schema("plannotation-index-0.1.json")
         sha = schema["properties"]["model"]["properties"]["sha256"]
         assert sha["pattern"] == "^[a-f0-9]{64}$"

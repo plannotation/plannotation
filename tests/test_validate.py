@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The validator of design brief section 8.
+"""The validator of SPEC 4.4.
 
 The rule corpus under ``tests/fixtures/rules`` is the point of this module. Every case
 there is a document that is perfectly **schema-valid** and still wrong, which is the
-distinction the whole phase exists for: the twelve negative fixtures in
+distinction the whole validator exists for: the twelve negative fixtures in
 ``tests/fixtures/plannotations/invalid`` test the schema, and these test everything the schema
 cannot say.
 
@@ -121,7 +121,7 @@ class TestTheRuleCorpus:
 
     @pytest.mark.parametrize("entry", cases("invalid"))
     def test_the_severity_is_the_one_claimed(self, entry: dict[str, Any]) -> None:
-        """Design brief section 8 makes some of these warnings on purpose."""
+        """SPEC 4.4 makes some of these warnings on purpose."""
         finding = next(f for f in findings_for(entry) if f.code == entry["code"])
         assert finding.severity.value == entry["severity"]
 
@@ -343,7 +343,7 @@ class TestReportSnapshots:
 
 
 class TestTheCommandLine:
-    """Design brief section 8: the exit codes are a public contract."""
+    """The exit codes are a public contract."""
 
     @staticmethod
     def _run(*args: str) -> Result:
@@ -399,7 +399,7 @@ class TestTheCommandLine:
         assert "PL-GEO-002" in result.stdout
 
     def test_a_plannotated_pdf_validates_through_the_same_command(self, tmp_path: Path) -> None:
-        """One command, three carriers: section 8 takes a PDF or a plannotations file."""
+        """One command, three carriers: validate takes a PDF or a plannotations file."""
         source = tmp_path / "two-page.pdf"
         source.write_bytes(fx.build_drawing_set())
         plannotations = [
@@ -436,7 +436,7 @@ needs_ifc = pytest.mark.skipif(not has_ifcopenshell(), reason="ifcopenshell is n
 
 @needs_ifc
 class TestTheModelCrossCheck:
-    """Design brief section 8 rule 4: what the plannotation claims against what the model holds."""
+    """Rule 4, SPEC 7.3: what the plannotation claims against what the model holds."""
 
     @staticmethod
     def _model(tmp_path: Path, *, entity: str = "IfcWall") -> tuple[Path, str]:
@@ -511,7 +511,7 @@ class TestTheModelCrossCheck:
         assert codes == ["PL-IFC-001"]
 
     def test_a_supertype_claim_is_accepted(self, tmp_path: Path) -> None:
-        """Section 8: the class must match "or be a subtype".
+        """SPEC 7.1.1: ifcClass may name the entity's class or any supertype of it.
 
         A plannotation may legitimately describe an IfcWall as the IfcBuildingElement it
         is, because a drawing is allowed to be less specific than the model.
@@ -580,7 +580,7 @@ class TestTheModelCrossCheckWithoutIfcopenshell:
 
 
 class TestTheVeraPdfPassThrough:
-    """Design brief section 8 rule 7, and section 7: never fail CI for a missing tool."""
+    """Rule 7, the optional veraPDF pass: never fail CI for a missing tool."""
 
     def test_detection_is_honest_about_a_binary_that_cannot_run(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -741,7 +741,7 @@ class TestWhatCouldBeRemeasured:
     from a clean report.
 
     The re-measurement itself needs elements carrying real IFC representation
-    geometry, which Phase 4 generates; these cover the counting and the
+    geometry, which the exporter's sample models carry; these cover the counting and the
     nothing-to-compare path.
     """
 
@@ -847,7 +847,7 @@ class TestTheReportSurvivesExtremes:
 
 @needs_ifc
 class TestDimensionsAreRemeasuredAgainstTheModel:
-    """Design brief section 8 rule 4: the re-measurement, and its stated tolerance.
+    """Rule 4: the re-measurement, and its stated tolerance.
 
     This is the check that makes a plannotation falsifiable. Everything else asks
     whether the plannotation is internally consistent; this asks whether it agrees with
@@ -980,7 +980,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         assert "PL-IFC-003" not in codes
 
     def test_a_dimension_inside_the_one_percent_tolerance_is_clean(self, tmp_path: Path) -> None:
-        """Section 8: 1% or 5 mm, whichever is larger. 1% of 4 m is 40 mm."""
+        """The tolerance is 1% or 5 mm, whichever is larger. 1% of 4 m is 40 mm."""
         codes = [f.code for f in self._check(tmp_path, self.GAP_MM + 30.0)]
         assert "PL-IFC-003" not in codes
 

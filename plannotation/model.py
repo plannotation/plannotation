@@ -14,7 +14,7 @@ What lives here
 * :class:`Sidecar`, the root of ``plannotation-sidecar-0.1.json``: an index and every
   plannotation of one document in one file, which is what the sidecar carrier writes
   beside a document that cannot or must not carry them itself.
-* The Phase 1 rules from the design brief as pure functions with thin model
+* The rules of SPEC 4.1, 4.5 and 4.6 as pure functions with thin model
   properties over them: :func:`aggregate_provenance`, :func:`conformance_level`,
   :func:`annotation_has_link`, :func:`local_ids`.
 * Canonical serialisation, :func:`canonical_json`, and its inverses
@@ -525,7 +525,7 @@ class _ProvenancedItem(_PlannotationModel):
 
     @model_validator(mode="after")
     def _confidence_required_when_inferred(self) -> Self:
-        """Enforce the design-brief rule that an inferred item carries a confidence.
+        """Enforce the rule of SPEC 4.6.5 that an inferred item carries a confidence.
 
         Returns:
             The validated item.
@@ -812,7 +812,7 @@ class Sidecar(_PlannotationModel):
 
 
 # ---------------------------------------------------------------------------
-# Rules from the design brief, as pure functions
+# Rules of SPEC 4.1, 4.5 and 4.6, as pure functions
 # ---------------------------------------------------------------------------
 def _inherited_provenance(declared: Provenance | None) -> Provenance:
     """Return the provenance an item inherits when it declares none.
@@ -839,10 +839,10 @@ def aggregate_provenance(
 ) -> Provenance | None:
     """Aggregate the provenance of a page's elements and annotations.
 
-    The design brief gives three rules: the top level is ``authored`` only if every
-    element and annotation is authored; ``mixed`` otherwise; and a document with no
-    authored items at all is ``inferred``. Read literally the three overlap, so the
-    boundary cases are resolved as follows.
+    SPEC 4.6.4 gives three rules: the top level is ``authored`` only if every
+    element and annotation is authored, ``inferred`` only if every one is inferred,
+    and ``mixed`` otherwise. Read literally they leave the boundary cases open, so
+    those are resolved as follows.
 
     *No elements and no annotations at all.* Nothing is aggregated and the answer is
     None: this rule does not determine such a document's provenance, and the
@@ -852,8 +852,8 @@ def aggregate_provenance(
     reading it as ``authored`` would let a sheet recovered from a legacy PDF claim it
     came from a model, which is equally false. With no items there is no evidence
     either way, and a format whose principle is that the page leads and the
-    plannotation is auxiliary should not invent one. The literal reading is one line
-    away, in this function, if the specification later decides otherwise.
+    plannotation is auxiliary should not invent one. Either of the other readings is
+    one line away, in this function, if the specification later decides otherwise.
 
     *Items that omit ``provenance``.* The property is optional on an item and
     required at the top level, so an item that does not say **inherits the
@@ -869,8 +869,8 @@ def aggregate_provenance(
     together, so this is ``mixed`` -- as is any other combination.
 
     *An item that declares itself ``mixed``.* Such an item contains authored content,
-    so it cannot make a document purely inferred: "no authored items at all" is read
-    as "every item is inferred".
+    so it cannot make a document purely inferred: "every one is inferred" does not
+    hold, and the answer is ``mixed``.
 
     Args:
         items: The ``provenance`` of every element and annotation on the page, in any
@@ -897,7 +897,7 @@ def aggregate_provenance(
 def annotation_has_link(annotation: Annotation) -> bool:
     """Report whether an annotation links to anything.
 
-    The design brief's L3 test is an annotation with at least one link: ``measures``,
+    The L3 test of SPEC 4.1 is an annotation with at least one link: ``measures``,
     ``shows``, ``target``, ``axis`` or ``ifcGuid``. A link must be substantive -- an
     empty ``shows`` object or an empty ``axis`` string is schema-valid and links
     nothing, so neither counts.

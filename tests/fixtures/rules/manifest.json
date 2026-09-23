@@ -19,7 +19,7 @@
       "reportPath": "$.annotations[8].id",
       "rule": "referential.local-id-unique",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: every viewport, element and annotation id MUST be unique across all three collections, which share one namespace."
     },
     {
@@ -34,7 +34,7 @@
       "reportPath": "$.elements[3].viewport",
       "rule": "referential.viewport-resolves",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: element.viewport MUST reference a viewport in this plannotation. A reference that does not resolve is an error."
     },
     {
@@ -49,7 +49,7 @@
       "reportPath": "$.annotations[5].viewport",
       "rule": "referential.viewport-resolves",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: annotation.viewport MUST reference a viewport in this plannotation."
     },
     {
@@ -64,7 +64,7 @@
       "reportPath": "$.annotations[6].measures[1]",
       "rule": "referential.measures-resolves",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: every measures entry MUST reference an element, or an annotation of type grid or level, in this plannotation."
     },
     {
@@ -79,7 +79,7 @@
       "reportPath": "$.annotations[6].measures[1]",
       "rule": "referential.measures-target-kind",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: measures admits an element, or an annotation of type grid or level, and nothing else. A tag is not a thing a dimension can run to."
     },
     {
@@ -94,7 +94,7 @@
       "reportPath": "$.annotations[7].shows.element",
       "rule": "referential.shows-element-resolves",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: annotation.shows.element MUST reference an element in this plannotation."
     },
     {
@@ -109,8 +109,8 @@
       "reportPath": "$.annotations[8].shows.property",
       "rule": "referential.shows-property-resolves",
       "severity": "warning",
-      "spec": "design brief 8.2; SPEC 4.5",
-      "violates": "Design brief 8.2 requires that shows references resolve; shows.property names a property set and a property within it, and the element carries no such set."
+      "spec": "SPEC 4.5, 7.2",
+      "violates": "A shows reference should resolve: shows.property names a property set and a property within it (SPEC 7.2), and the element carries no such set."
     },
     {
       "buildsThroughModel": true,
@@ -139,7 +139,7 @@
       "reportPath": "$.annotations[10].target.viewportId",
       "rule": "referential.target-viewport-resolves",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: target.viewportId is a localId interpreted in the targeted page. Where target.sheetId names this very sheet, the targeted page is this one and the reference MUST resolve on it like any other."
     },
     {
@@ -156,7 +156,7 @@
       "reportPath": "$.annotations[9].target.pdfPage",
       "rule": "referential.target-pdf-page-in-range",
       "severity": "error",
-      "spec": "SPEC 4.5; design brief 8.2",
+      "spec": "SPEC 4.5",
       "violates": "SPEC 4.5: target.pdfPage is a zero-based page index within the same document and MUST be less than that document's page count."
     },
     {
@@ -186,8 +186,8 @@
       "reportPath": "$.annotations[5].paperBBox",
       "rule": "geometric.bbox-within-page",
       "severity": "error",
-      "spec": "SPEC 3.1, 4.4 (6); design brief 8.3",
-      "violates": "SPEC 4.4 (6) and design brief 8.3: every bbox lies inside the page, to within the geometric tolerance of 0.5 mm. The box stands 4 mm above a 594 mm page."
+      "spec": "SPEC 3.1, 4.4 (6)",
+      "violates": "SPEC 4.4 (6): every bbox lies inside the page, to within the geometric tolerance of 0.5 mm. The box stands 4 mm above a 594 mm page."
     },
     {
       "buildsThroughModel": true,
@@ -216,7 +216,7 @@
       "reportPath": "$.annotations[0].geometry",
       "rule": "geometric.geometry-within-bbox",
       "severity": "error",
-      "spec": "SPEC 3.4, 4.4 (6); design brief 8.3",
+      "spec": "SPEC 3.4, 4.4 (6)",
       "violates": "SPEC 3.4: where an object carries both a paperBBox and geometry, every point of that geometry MUST lie within the bounding box, to within 0.5 mm."
     },
     {
@@ -231,8 +231,8 @@
       "reportPath": "$.viewports[0].paperBBox",
       "rule": "geometric.bbox-within-page",
       "severity": "error",
-      "spec": "SPEC 3.1, 4.4 (6); design brief 8.3",
-      "violates": "SPEC 4.4 (6) and design brief 8.3: viewport boxes do not exceed the page. This is the same rule as invalid/09, applied to a viewport; the design brief names the two cases separately and one implementation must serve both."
+      "spec": "SPEC 3.1, 4.4 (6)",
+      "violates": "SPEC 4.4 (6): viewport boxes do not exceed the page. This is the same rule as invalid/09, applied to a viewport; a viewport's box and an item's box are two cases of one rule, and one implementation must serve both."
     },
     {
       "buildsThroughModel": true,
@@ -246,8 +246,8 @@
       "reportPath": "$.elements[0].paperBBox",
       "rule": "geometric.element-within-viewport",
       "severity": "warning",
-      "spec": "SPEC 4.4; design brief 8.3",
-      "violates": "Design brief 8.3: elements' boxes inside their viewport's, as a warning and not an error. SPEC 4.4 gives this very case as its example of a warning, because it is legitimate for a tag drawn in the margin."
+      "spec": "SPEC 4.4",
+      "violates": "Elements' boxes lie inside their viewport's, as a warning and not an error. SPEC 4.4 gives this very case as its example of a warning, because it is legitimate for a tag drawn in the margin."
     },
     {
       "buildsThroughModel": true,
@@ -351,8 +351,8 @@
       "reportPath": "$.annotations[1]",
       "rule": "geometric.dimension-matches-drawn-length",
       "severity": "warning",
-      "spec": "SPEC 3.5, 4.4; design brief 8.4",
-      "violates": "The dimension's value must be the length it draws at its viewport's scale: 234 mm of paper at 1:50 is 11.7 m, and the plannotation says 12.5 m. Reported as a warning: SPEC 4.4 (6) enumerates the geometric violations a validator MUST report and this is not among them, and SPEC 4.4 defines a warning as a finding that depends on a tolerance or a heuristic -- here, that the dimension line's path length is the quantity the value states, which a jogged or broken dimension legitimately breaks. The design brief puts re-measurement under the optional --ifc cross-check of 8.4, not under the errors of 8.3."
+      "spec": "SPEC 3.5, 4.4",
+      "violates": "The dimension's value must be the length it draws at its viewport's scale: 234 mm of paper at 1:50 is 11.7 m, and the plannotation says 12.5 m. Reported as a warning: SPEC 4.4 (6) enumerates the geometric violations a validator MUST report and this is not among them, and SPEC 4.4 defines a warning as a finding that depends on a tolerance or a heuristic -- here, that the dimension line's path length is the quantity the value states, which a jogged or broken dimension legitimately breaks. Re-measuring a dimension against the model is the job of the optional --ifc cross-check (PL-IFC-003), which reports it as a warning too, and is not one of the geometric errors."
     },
     {
       "buildsThroughModel": true,
@@ -381,7 +381,7 @@
       "reportPath": "$.provenance",
       "rule": "provenance.aggregate-matches-items",
       "severity": "error",
-      "spec": "SPEC 4.6.4; design brief 6, 8.5",
+      "spec": "SPEC 4.6.4",
       "violates": "SPEC 4.6.4: the top-level provenance MUST be authored if and only if every value in the plannotation is authored, and mixed otherwise. One element is inferred, so the aggregate is mixed."
     },
     {
@@ -400,7 +400,7 @@
       "reportPath": "$.elements[1]",
       "rule": "provenance.inferred-carries-confidence",
       "severity": "error",
-      "spec": "SPEC 4.6.5; design brief 6, 8.5",
+      "spec": "SPEC 4.6.5",
       "violates": "SPEC 4.6.5: an element or annotation whose effective provenance is inferred MUST carry a confidence, and a validator MUST report a missing confidence on an inferred object as an error."
     },
     {
@@ -415,7 +415,7 @@
       "reportPath": "$.annotations[1]",
       "rule": "provenance.inferred-carries-confidence",
       "severity": "error",
-      "spec": "SPEC 4.6.3, 4.6.5; design brief 6, 8.5",
+      "spec": "SPEC 4.6.3, 4.6.5",
       "violates": "SPEC 4.6.3 and 4.6.5: an item that omits provenance takes the plannotation's own, so this tag's effective provenance is inferred and it MUST carry a confidence."
     },
     {
@@ -430,7 +430,7 @@
       "reportPath": "$.elements[2]",
       "rule": "provenance.mixed-marks-every-item",
       "severity": "error",
-      "spec": "SPEC 4.6.4; design brief 6, 8.5",
+      "spec": "SPEC 4.6.4",
       "violates": "SPEC 4.6.4: where the top-level provenance is mixed, a writer MUST record provenance on every element and every annotation."
     },
     {

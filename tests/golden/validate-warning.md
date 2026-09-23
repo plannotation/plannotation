@@ -16,7 +16,7 @@
 
 ### page 3
 
-- **warning** `PL-GEO-009` at `/annotations/1` -- annotation 'a-dim-raum': geometry runs 234 mm of paper at 1:50 = 11700 mm, but the value is 12.5 m = 12500 mm _(SPEC 3.4; design brief 8 (3))_
+- **warning** `PL-GEO-009` at `/annotations/1` -- annotation 'a-dim-raum': geometry runs 234 mm of paper at 1:50 = 11700 mm, but the value is 12.5 m = 12500 mm _(SPEC 3.5, 4.4)_
 
 ## Notes
 

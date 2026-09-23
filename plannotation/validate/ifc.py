@@ -74,10 +74,10 @@ __all__ = [
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-#: Relative tolerance on a re-measured distance -- the design brief's 1 per cent.
+#: Relative tolerance on a re-measured distance -- 1 per cent of the value.
 REMEASURE_TOLERANCE_RATIO: Final = 0.01
 
-#: Absolute floor of that tolerance, in model millimetres -- the design brief's 5 mm.
+#: Absolute floor of that tolerance, in model millimetres -- 5 mm.
 #:
 #: "1 % or 5 mm, whichever is LARGER": a 200 mm dimension is held to 5 mm and a 10 m one
 #: to 100 mm. The floor exists because the smaller a dimension is, the more of its

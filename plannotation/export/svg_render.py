@@ -18,8 +18,8 @@ between them decide whether a drawing appears:
     ``setSectionHeightsFromStoreys`` nothing to work from, so the height is passed
     explicitly and recorded in the plannotation as the viewport's ``cutHeight``.
 
-What comes out carries the conventions the design brief names and Plannotation must not
-disturb: a product group is ``id="product-<uuid>-body"`` with ``class="IfcWall"``,
+What comes out carries the conventions SPEC 6.4.1 says Plannotation must not disturb:
+a product group is ``id="product-<uuid>-body"`` with ``class="IfcWall"``,
 ``ifc:guid`` holding the IFC GlobalId and ``ifc:name`` the product's name, and the view
 group carries ``ifc:matrix3`` and ``ifc:plane``. Note that the GlobalId is in
 ``ifc:guid`` and **not** in the id, which is a fresh UUID -- reading the id would give

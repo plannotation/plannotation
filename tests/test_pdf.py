@@ -5,8 +5,8 @@ The project's central claim is that a drawing can be plannotated, and unplannota
 without the drawing changing. This module holds that claim to account, and it is
 written so that every assertion in it could fail.
 
-The five gate items of the design brief's section 7
--------------------------------------------------
+The five gate items of the PDF carrier
+--------------------------------------
 1. **The appearance guarantee.** Every page of the input and of the output is
    rasterised at 150 dpi with pdfium and the two ``numpy`` arrays are compared for
    exact equality -- no tolerance anywhere. :class:`TestTheAppearanceTestCanFail` then
@@ -107,8 +107,8 @@ MOD_DATE_STRING: Final = "D:20240101120000Z"
 #: The resolution the appearance guarantee is asserted at.
 DPI: Final = 150.0
 
-#: The design brief's ceiling on a committed fixture. Nothing here is committed, but a
-#: fixture that outgrew it would be one nobody wants to regenerate.
+#: The project's ceiling on a committed binary (CONTRIBUTING.md). Nothing here is
+#: committed, but a fixture that outgrew it would be one nobody wants to regenerate.
 FIXTURE_SIZE_LIMIT: Final = 200 * 1024
 
 #: The eight values ISO 32000-2 allows in ``/AFRelationship``. A vendor value fails
@@ -622,7 +622,7 @@ class TestFixture:
         assert fx.build_drawing_set() == there
 
     def test_it_is_small_enough_to_be_a_fixture(self) -> None:
-        """The fixture stays far below the design brief's 200 kB ceiling."""
+        """The fixture stays far below the project's 200 kB ceiling."""
         assert len(fx.build_drawing_set()) < FIXTURE_SIZE_LIMIT
 
     def test_the_two_pages_have_different_sizes_and_one_is_rotated(self, drawing_set: Path) -> None:
@@ -851,7 +851,7 @@ class TestRoundTrip:
         assert canonical_bytes(found.index) == canonical_bytes(index)
 
     def test_the_result_unpacks_as_the_documented_pair(self, plannotated: Path) -> None:
-        """``index, pages = read(pdf)`` is the shape the design brief specifies."""
+        """``index, pages = read(pdf)`` is the documented shape of a read."""
         found_index, found_pages = embed.read(plannotated)
         assert found_index is not None
         assert isinstance(found_pages, dict)

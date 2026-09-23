@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """The benchmark harness, exercised end to end without ever reaching the API.
 
-The design brief's rules for Phase 8 are what is tested: both conditions share one
-prompt and differ only by the plannotation supplied as a tool result; numbers are
-scored within 1 % and everything else exactly; responses are cached on condition,
-model and question so a re-run asks nothing; and no API key is needed to run what is
-cached.
+The benchmark's rules are what is tested: both conditions share one prompt and differ
+only by the plannotation supplied as a tool result; numbers are scored within 1 % and
+everything else exactly; responses are cached on condition, model and question so a
+re-run asks nothing; and no API key is needed to run what is cached.
 
 A fake transport stands in for the API everywhere. Where the real SDK is exercised,
 it talks to an in-process mock HTTP transport, so the request shapes are checked by

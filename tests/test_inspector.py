@@ -96,7 +96,7 @@ class TestItReadsWhatThisProjectWrites:
         for kind in ("viewports", "elements", "annotations"):
             assert kind in source
 
-    def test_it_offers_the_two_exports_the_design_brief_asks_for(self) -> None:
+    def test_it_copies_json_and_exports_csv(self) -> None:
         """Copy JSON and export CSV."""
         source = html()
         assert "clipboard.writeText" in source

@@ -82,8 +82,7 @@ class Rule:
         code: The stable identifier, such as ``PL-GEO-003``.
         severity: Error or warning, decided once here rather than at the call site.
         summary: The rule in one line, as a person would state it.
-        reference: The clause of the specification, or of the design brief, it comes
-            from.
+        reference: The clause of the specification it comes from.
         why: Why it carries the severity it does. Recorded because the error/warning
             line is the validator's most consequential design decision and the one most
             likely to be argued with.
@@ -233,12 +232,12 @@ _CATALOGUE: Final = (
         "PL-REF-012",
         _WARNING,
         "a dotted shows.property names a property set the element carries",
-        "SPEC 4.5; design brief 8 (2)",
-        "Warning. The design brief asks that shows resolve and a property named on an "
-        "element that does not carry it is a false statement about the page, but the "
-        "schema calls shows.property free text and no MUST covers it -- and the rule "
-        "only applies to the spellings this validator recognises as a property-set "
-        "reference, which is a heuristic. 4.4 files both as warnings.",
+        "SPEC 4.5, 7.2",
+        "Warning. A property named on an element that does not carry it is a false "
+        "statement about the page, but the schema calls shows.property free text and no "
+        "MUST covers it -- and the rule only applies to the spellings this validator "
+        "recognises as a property-set reference, which is a heuristic. 4.4 files both as "
+        "warnings.",
     ),
     # -- Rule 3: geometry -----------------------------------------------------
     _rule(
@@ -277,9 +276,9 @@ _CATALOGUE: Final = (
         "PL-GEO-005",
         _WARNING,
         "an item's bbox lies within the bbox of the viewport it names",
-        "SPEC 4.4; design brief 8 (3)",
-        "Warning, and both sources say so explicitly: a tag or a dimension drawn in the "
-        "margin beside its viewport is ordinary drafting, not a defect.",
+        "SPEC 4.4",
+        "Warning, and 4.4 says so explicitly: a tag or a dimension drawn in the margin "
+        "beside its viewport is ordinary drafting, not a defect.",
     ),
     _rule(
         "PL-GEO-006",
@@ -309,7 +308,7 @@ _CATALOGUE: Final = (
         "PL-GEO-009",
         _WARNING,
         "a dimension's value matches the length it is drawn at, through its scale",
-        "SPEC 3.4; design brief 8 (3)",
+        "SPEC 3.5, 4.4",
         "Warning. It rests on a tolerance and on the assumption that the dimension line "
         "is drawn to the full run it measures, which an abbreviated or off-scale "
         "dimension legitimately breaks; 4.4 files such findings as warnings.",
@@ -465,7 +464,7 @@ _CATALOGUE: Final = (
         "PL-IFC-001",
         _ERROR,
         "every ifcGuid names an entity in the model",
-        "Design brief 8 (4)",
+        "SPEC 7.1.2, 7.3",
         "Error: a GlobalId that resolves to nothing is a plain fact about two files "
         "that were given to the validator together, decided by no tolerance.",
     ),
@@ -473,7 +472,7 @@ _CATALOGUE: Final = (
         "PL-IFC-002",
         _ERROR,
         "an entity's class is the ifcClass claimed, or a subtype of it",
-        "Design brief 8 (4)",
+        "SPEC 7.1.1, 7.3",
         "Error, and a plain fact for the same reason. The plannotation may name a "
         "supertype -- IfcWall for an IfcWallStandardCase -- and nothing narrower.",
     ),
@@ -481,7 +480,7 @@ _CATALOGUE: Final = (
         "PL-IFC-003",
         _WARNING,
         "a dimension's value matches the distance re-measured in the model",
-        "Design brief 8 (4)",
+        "SPEC 4.4, 7.3",
         "Warning. It rests on a tolerance -- 1 % or 5 mm, whichever is larger -- and on "
         "the heuristic that the distance between two elements is the distance between "
         "their bounding geometry projected on the viewport's plane.",
@@ -491,7 +490,7 @@ _CATALOGUE: Final = (
         "PL-PDF-001",
         _ERROR,
         "veraPDF finds the document conforming to the flavour it declares",
-        "Design brief 8 (7)",
+        "SPEC 6.3.7",
         "Error, but only when the caller asked for the pass: a document that declares a "
         "PDF/A flavour and does not meet it is broken as a PDF, before any plannotation.",
     ),

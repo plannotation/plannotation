@@ -253,7 +253,7 @@ class TestPdfConversion:
         assert (box[3] - box[1]) * 25.4 / 72 == pytest.approx(height, abs=0.1)
 
     def test_conversion_is_reproducible(self, tmp_path: Path) -> None:
-        """Design brief section 16: two runs over the same input, the same bytes."""
+        """Two runs over the same input, the same bytes."""
         from plannotation.export.to_pdf import svg_to_pdf
 
         svg, width, height = self._sheet()
@@ -351,7 +351,7 @@ class TestReadingProductsOutOfASvg:
 
 @needs_ifc
 class TestTheSampleModel:
-    """Design brief section 9: the samples are built from source, and reproducibly."""
+    """The samples are built from source, and reproducibly."""
 
     def test_a_rebuilt_model_is_byte_identical(self, tmp_path: Path) -> None:
         """Every entity gets a fresh GlobalId from the API, so they are reseeded.
@@ -483,7 +483,7 @@ class TestTheSampleModel:
 @needs_ifc
 @needs_cairo
 class TestTheSampleSets:
-    """Design brief section 9: three sets, reproducible, and every one L3 and clean.
+    """Three sets, reproducible, and every one L3 and clean.
 
     These are slow -- three models built, drawn, converted and plannotated -- and they
     are the only tests that exercise the whole chain at once. Everything later in the
@@ -659,8 +659,8 @@ class TestLevelText:
 
 
 @needs_samples
-class TestWhatTheDesignBriefAsksOfTheSamples:
-    """Design brief section 9, sheet by sheet."""
+class TestWhatEachSampleSheetCarries:
+    """What each sample must show, sheet by sheet."""
 
     @pytest.mark.parametrize("name", ["floorplan", "positionsplan", "section"])
     def test_the_plannotation_states_the_model_s_own_unit(self, name: str) -> None:
@@ -789,7 +789,7 @@ class TestWhatTheDesignBriefAsksOfTheSamples:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stand-in inkscape is a shell script")
 class TestTheInkscapeFallback:
-    """Design brief section 9: fall back to the Inkscape CLI if present and the flag is set."""
+    """Fall back to the Inkscape CLI if it is present and the flag is set."""
 
     SHEET = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="420mm" height="297mm" '
