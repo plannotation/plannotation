@@ -21,6 +21,7 @@ from typing import Any
 
 import pytest
 
+from plannotation.infer.evaluate import GATE
 from plannotation.infer.match_ifc import normalise_mark
 from plannotation.infer.patterns import (
     GRID_AXIS,
@@ -168,12 +169,9 @@ class TestTheGate:
                 total[2] += item.correct
         return totals
 
-    @pytest.mark.parametrize(
-        ("category", "floor"),
-        [("tag", 0.90), ("dimension", 0.80), ("grid", 1.0), ("level", 1.0)],
-    )
+    @pytest.mark.parametrize(("category", "floor"), sorted(GATE.items()))
     def test_recall_meets_the_gate(self, category: str, floor: float) -> None:
-        """90% of tags, 80% of dimensions, every grid."""
+        """90% of tags, 80% of dimensions, every grid and every level."""
         expected, _, correct = self._scores()[category]
         assert correct / expected >= floor
 

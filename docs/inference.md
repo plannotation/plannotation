@@ -49,7 +49,7 @@ authored one does: the right number linked to the wrong grids states a false dis
 | Tags | 100% | 100% | ≥ 90% |
 | Dimensions, value and what they measure | 100% | 100% | ≥ 80% |
 | Grids | 100% | 100% | all |
-| Levels | 100% | 100% | — |
+| Levels | 100% | 100% | all |
 | Callouts | 100% | 100% | — |
 | Title block fields | 100% | 100% | — |
 
