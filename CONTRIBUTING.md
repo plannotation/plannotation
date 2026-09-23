@@ -11,7 +11,7 @@ By contributing you agree that your contribution is licensed under the
 ```bash
 uv sync --all-extras          # create the environment from uv.lock
 uv run plannotation --version    # smoke test
-make check                    # format, lint, type-check, test
+make check                    # format, lint, type-check, test, fixtures
 ```
 
 `make check` is the single gate. It runs exactly what CI runs:
@@ -20,8 +20,9 @@ make check                    # format, lint, type-check, test
 | --- | --- |
 | Format | `ruff format --check .` |
 | Lint | `ruff check .` |
-| Types | `mypy --strict plannotation` |
+| Types | `mypy --strict plannotation` and `mypy --strict plannotation_mcp/plannotation_mcp` |
 | Tests | `pytest -q` |
+| Fixtures | `python tools/check_fixtures.py` |
 
 Install the hooks so you find problems before CI does:
 
