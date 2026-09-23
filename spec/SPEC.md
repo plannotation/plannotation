@@ -493,10 +493,19 @@ S = k × (millimetres per model length unit)    the scale denominator
 
 For `k = 0.05` with `model.lengthUnit = "m"`, `S = 0.05 × 1000 = 50`: the view is
 at 1:50. Where a viewport carries both `scale` and `paperToPlane`, and the linear
-part is a similarity, the two MUST agree to within 0.1 %; a validator MUST report
-a disagreement. Where the linear part is not a similarity, `k` is undefined and no
+part is a similarity, the two MUST agree to within 0.1 % of `scale` plus what
+rounding explains (3.8). Rounding each coefficient by up to 0.0005 moves `k` by at
+most 2 × 0.0005 = 0.001, which is 1 in `S` for a model in metres, 0.01 in
+centimetres and 0.001 in millimetres. A validator MUST report a larger
+disagreement. Where the linear part is not a similarity, `k` is undefined and no
 scale can be recovered; `scale` then stands alone and a validator MUST NOT check
 it against the transform.
+
+In the component order above, a similarity has `a = d` and `c = −b` (a rotation)
+or `a = −d` and `c = b` (a reflection). Rounding need not keep those equalities
+exact, so a serialised transform is a similarity where some similarity lies within
+0.0005 of each of its coefficients: where `|a − d|` and `|b + c|`, or `|a + d|` and
+`|b − c|`, are both at most 0.001.
 
 ### 3.6 The model plane
 
@@ -504,10 +513,24 @@ A viewport's `plane` gives the model-space plane the view projects onto, as an
 `origin` and two axis directions `xAxis` and `yAxis`, all `vec3` in the model's
 length unit (the axes being directions, their unit is immaterial).
 
-`xAxis` and `yAxis` MUST be unit vectors and MUST be mutually orthogonal, each to
-within 1 × 10⁻⁶. The requirement exists because scale is already carried by
-`paperToPlane`: axes of a length other than one would express it a second time and
-the two statements could disagree.
+`xAxis` and `yAxis` MUST be unit vectors and MUST be mutually orthogonal. The
+requirement exists because scale is already carried by `paperToPlane`: axes of a
+length other than one would express it a second time and the two statements could
+disagree.
+
+An oblique axis has no exact spelling at the three decimals of 3.8: a plan turned
+29.18° to follow its building's grid has `xAxis` `[0.873, −0.487, 0]`, which is
+0.99965 long. Both requirements therefore hold to within what that rounding
+explains, and a validator MUST report an axis or a pair beyond it:
+
+- each axis's length is within √3 × 0.0005 ≈ 0.00087 of 1: rounding three
+  components by up to 0.0005 each moves a vector by at most that, and so changes
+  its length by no more;
+- `|xAxis · yAxis|` is at most 2√3 × 0.0005 + 3 × 0.0005² ≈ 0.0017, which bounds the
+  dot product rounding can give two orthogonal unit vectors.
+
+An axis along a model axis, such as `[1, 0, 0]`, is exact at three decimals and
+gains nothing from this: 0.999 and 1.001 are both outside it.
 
 Plane coordinates `(X, Y)` — the output of `paperToPlane` — map to a model point:
 
@@ -546,9 +569,11 @@ actually specified by — German practice writes it on the sheet as *Schnitthöh
 m über OKFF*.
 
 It follows that where both `storey.elevation` and `cutHeight` are present, the
-component of `plane.origin` along the plane normal `n` MUST equal
-`storey.elevation + cutHeight`. A validator MUST check this, and a writer that
-cannot satisfy it has misplaced one of the three.
+component of `plane.origin` along the plane normal, `plane.origin · n / |n|`, MUST
+equal `storey.elevation + cutHeight`, to within (2 + √3) × 0.0005 ≈ 0.0019 model
+length units, which bounds how far rounding the three can separate them (3.8). A
+validator MUST check this, and a writer that cannot satisfy it has misplaced one of
+the three.
 
 So a plan of a storey whose finished floor is at elevation 3.0 m, cut 1.2 m above
 that floor, has `storey.elevation` 3.0, `cutHeight` 1.2, and a `plane.origin` whose
@@ -652,6 +677,19 @@ as approximate, with the bound above, and MUST NOT present them as measurements 
 the building. Where a reader needs model geometry to a finer tolerance, it MUST
 obtain it from the model. The plannotation says what is on the page; it is no more a
 substitute for the model than it is for the drawing.
+
+**Relations among rounded numbers.** Four requirements relate serialised numbers
+exactly: that the plane axes are unit vectors and orthogonal (3.6), that `scale`
+agrees with `paperToPlane` (3.5), and that `plane.origin` sits at
+`storey.elevation + cutHeight` (3.6). A writer meets each with the values it holds
+before rounding, and rounding may then leave the serialised numbers slightly off.
+Each of those clauses therefore states a tolerance, derived from the 0.0005 by which
+rounding can move one number, that admits everything rounding can explain; a
+validator MUST NOT report a violation within it and MUST report one beyond it. The
+requirements on a transform's determinant (3.5) and on bounding boxes (3.4) are not
+relaxed. A reader inverts the transform the file holds, so its determinant is a
+fact about the file; and rounding is monotonic, so it can neither reverse a box nor
+move one out of a box that held it.
 
 ### 3.9 A worked example
 
