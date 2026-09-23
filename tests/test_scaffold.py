@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
+import json
 import re
 import shutil
 import subprocess
@@ -201,3 +203,27 @@ def test_scaffold_covers_the_architecture() -> None:
     ]
     missing = [name for name in required if not (REPO_ROOT / name).is_dir()]
     assert not missing, f"missing directories: {missing}"
+
+
+def test_the_site_serves_every_schema_at_its_id_and_the_spec_at_its_uri(
+    tmp_path: Path,
+) -> None:
+    """Documents declare these URLs; ``make docs`` must stage a file at each one."""
+    loader = importlib.util.spec_from_file_location(
+        "stage_site", REPO_ROOT / "tools" / "stage_site.py"
+    )
+    assert loader is not None
+    assert loader.loader is not None
+    stage_site = importlib.util.module_from_spec(loader)
+    loader.loader.exec_module(stage_site)
+    stage_site.stage(tmp_path)
+
+    def staged(url: str) -> Path:
+        return tmp_path / url.removeprefix(f"{BASE_URL}/")
+
+    for schema in sorted((REPO_ROOT / "plannotation" / "schema").glob("*.json")):
+        schema_id = json.loads(schema.read_text("utf-8"))["$id"]
+        assert staged(schema_id).read_bytes() == schema.read_bytes(), schema_id
+    assert staged(SCHEMA_ID).is_file()
+    assert staged(INDEX_SCHEMA_ID).is_file()
+    assert (staged(SPEC_URI) / "index.md").is_file()

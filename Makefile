@@ -116,16 +116,11 @@ bench-dry: samples ## Say how many benchmark questions would reach the API; ask 
 	$(RUN) plannotation-bench run --condition plain       --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 	$(RUN) plannotation-bench run --condition plannotated --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 
-# The schema version is read from plannotation.SCHEMA_VERSION rather than repeated
-# here, so the published URL layout cannot drift from the one constant that
-# defines it.
-docs: ## Stage spec/, schema/ and README into site/ for GitHub Pages
-	@V=`$(RUN) python -c 'import plannotation; print(plannotation.SCHEMA_VERSION)'`; \
-	 mkdir -p "site/schema/$$V" site/spec; \
-	 cp -f $(PKG)/schema/*.json "site/schema/$$V/" 2>/dev/null || true; \
-	 cp -f spec/SPEC.md site/spec/; \
-	 cp -f README.md site/index.md; \
-	 printf 'docs staged in site/ (schema %s) -- publish with GitHub Pages\n' "$$V"
+# Every schema is staged at the path of its own $id and the spec at SPEC_URI, both
+# read from the code, so the published layout cannot drift from what documents
+# declare.
+docs: ## Stage the schemas, the spec and the README into site/ for GitHub Pages
+	$(RUN) python tools/stage_site.py site
 
 # The inspector is one static file with no build step; this only makes sure there is
 # a plannotated drawing to open in it. `open` is macOS, `xdg-open` elsewhere.
