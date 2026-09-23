@@ -2,7 +2,8 @@
 #
 # Plannotation continuous integration.
 #
-# Runs exactly the `make check` a developer runs locally:
+# Installs every extra, builds the reference samples, then runs exactly the
+# `make check` a developer runs locally:
 #   ruff format --check  ->  ruff check  ->  mypy --strict  ->  pytest -q
 # Nothing is duplicated here, so the two cannot drift apart.
 #
@@ -43,13 +44,13 @@ jobs:
     timeout-minutes: 20
 
     strategy:
-      # Report all four cells; a macOS-only wheel problem must not be hidden by
+      # Report every cell; a macOS-only wheel problem must not be hidden by
       # an unrelated Linux failure.
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.11", "3.12"]
-        # Both runners are load-bearing: pikepdf and (with the extras) ifcopenshell
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        # Both runners are load-bearing: pikepdf and ifcopenshell
         # publish a separate binary wheel per Python-minor x platform, so each
         # cell installs different compiled code.
         #
@@ -88,7 +89,7 @@ jobs:
           activate-environment: true
           enable-cache: true
           # The cache key already includes arch, OS and Python version, so the
-          # four cells never share an entry. Narrowing the dependency part to the
+          # no two cells share an entry. Narrowing the dependency part to the
           # lockfile means pyproject.toml edits that do not change resolution
           # keep the cache warm.
           cache-dependency-glob: uv.lock
@@ -96,12 +97,36 @@ jobs:
           # [tool.uv] required-version in pyproject.toml, so dev and CI are
           # pinned to one uv range from a single place.
 
+      - name: Install libcairo (Linux)
+        # `make samples` imports cairosvg, a cffi binding to a SYSTEM libcairo that
+        # no wheel can ship.
+        if: runner.os == 'Linux'
+        run: |
+          if ! ldconfig -p 2>/dev/null | grep -q 'libcairo\.so\.2'; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends libcairo2
+          fi
+
+      - name: Install libcairo (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          brew list --formula cairo >/dev/null 2>&1 || brew install cairo
+          # ctypes.util.find_library() does not search /opt/homebrew/lib on Apple
+          # silicon, so cairocffi cannot load libcairo.2.dylib without this.
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib:${DYLD_FALLBACK_LIBRARY_PATH:-/usr/local/lib:/usr/lib}" >> "$GITHUB_ENV"
+
       - name: Install the locked dependencies
         # --locked fails instead of silently relocking, so a stale uv.lock is a
         # CI error rather than a surprise. --all-packages covers both workspace
-        # members. Extras are deliberately not installed: see the dev group note
-        # in pyproject.toml.
-        run: uv sync --locked --all-packages --dev
+        # members, --all-extras the exporter, the SVG reader and the benchmark.
+        run: uv sync --locked --all-packages --all-extras --dev
+
+      - name: Build the reference samples
+        # The MCP, inspector and inference tests read these; without them they skip.
+        run: make samples
 
       - name: make check
         run: make check
@@ -113,34 +138,3 @@ jobs:
         # The hardest constraint in the project: no AGPL, no PyMuPDF, and no
         # unacknowledged copyleft anywhere in the installed closure.
         run: uv run --no-sync python tools/audit_licenses.py
-
-# ---------------------------------------------------------------------------
-# Needed once CI installs the svg extra -- do not delete.
-#
-# `make samples` imports cairosvg, which is a cffi binding to a SYSTEM libcairo
-# that no wheel can ship. Once the svg extra is installed in CI, these two steps
-# must be added before the sync step, or macOS turns red with an opaque
-# `OSError: no library called "cairo-2" was found`. Both were verified locally.
-#
-#   - name: Install libcairo (Linux)
-#     if: runner.os == 'Linux'
-#     run: |
-#       if ! ldconfig -p 2>/dev/null | grep -q 'libcairo\.so\.2'; then
-#         sudo apt-get update -qq
-#         sudo apt-get install -y --no-install-recommends libcairo2
-#       fi
-#
-#   - name: Install libcairo (macOS)
-#     if: runner.os == 'macOS'
-#     env:
-#       HOMEBREW_NO_AUTO_UPDATE: "1"
-#       HOMEBREW_NO_INSTALL_CLEANUP: "1"
-#     run: |
-#       brew list --formula cairo >/dev/null 2>&1 || brew install cairo
-#       # ctypes.util.find_library() does not search /opt/homebrew/lib on Apple
-#       # silicon, so cairocffi cannot load libcairo.2.dylib without this.
-#       echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib:${DYLD_FALLBACK_LIBRARY_PATH:-/usr/local/lib:/usr/lib}" >> "$GITHUB_ENV"
-#
-# The sync step then becomes:
-#   run: uv sync --locked --all-packages --all-extras --dev
-# ---------------------------------------------------------------------------

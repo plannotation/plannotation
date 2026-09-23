@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Weekly bumps for the pinned actions and for uv.lock. Each arrives as a pull
+# request, so CI proves it on every cell before it merges.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
