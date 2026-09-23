@@ -883,7 +883,7 @@ def samples_build(
 def inspect(
     source: Annotated[
         Path,
-        typer.Argument(help="A plannotated PDF, a sidecar, or a plannotations file.", exists=True),
+        typer.Argument(help="A plannotated PDF, or its sidecar.", exists=True),
     ],
     page: Annotated[
         int | None,
