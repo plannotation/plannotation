@@ -21,6 +21,14 @@ Three checks, and the reason two are errors and one is not
   case and wrong for a dimension to a face, to a centre line or to a grid, and 4.4
   files a finding that rests on a tolerance or a heuristic as a warning.
 
+The model is measured in metres
+-------------------------------
+ifcopenshell builds geometry in metres whatever length unit the file is written in,
+unless it is told to convert back, and this module never tells it to. A distance
+between two bounds is therefore converted from metres, not from ``model.lengthUnit``:
+scaling it by the file's unit instead would be right for a model in metres and a
+thousand times short for one in millimetres, which is most of them.
+
 Class matching is directional
 -----------------------------
 A plannotation may name a **supertype** of the entity's class and nothing narrower:
@@ -49,7 +57,6 @@ from typing import TYPE_CHECKING, Any, Final
 from plannotation.errors import InputNotValidatableError, MissingExtraError
 from plannotation.validate.codes import finding
 from plannotation.validate.geometric import (
-    MM_PER_MODEL_UNIT,
     declared_length,
     measured_length_mm,
     millimetres,
@@ -91,6 +98,9 @@ REMEASURE_TOLERANCE_MM: Final = 5.0
 #: reported as not done rather than allowed to run away.
 MAX_MEASURED_ENTITIES: Final = 2000
 
+#: Millimetres per metre, the unit ifcopenshell builds geometry in.
+_MM_PER_METRE: Final = 1000.0
+
 
 class IfcModel:
     """An open IFC model, with the two questions this module asks it.
@@ -131,15 +141,16 @@ class IfcModel:
     def bounds(
         self, guid: str
     ) -> tuple[tuple[float, float, float], tuple[float, float, float]] | None:
-        """Return an entity's axis-aligned bounds in model coordinates.
+        """Return an entity's axis-aligned bounds in model coordinates, in metres.
 
         Args:
             guid: The entity's GlobalId.
 
         Returns:
-            The minimum and maximum corner, or None when the entity has no geometry,
-            when its geometry cannot be built, or when this run has already measured
-            :data:`MAX_MEASURED_ENTITIES` entities.
+            The minimum and maximum corner in metres, whatever unit the file is written
+            in, or None when the entity has no geometry, when its geometry cannot be
+            built, or when this run has already measured :data:`MAX_MEASURED_ENTITIES`
+            entities.
         """
         if guid in self._boxes:
             return self._boxes[guid]
@@ -164,10 +175,10 @@ class IfcModel:
             entity: The ifcopenshell entity.
 
         Returns:
-            Its bounds in model coordinates, or None when the shape cannot be built.
-            A model that refuses to tessellate one element is an ordinary occurrence
-            and must not end the run, so the failure is logged and treated as "no
-            geometry".
+            Its bounds in model coordinates and in metres, or None when the shape cannot
+            be built. A model that refuses to tessellate one element is an ordinary
+            occurrence and must not end the run, so the failure is logged and treated
+            as "no geometry".
         """
         geom = _module("ifcopenshell.geom")
         settings = geom.settings()
@@ -175,6 +186,8 @@ class IfcModel:
         # passed to a generic setter, not a mode flag, so the boolean-trap rule does
         # not apply and the keyword form it suggests is a TypeError.
         settings.set("use-world-coords", True)  # noqa: FBT003
+        # Metres, whatever the file's unit; the module docstring says why that matters.
+        settings.set("convert-back-units", False)  # noqa: FBT003
         try:
             shape = geom.create_shape(settings, entity)
         except (RuntimeError, OSError) as exc:  # pragma: no cover - model-dependent
@@ -368,17 +381,16 @@ def _check_dimensions(plannotation: Plannotation, model: IfcModel, *, source: st
         by more than 1 per cent or 5 mm, whichever is larger. A dimension that names
         fewer than two elements, names one without a GlobalId, or names one whose
         geometry cannot be built is not reported at all: there is nothing to compare.
+        ``model.lengthUnit`` is not needed: the value carries its own unit and the
+        model is measured in metres.
     """
-    unit = plannotation.source_model.length_unit if plannotation.source_model else None
-    if unit is None:
-        return []
     elements = {element.local_id: element for element in plannotation.elements or []}
     found: list[Finding] = []
     for position, annotation in enumerate(plannotation.annotations or []):
         expected = measured_length_mm(annotation)
         if expected is None:
             continue
-        measured = _remeasure(annotation, elements, model, unit=unit)
+        measured = _remeasure(annotation, elements, model)
         if measured is None:
             continue
         tolerance = max(REMEASURE_TOLERANCE_MM, REMEASURE_TOLERANCE_RATIO * abs(expected))
@@ -404,8 +416,6 @@ def _remeasure(
     annotation: Annotation,
     elements: Mapping[str, Element],
     model: IfcModel,
-    *,
-    unit: str,
 ) -> float | None:
     """Measure the distance between the two elements a dimension names.
 
@@ -418,10 +428,9 @@ def _remeasure(
         annotation: The dimension.
         elements: Every element on the page, by local id.
         model: The opened model.
-        unit: ``model.lengthUnit``, which the model's coordinates are in.
 
     Returns:
-        The distance in model millimetres, or None when it cannot be measured.
+        The distance in millimetres, or None when it cannot be measured.
     """
     named = [elements[ref] for ref in (annotation.measures or []) if ref in elements]
     if len(named) != 2:  # noqa: PLR2004 - a dimension runs between exactly two things
@@ -437,7 +446,7 @@ def _remeasure(
         for axis in range(3)
     ]
     distance = math.sqrt(sum(gap * gap for gap in gaps))
-    return distance * MM_PER_MODEL_UNIT[unit]
+    return distance * _MM_PER_METRE
 
 
 def remeasurable(plannotation: Plannotation) -> int:

@@ -21,7 +21,7 @@ import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 import pikepdf
@@ -933,17 +933,40 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
     This is the check that makes a plannotation falsifiable. Everything else asks
     whether the plannotation is internally consistent; this asks whether it agrees with
     the building.
+
+    Every case runs against a model in millimetres and a model in metres, and each
+    plannotation states its model's unit truthfully. ifcopenshell builds geometry in
+    metres whatever unit the file is in, so a re-measurement that scaled that geometry
+    by the file's unit would pass one of the two and be a thousand times off on the
+    other.
     """
 
     GAP_MM = 4000.0
     """The clear distance between the two walls the fixture model places."""
 
-    @staticmethod
-    def _two_walls(tmp_path: Path) -> tuple[Path, str, str]:
+    #: The SI prefix of each length unit a fixture model is written in.
+    PREFIXES: ClassVar[dict[str, str | None]] = {"mm": "MILLI", "m": None}
+
+    @pytest.fixture(params=["mm", "m"])
+    def unit(self, request: pytest.FixtureRequest) -> str:
+        """The length unit the fixture model is written in.
+
+        Args:
+            request: The pytest request, carrying the parameter.
+
+        Returns:
+            ``mm`` or ``m``, as ``model.lengthUnit`` spells it.
+        """
+        value: str = request.param
+        return value
+
+    @classmethod
+    def _two_walls(cls, tmp_path: Path, unit: str) -> tuple[Path, str, str]:
         """Write a model holding two walls four metres apart.
 
         Args:
             tmp_path: Directory to write into.
+            unit: The model's length unit, ``mm`` or ``m``.
 
         Returns:
             The model's path and the two GlobalIds.
@@ -956,7 +979,10 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
 
         model = ifcopenshell.file(schema="IFC4")
         ifcopenshell.api.root.create_entity(model, ifc_class="IfcProject", name="Fixture")
-        ifcopenshell.api.unit.assign_unit(model)
+        length = ifcopenshell.api.unit.add_si_unit(
+            model, unit_type="LENGTHUNIT", prefix=cls.PREFIXES[unit]
+        )
+        ifcopenshell.api.unit.assign_unit(model, units=[length])
         parent = ifcopenshell.api.context.add_context(model, context_type="Model")
         body = ifcopenshell.api.context.add_context(
             model,
@@ -985,13 +1011,14 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         return path, guids[0], guids[1]
 
     @staticmethod
-    def _plannotation(first: str, second: str, value: float) -> Plannotation:
+    def _plannotation(first: str, second: str, value: float, unit: str) -> Plannotation:
         """Build a plannotation whose dimension measures between two GlobalIds.
 
         Args:
             first: The first wall's GlobalId.
             second: The second wall's GlobalId.
             value: The distance the dimension claims, in millimetres.
+            unit: ``model.lengthUnit``, the unit the model is written in.
 
         Returns:
             The parsed plannotation.
@@ -1001,7 +1028,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
             "provenance": "authored",
             "page": {"index": 0, "widthMm": 420, "heightMm": 297},
             "sheet": {"id": "A-101"},
-            "model": {"lengthUnit": "m"},
+            "model": {"lengthUnit": unit},
             "elements": [
                 {
                     "id": "e1",
@@ -1029,53 +1056,70 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         }
         return load_plannotation(json.dumps(document))
 
-    def _check(self, tmp_path: Path, value: float) -> list[Finding]:
+    def _check(self, tmp_path: Path, value: float, unit: str) -> list[Finding]:
         """Cross-check a claimed distance against the model.
 
         Args:
             tmp_path: Directory for the model.
             value: The distance the dimension claims, in millimetres.
+            unit: The length unit the model is written in.
 
         Returns:
             The findings.
         """
         from plannotation.validate.ifc import check_against_model, open_model
 
-        path, first, second = self._two_walls(tmp_path)
+        path, first, second = self._two_walls(tmp_path, unit)
         return check_against_model(
-            self._plannotation(first, second, value), open_model(path), source="plannotation"
+            self._plannotation(first, second, value, unit),
+            open_model(path),
+            source="plannotation",
         )
 
-    def test_the_model_is_measured_at_all(self, tmp_path: Path) -> None:
+    def test_the_model_is_measured_at_all(self, tmp_path: Path, unit: str) -> None:
         """The fixture has to be a real measurement or the rest proves nothing."""
         from plannotation.validate.ifc import open_model
 
-        path, first, second = self._two_walls(tmp_path)
+        path, first, second = self._two_walls(tmp_path, unit)
         model = open_model(path)
         assert model.bounds(first) is not None
         assert model.bounds(second) is not None
 
-    def test_a_dimension_that_agrees_with_the_model_is_clean(self, tmp_path: Path) -> None:
+    def test_bounds_are_in_metres_whatever_the_models_unit(self, tmp_path: Path, unit: str) -> None:
+        """The second wall starts 5 m along x, in a model in millimetres as in metres."""
+        from plannotation.validate.ifc import open_model
+
+        path, _, second = self._two_walls(tmp_path, unit)
+        bounds = open_model(path).bounds(second)
+        assert bounds is not None
+        assert bounds[0][0] == pytest.approx(5.0)
+
+    def test_a_dimension_that_agrees_with_the_model_is_clean(
+        self, tmp_path: Path, unit: str
+    ) -> None:
         """Four metres between the walls, and the plannotation says four metres."""
-        codes = [f.code for f in self._check(tmp_path, self.GAP_MM)]
+        codes = [f.code for f in self._check(tmp_path, self.GAP_MM, unit)]
         assert "PL-IFC-003" not in codes
 
-    def test_a_dimension_inside_the_one_percent_tolerance_is_clean(self, tmp_path: Path) -> None:
+    def test_a_dimension_inside_the_one_percent_tolerance_is_clean(
+        self, tmp_path: Path, unit: str
+    ) -> None:
         """The tolerance is 1% or 5 mm, whichever is larger. 1% of 4 m is 40 mm."""
-        codes = [f.code for f in self._check(tmp_path, self.GAP_MM + 30.0)]
+        codes = [f.code for f in self._check(tmp_path, self.GAP_MM + 30.0, unit)]
         assert "PL-IFC-003" not in codes
 
-    def test_a_dimension_outside_the_tolerance_is_reported(self, tmp_path: Path) -> None:
+    def test_a_dimension_outside_the_tolerance_is_reported(self, tmp_path: Path, unit: str) -> None:
         """A metre of disagreement between the drawing and the building."""
-        findings = self._check(tmp_path, self.GAP_MM + 1000.0)
+        findings = self._check(tmp_path, self.GAP_MM + 1000.0, unit)
         assert [f.code for f in findings] == ["PL-IFC-003"]
 
-    def test_the_mismatch_is_a_warning_and_not_an_error(self, tmp_path: Path) -> None:
+    def test_the_mismatch_is_a_warning_and_not_an_error(self, tmp_path: Path, unit: str) -> None:
         """A section crops, a dimension may be to a face this heuristic cannot see."""
-        finding = next(f for f in self._check(tmp_path, self.GAP_MM + 1000.0))
+        finding = next(f for f in self._check(tmp_path, self.GAP_MM + 1000.0, unit))
         assert finding.severity is Severity.WARNING
 
-    def test_the_message_gives_both_numbers(self, tmp_path: Path) -> None:
+    def test_the_message_gives_both_numbers(self, tmp_path: Path, unit: str) -> None:
         """A mismatch nobody can check is a mismatch nobody will act on."""
-        message = next(iter(self._check(tmp_path, self.GAP_MM + 1000.0))).message
-        assert "5000" in message.replace(",", "") or "5.0" in message
+        message = next(iter(self._check(tmp_path, self.GAP_MM + 1000.0, unit))).message
+        assert "5000 mm" in message
+        assert "4000 mm apart" in message
