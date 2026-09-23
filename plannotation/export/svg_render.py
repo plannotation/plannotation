@@ -21,9 +21,9 @@ between them decide whether a drawing appears:
 What comes out carries the conventions SPEC 6.4.1 says Plannotation must not disturb:
 a product group is ``id="product-<uuid>-body"`` with ``class="IfcWall"``,
 ``ifc:guid`` holding the IFC GlobalId and ``ifc:name`` the product's name, and the view
-group carries ``ifc:matrix3`` and ``ifc:plane``. Note that the GlobalId is in
-``ifc:guid`` and **not** in the id, which is a fresh UUID -- reading the id would give
-an identifier that means nothing outside this one file.
+group carries ``ifc:matrix3`` and ``ifc:plane``. The UUID in the id is not a fresh one:
+it is the GlobalId's 128 bits written in hexadecimal (SPEC 7.1.2), so the id and
+``ifc:guid`` name the same product.
 
 ifcopenshell lives behind the ``ifc`` extra and is not installed in CI, so it is
 imported inside the functions that need it.
@@ -232,9 +232,11 @@ def _read_view_group(svg: str) -> tuple[tuple[tuple[float, float, float], ...], 
 def read_products(svg: str) -> list[DrawnProduct]:
     """Read every product group out of a rendered view.
 
-    The GlobalId is taken from ``ifc:guid`` rather than from the element id. The id is a
-    fresh UUID that identifies the shape within this one file and means nothing outside
-    it; the guid is the identity the model and the plannotation share.
+    The GlobalId is taken from ``ifc:guid`` rather than decoded from the element id.
+    Both name the same product, but ``ifc:guid`` is already the 22-character form that
+    the model and the plannotation store, while the id's form is a serializer setting:
+    ``use-element-names`` or ``use-element-step-ids`` replaces it with something that is
+    no GlobalId at all.
 
     Groups nest -- every product sits inside the view group -- so the extent of a group
     is found by counting opening and closing tags rather than by matching to the next

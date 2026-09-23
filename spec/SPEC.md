@@ -1762,14 +1762,17 @@ break the documents it experiments on.
 
 **6.4.1 Compatibility.** The SVG documents Plannotation cares about are produced by
 IfcOpenShell's serialiser, which carries IFC identity in the markup already:
-product groups take `id="product-<GlobalId>"`, IFC classes appear as `class`
-values, and view information is carried in attributes of its own.
+product groups take `id="product-<uuid>-body"`, where the UUID is the product's
+GlobalId written as the 128-bit number it encodes (7.1.2), and repeat the GlobalId
+as the model stores it in `ifc:guid` (`data-guid` where the serialiser writes no
+`ifc` namespace); IFC classes appear as `class` values, and view information is
+carried in attributes of its own.
 
 A writer MUST NOT rename, renumber or remove an existing `id` or `class` value,
 and MUST NOT alter any existing attribute. Those values are another tool's
 identifiers, other documents reference them, and Plannotation gains nothing by
-owning them. Where an `id` encodes an IFC GlobalId, a writer SHOULD read
-`element.ifcGuid` from it and MUST NOT rewrite it.
+owning them. Where the markup carries an IFC GlobalId, in `ifc:guid` or encoded in
+an `id`, a writer SHOULD read `element.ifcGuid` from it and MUST NOT rewrite it.
 
 **6.4.2 Where Plannotation data goes.** Plannotation data is carried in a `<metadata>`
 element, or in attributes whose names begin `data-plannotation-`, and nowhere else.
@@ -1798,9 +1801,10 @@ carries a payload, the declaration of 6.3 having no SVG equivalent.
 IfcOpenShell's serializer already says which product each group draws and how each
 view maps to the model, so a writer can derive a plannotation for the PDF rendered
 from that SVG without an SVG payload: the GlobalId from `ifc:guid`, or from the
-serializer's `id="product-<uuid>"` by 7.1.2; the class from the group's `class`;
-and the paper transform of 3.5 from the view group's `ifc:matrix3` and `ifc:plane`
-composed with every transform and viewport above it, followed by the flip of 3.3.
+serializer's `id="product-<uuid>-body"` by 7.1.2; the class from the group's
+`class`; and the paper transform of 3.5 from the view group's `ifc:matrix3` and
+`ifc:plane` composed with every transform and viewport above it, followed by the
+flip of 3.3.
 The reference implementation's `plannotation from-svg` and its Bonsai operator do
 exactly this, and write nothing into the SVG.
 
@@ -2033,8 +2037,8 @@ IFC's base-64 alphabet encoding a 128-bit number, so that its first character is
 to `3`. A writer MUST NOT invent a GlobalId for something the model does not contain;
 such an element has no `ifcGuid`. A reader MUST compare GlobalIds as case-sensitive
 strings. Where a tool records the 128-bit number as a UUID, as IfcOpenShell's SVG
-serializer does in `id="product-<uuid>"`, the GlobalId is its base-64 encoding and a
-writer MAY decode it (6.4.5).
+serializer does in `id="product-<uuid>-body"`, the GlobalId is its base-64 encoding
+and a writer MAY decode it (6.4.5).
 
 **7.1.3 Units.** `model.lengthUnit` MUST name the length unit of the model's
 `IfcUnitAssignment` — `m` for the SI metre without prefix, `cm` for `CENTI`, `mm` for
