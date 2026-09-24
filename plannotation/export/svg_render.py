@@ -14,9 +14,12 @@ between them decide whether a drawing appears:
 ``setAlwaysProject(True)``
     Draw what is below the cut as a projection, so a plan is a plan and not an outline.
 ``setSectionHeight(...)``
-    Where the cut is. A model whose storeys carry no elevation gives
-    ``setSectionHeightsFromStoreys`` nothing to work from, so the height is passed
-    explicitly and recorded in the plannotation as the viewport's ``cutHeight``.
+    Where the cut is, as an absolute z in the model's coordinates, not a height above
+    a storey: the serializer cuts every storey at that one z. A model whose storeys
+    carry no elevation gives ``setSectionHeightsFromStoreys`` nothing to work from, so
+    the height is passed explicitly -- the storey's z plus the cut height, which the
+    plannotation records as ``storey.elevation`` and ``cutHeight``. Passing the cut
+    height alone draws a storey that stands at z = 14.3 m from 1.2 m, well below it.
 
 What comes out carries the conventions SPEC 6.4.1 says Plannotation must not disturb:
 a product group is ``id="product-<uuid>-body"`` with ``class="IfcWall"``,
@@ -40,6 +43,7 @@ from typing import TYPE_CHECKING, Any
 from plannotation.errors import MissingExtraError
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     from plannotation.export.models import SectionCut
@@ -127,6 +131,7 @@ def render_view(
     section_height: float | None = None,
     section: SectionCut | None = None,
     name: str = "",
+    include: Sequence[str] | None = None,
 ) -> RenderedView:
     """Render one view of a model to SVG: a plan cut, or a vertical section.
 
@@ -135,10 +140,15 @@ def render_view(
         scale_denominator: The drawing scale's denominator, so 50 for 1:50.
         width_mm: The bounding rectangle's width in millimetres.
         height_mm: Its height in millimetres.
-        section_height: For a plan, where to cut, in metres above the storey.
-        section: For a section, the vertical cutting plane. The serializer draws it
-            through ``addDrawing`` with the storeys' own plans switched off.
+        section_height: For a storey plan, the z of the cut in model coordinates, in
+            metres: the storey's own z plus the height of the cut above it.
+        section: An explicit cutting plane: a vertical section, or a plan drawn along
+            axes of its own. The serializer draws it through ``addDrawing`` with the
+            storeys' own plans switched off.
         name: The view's name, recorded as the view group's ``ifc:name``.
+        include: The GlobalIds of the products to draw, or None for every product.
+            A plan of one storey draws that storey's products only; left to itself the
+            serializer draws whatever else the cut passes through as well.
 
     Returns:
         The rendered view.
@@ -183,7 +193,19 @@ def render_view(
     serializer.setMirrorY(False)
     serializer.setDrawStoreyHeights(0)
 
-    iterator = geom.iterator(settings, model, exclude=list(EXCLUDED_CLASSES))
+    if include is None:
+        iterator = geom.iterator(settings, model, exclude=list(EXCLUDED_CLASSES))
+    else:
+        chosen = [model.by_guid(guid) for guid in include]
+        iterator = geom.iterator(
+            settings,
+            model,
+            include=[
+                product
+                for product in chosen
+                if not any(product.is_a(excluded) for excluded in EXCLUDED_CLASSES)
+            ],
+        )
     if iterator.initialize():
         while True:
             serializer.write(iterator.get())

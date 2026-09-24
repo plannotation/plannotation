@@ -191,16 +191,19 @@ def frame_box(width_mm: float, height_mm: float) -> tuple[float, float, float, f
     return (MARGIN_MM, MARGIN_MM, width_mm - MARGIN_MM, height_mm - MARGIN_MM)
 
 
-def title_block_box(width_mm: float, height_mm: float) -> tuple[float, float, float, float]:
+def title_block_box(
+    width_mm: float, height_mm: float, size_mm: tuple[float, float] | None = None
+) -> tuple[float, float, float, float]:
     """Return the title block's paper bounding box, at the frame's bottom-right.
 
     Args:
         width_mm: The page width.
         height_mm: The page height.
+        size_mm: The block's width and height, or None for :data:`TITLE_BLOCK_MM`.
 
     Returns:
         ``(x0, y0, x1, y1)`` in paper millimetres.
     """
     _, _, right, _ = frame_box(width_mm, height_mm)
-    block_width, block_height = TITLE_BLOCK_MM
+    block_width, block_height = size_mm or TITLE_BLOCK_MM
     return (right - block_width, MARGIN_MM, right, MARGIN_MM + block_height)

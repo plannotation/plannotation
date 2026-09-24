@@ -73,8 +73,15 @@ if TYPE_CHECKING:
     from plannotation.export.models import BuiltModel, Level
     from plannotation.model import Discipline
 
-#: Where the drawing sits on the sheet, as a paper bounding box on an A3 page.
-VIEWPORT_BOX = (25.0, 85.0, 325.0, 285.0)
+#: A paper bounding box, ``(x0, y0, x1, y1)`` in millimetres.
+Box = tuple[float, float, float, float]
+
+#: Where the drawing sits on an A3 sheet: :func:`viewport_box` for that page.
+VIEWPORT_BOX: Box = (25.0, 85.0, 325.0, 285.0)
+
+#: The viewport's clearance inside the frame on the left and above the title block,
+#: the room kept on its right for the dimension chains, and its clearance at the top.
+_VIEWPORT_INSET_MM, _VIEWPORT_RIGHT_MM, _VIEWPORT_TOP_MM = 15.0, 85.0, 2.0
 
 #: How far short of the viewport's edge a grid line stops, leaving room for its bubble
 #: inside the sheet frame.
@@ -142,28 +149,78 @@ class GridAxis:
 
 
 @dataclass(frozen=True)
+class Wording:
+    """The words a compact title block prints around its values, in the sheet's language.
+
+    Attributes:
+        project: Printed before the project number.
+        revision: Printed before the revision.
+        scale: The scale as printed, ``{denominator}`` standing for its denominator.
+    """
+
+    project: str = "Project"
+    revision: str = "Revision"
+    scale: str = "1:{denominator}"
+
+
+@dataclass(frozen=True)
+class TitleField:
+    """One labelled field of a title block, such as ``SCALE`` and ``1:100``.
+
+    Attributes:
+        label: The field's label as it prints, in as many languages as the sheet uses.
+        value: Its value. A long value wraps onto further lines.
+    """
+
+    label: str
+    value: str
+
+
+@dataclass(frozen=True)
 class SheetSpec:
     """What is drawn on one sheet, and what the sheet says about itself.
+
+    Nothing about the project is assumed: a value the spec leaves out is read from the
+    model where the model holds it, and otherwise neither printed nor recorded.
 
     Attributes:
         sheet_id: The sheet number as it prints.
         title: The sheet title as it prints.
         scale: The drawing scale's denominator.
         grids: The grid lines to draw and dimension between.
-        callout_to: The sheet the callout points at.
+        callout_to: The sheet the callout in the viewport's corner points at, or None
+            for no such callout.
         drawing_type: What kind of drawing this is. It is stated rather than assumed:
             a plannotation calling a position plan an architectural plan makes a false
             statement about the sheet, and it is exactly the one inference caught.
         discipline: The discipline the drawing belongs to.
+        project: The project's name and number; None takes the name from the model's
+            ``IfcProject``.
+        revision: The sheet's revision, or None for a sheet that has none.
+        page_size: A key of :data:`plannotation.export.sheet.PAPER_SIZES`.
+        viewport_box: Where the view is drawn on the paper; None for
+            :func:`viewport_box` of the page.
+        wording: The words a compact title block prints.
+        title_fields: The title block's labelled fields. With none, the title block is
+            the compact one: project, title, sheet number, scale and revision.
+        title_block_mm: The title block's width and height; None for
+            :data:`plannotation.export.sheet.TITLE_BLOCK_MM`.
     """
 
     sheet_id: str
     title: str
     scale: float
     grids: tuple[GridAxis, ...]
-    callout_to: str
+    callout_to: str | None
     drawing_type: DrawingType = "plan"
     discipline: Discipline = "architecture"
+    project: Project | None = None
+    revision: str | None = None
+    page_size: str = "A3"
+    viewport_box: Box | None = None
+    wording: Wording = field(default_factory=Wording)
+    title_fields: tuple[TitleField, ...] = ()
+    title_block_mm: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -188,6 +245,8 @@ class ModelFacts:
     Attributes:
         unit_scale: The model's length unit in metres.
         sha256: The SHA-256 of the model file's bytes, which ``model.sha256`` records.
+        schema: The model's IFC schema, such as ``IFC4`` or ``IFC2X3``.
+        project: The ``IfcProject``'s name, or None.
         classes: Each building element's IFC class and name, by GlobalId.
         tags: Each product's ``Tag``, by GlobalId.
         properties: Each product's common property sets, by GlobalId.
@@ -196,6 +255,8 @@ class ModelFacts:
 
     unit_scale: float
     sha256: str
+    schema: str = "IFC4"
+    project: str | None = None
     classes: dict[str, tuple[str, str | None]] = field(default_factory=dict)
     tags: dict[str, str] = field(default_factory=dict)
     properties: dict[str, dict[str, dict[str, object]]] = field(default_factory=dict)
@@ -241,12 +302,37 @@ class _Frame:
         return invert(self.transform, 0.0, plane_y_m / self.unit_scale)[1]
 
 
+def viewport_box(
+    width_mm: float, height_mm: float, title_block_mm: tuple[float, float] | None = None
+) -> Box:
+    """Return where a view is drawn on a page of a given size, by default.
+
+    Inside the frame, above the title block, with room on the right for the dimension
+    chains. On an A3 page with the default title block this is :data:`VIEWPORT_BOX`.
+
+    Args:
+        width_mm: The page width.
+        height_mm: The page height.
+        title_block_mm: The title block's size, or None for the default.
+
+    Returns:
+        The viewport's paper box.
+    """
+    left, _, right, top = frame_box(width_mm, height_mm)
+    block = title_block_box(width_mm, height_mm, title_block_mm)
+    return (
+        left + _VIEWPORT_INSET_MM,
+        block[3] + _VIEWPORT_INSET_MM,
+        right - _VIEWPORT_RIGHT_MM,
+        top - _VIEWPORT_TOP_MM,
+    )
+
+
 def export_sheet(
     built: BuiltModel,
     spec: SheetSpec,
     *,
     generator_version: str,
-    page_size: str = "A3",
 ) -> ExportedSheet:
     """Draw one model on one sheet and describe it.
 
@@ -254,7 +340,6 @@ def export_sheet(
         built: The model to draw.
         spec: What the sheet is and what is drawn on it.
         generator_version: The version to record in ``generator``.
-        page_size: A key of :data:`plannotation.export.sheet.PAPER_SIZES`.
 
     Returns:
         The composed sheet, its plannotation, and its ground truth.
@@ -262,28 +347,32 @@ def export_sheet(
     Raises:
         ExportError: If the view draws no element.
     """
-    width_mm, height_mm = PAPER_SIZES[page_size]
+    width_mm, height_mm = PAPER_SIZES[spec.page_size]
+    box = spec.viewport_box or viewport_box(width_mm, height_mm, spec.title_block_mm)
+    plan = built.is_plan
     facts = read_model_facts(built.path)
     view = render_view(
         built.path,
         scale_denominator=spec.scale,
-        width_mm=VIEWPORT_BOX[2] - VIEWPORT_BOX[0],
-        height_mm=VIEWPORT_BOX[3] - VIEWPORT_BOX[1],
-        section_height=built.cut_height,
+        width_mm=box[2] - box[0],
+        height_mm=box[3] - box[1],
+        # The serializer cuts at an absolute z, so the storey's own z goes in with it.
+        section_height=built.storey_elevation + (built.cut_height or 0.0),
         section=built.section,
         name=spec.title,
+        include=built.include,
     )
 
     sheet = Sheet(width_mm=width_mm, height_mm=height_mm)
     sheet.rect(frame_box(width_mm, height_mm))
     # The serializer draws into its own box, whose top-left goes at the viewport's
     # top-left on the sheet. In SVG that is a downward y, so the paper top edge.
-    offset = (VIEWPORT_BOX[0], sheet.y(VIEWPORT_BOX[3]))
+    offset = (box[0], sheet.y(box[3]))
 
     transform = paper_to_plane(view.matrix3, height_mm, facts.unit_scale, svg_offset=offset)
     origin, x_axis, y_axis = plane_from_ifc_plane(view.ifc_plane, facts.unit_scale)
     frame = _Frame(
-        viewport="vp-section" if built.section is not None else "vp-plan",
+        viewport="vp-plan" if plan else "vp-section",
         transform=transform,
         unit_scale=facts.unit_scale,
         origin_z=origin[2],
@@ -304,18 +393,19 @@ def export_sheet(
     content = union_box(element.paper_bbox for element in elements)
 
     annotations: list[Annotation] = []
-    annotations += _draw_grids(sheet, spec.grids, frame)
-    levels = _draw_levels(sheet, built.levels, frame, left=content[0])
+    annotations += _draw_grids(sheet, spec.grids, frame, box)
+    levels = _draw_levels(sheet, built.levels, frame, left=content[0], datum=built.datum)
     annotations += levels
     annotations += _draw_grid_dimensions(sheet, spec.grids, frame, content)
     annotations += _draw_level_dimensions(sheet, levels, built.levels, content)
-    annotations.append(_draw_callout(sheet, spec.callout_to, frame.viewport))
+    if spec.callout_to is not None:
+        annotations.append(_draw_callout(sheet, spec.callout_to, frame.viewport, box))
     annotations += _draw_tags(sheet, elements, frame.viewport, content, annotations)
-    _draw_title_block(sheet, width_mm, height_mm, spec.sheet_id, spec.title, spec.scale)
+    project = spec.project or (Project(name=facts.project) if facts.project else None)
+    _draw_title_block(sheet, spec, project)
 
     boxes = [element.paper_bbox for element in elements]
     boxes += [a.paper_bbox for a in annotations if a.viewport == frame.viewport]
-    plan = built.section is None
     viewport = Viewport(
         id=frame.viewport,
         name=spec.title,
@@ -330,7 +420,11 @@ def export_sheet(
         paperToPlane=transform,
         cutHeight=(built.cut_height or 0.0) / facts.unit_scale if plan else None,
         storey=(
-            Storey(name="Erdgeschoss", elevation=built.storey_elevation / facts.unit_scale)
+            Storey(
+                ifcGuid=built.storey_guid,
+                name=built.storey_name,
+                elevation=built.storey_elevation / facts.unit_scale,
+            )
             if plan
             else None
         ),
@@ -343,18 +437,18 @@ def export_sheet(
         sheet=SheetInfo(
             id=spec.sheet_id,
             title=spec.title,
-            revision="A",
+            revision=spec.revision,
             discipline=spec.discipline,
             drawingType=spec.drawing_type,
             scale=spec.scale,
-            project=Project(name="Wohnanlage Lindenhof", number="2024-118"),
-            titleBlockBBox=title_block_box(width_mm, height_mm),
+            project=project,
+            titleBlockBBox=title_block_box(width_mm, height_mm, spec.title_block_mm),
         ),
         model=Model(
             file=built.path.name,
             sha256=facts.sha256,
             lengthUnit=length_unit_for(facts.unit_scale),
-            schema="IFC4",
+            schema=facts.schema,
         ),
         viewports=[viewport],
         elements=elements,
@@ -400,9 +494,12 @@ def read_model_facts(model_path: Path) -> ModelFacts:
         }
         if common:
             properties[guid] = common
+    projects = model.by_type("IfcProject")
     return ModelFacts(
         unit_scale=float(unit.calculate_unit_scale(model)),
         sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
+        schema=str(model.schema),
+        project=str(projects[0].Name) if projects and projects[0].Name else None,
         classes=classes,
         tags=tags,
         properties=properties,
@@ -640,19 +737,22 @@ def _reference(element: Element) -> tuple[str, str] | None:
 # ---------------------------------------------------------------------------
 # Drawing
 # ---------------------------------------------------------------------------
-def _draw_grids(sheet: Sheet, grids: tuple[GridAxis, ...], frame: _Frame) -> list[Annotation]:
+def _draw_grids(
+    sheet: Sheet, grids: tuple[GridAxis, ...], frame: _Frame, box: Box
+) -> list[Annotation]:
     """Draw the grid lines and their bubbles, and describe them.
 
     Args:
         sheet: The sheet being composed.
         grids: The grid lines.
         frame: The view's placement.
+        box: The viewport's paper box, which the lines span.
 
     Returns:
         One ``grid`` annotation per line.
     """
     annotations: list[Annotation] = []
-    low_x, low_y, high_x, high_y = VIEWPORT_BOX
+    low_x, low_y, high_x, high_y = box
     for grid in grids:
         if grid.vertical:
             x = frame.paper_x(grid.position)
@@ -707,19 +807,25 @@ def level_text(elevation_m: float) -> str:
 
 
 def _draw_levels(
-    sheet: Sheet, levels: Sequence[Level], frame: _Frame, *, left: float
+    sheet: Sheet, levels: Sequence[Level], frame: _Frame, *, left: float, datum: float = 0.0
 ) -> list[Annotation]:
     """Mark each storey's level beside a section, from the model's elevations.
 
+    The mark stands at the storey's z in the model and prints its height above the
+    building's ±0,00, which is what a level mark states and what its ``elevation``
+    records. The two differ wherever the model places that datum away from z = 0: a
+    ground floor at z = 14.30 m reads ±0,00.
+
     The mark's box is centred on the level line, so that the point it stands for is
     the height it states: a reader taking the box's centre through ``paperToPlane``
-    lands on the elevation printed.
+    lands on the storey's floor.
 
     Args:
         sheet: The sheet being composed.
         levels: The storeys to mark, lowest first.
         frame: The view's placement.
         left: The drawing's left edge on the paper.
+        datum: The z of the building's ±0,00 in model coordinates, in metres.
 
     Returns:
         One ``level`` annotation per storey.
@@ -730,7 +836,8 @@ def _draw_levels(
     for index, level in enumerate(levels):
         plane_y = level.elevation - frame.origin_z * frame.unit_scale
         y = frame.paper_y(plane_y)
-        text = level_text(level.elevation)
+        above = round(level.elevation - datum, 6)
+        text = level_text(above)
         sheet.line(start, y, right, y, width=0.25)
         marker = start + 4.0
         sheet.line(marker - 1.5, y - 2.5, marker + 1.5, y - 2.5, width=0.18)
@@ -749,7 +856,7 @@ def _draw_levels(
                     y + LEVEL_HALF_HEIGHT_MM,
                 ),
                 text=text,
-                elevation=level.elevation,
+                elevation=above,
                 ifcGuid=level.guid,
                 geometry=[(start, y), (right, y)],
                 provenance=Provenance.AUTHORED,
@@ -1090,18 +1197,19 @@ def _draw_tags(
     return annotations
 
 
-def _draw_callout(sheet: Sheet, target_sheet: str, viewport: str) -> Annotation:
-    """Draw a callout pointing at another sheet.
+def _draw_callout(sheet: Sheet, target_sheet: str, viewport: str, box: Box) -> Annotation:
+    """Draw a callout pointing at another sheet, in the viewport's lower right corner.
 
     Args:
         sheet: The sheet being composed.
         target_sheet: The sheet id it refers to.
         viewport: The viewport's local id.
+        box: The viewport's paper box.
 
     Returns:
         The ``callout`` annotation.
     """
-    centre = (VIEWPORT_BOX[2] - 12.0, VIEWPORT_BOX[1] + 8.0)
+    centre = (box[2] - 12.0, box[1] + 8.0)
     sheet.circle(*centre, 6.0)
     sheet.text(centre[0], centre[1] - 1.2, target_sheet, size=2.5, anchor="middle")
     return Annotation(
@@ -1115,32 +1223,104 @@ def _draw_callout(sheet: Sheet, target_sheet: str, viewport: str) -> Annotation:
     )
 
 
-def _draw_title_block(
-    sheet: Sheet,
-    width_mm: float,
-    height_mm: float,
-    sheet_id: str,
-    title: str,
-    scale_denominator: float,
-) -> None:
-    """Draw the title block.
+def _draw_title_block(sheet: Sheet, spec: SheetSpec, project: Project | None) -> None:
+    """Draw the title block: the compact one, or labelled fields when the spec has them.
 
     Args:
         sheet: The sheet being composed.
-        width_mm: The page width.
-        height_mm: The page height.
-        sheet_id: The sheet number.
-        title: The sheet title.
-        scale_denominator: The drawing scale's denominator.
+        spec: What the sheet says about itself.
+        project: The project it belongs to, or None.
     """
-    box = title_block_box(width_mm, height_mm)
+    box = title_block_box(sheet.width_mm, sheet.height_mm, spec.title_block_mm)
     sheet.rect(box)
-    sheet.text(box[0] + 4.0, box[1] + 46.0, "Wohnanlage Lindenhof", size=5.0)
-    sheet.text(box[0] + 4.0, box[1] + 38.0, "Projekt 2024-118", size=3.0)
-    sheet.text(box[0] + 4.0, box[1] + 26.0, title, size=4.0)
-    sheet.text(box[0] + 4.0, box[1] + 8.0, sheet_id, size=6.0)
-    sheet.text(box[2] - 4.0, box[1] + 8.0, f"M 1:{scale_denominator:.0f}", size=4.0, anchor="end")
-    sheet.text(box[2] - 4.0, box[1] + 20.0, "Index A", size=3.0, anchor="end")
+    if spec.title_fields:
+        _draw_title_fields(sheet, box, spec)
+        return
+    wording = spec.wording
+    if project is not None and project.name:
+        sheet.text(box[0] + 4.0, box[1] + 46.0, project.name, size=5.0)
+    if project is not None and project.number:
+        sheet.text(box[0] + 4.0, box[1] + 38.0, f"{wording.project} {project.number}", size=3.0)
+    sheet.text(box[0] + 4.0, box[1] + 26.0, spec.title, size=4.0)
+    sheet.text(box[0] + 4.0, box[1] + 8.0, spec.sheet_id, size=6.0)
+    scale = wording.scale.format(denominator=f"{spec.scale:.0f}")
+    sheet.text(box[2] - 4.0, box[1] + 8.0, scale, size=4.0, anchor="end")
+    if spec.revision is not None:
+        revision = f"{wording.revision} {spec.revision}"
+        sheet.text(box[2] - 4.0, box[1] + 20.0, revision, size=3.0, anchor="end")
+
+
+#: A title block field's label size, value size, line spacing and padding, in mm.
+_FIELD_LABEL_MM, _FIELD_VALUE_MM, _FIELD_LEADING, _FIELD_PAD_MM = 1.8, 2.6, 1.3, 1.6
+
+#: How wide a character of Helvetica is, on average, as a share of its size. Used only
+#: to wrap a long value; generous, so that a wrapped line never overruns its field.
+_CHAR_WIDTH_EM = 0.56
+
+
+def wrap(text: str, width_mm: float, size_mm: float) -> list[str]:
+    """Break a value into lines that fit a field, at spaces.
+
+    Args:
+        text: The value.
+        width_mm: The width it has.
+        size_mm: Its font size.
+
+    Returns:
+        Its lines, at least one.
+    """
+    limit = max(1, int(width_mm / (size_mm * _CHAR_WIDTH_EM)))
+    lines: list[str] = []
+    for paragraph in text.split("\n"):
+        line = ""
+        for word in paragraph.split():
+            candidate = f"{line} {word}" if line else word
+            if len(candidate) > limit and line:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        lines.append(line)
+    return lines
+
+
+def _draw_title_fields(sheet: Sheet, box: Box, spec: SheetSpec) -> None:
+    """Draw a title block of labelled fields, one below the other, the last two side by side.
+
+    The last two fields -- the sheet number and the scale, by convention -- share the
+    bottom row, the sheet number large. Every other field takes the block's width.
+
+    Args:
+        sheet: The sheet being composed.
+        box: The title block's paper box.
+        spec: What the sheet says about itself.
+    """
+    left, bottom, right, top = box
+    width = right - left - 2 * _FIELD_PAD_MM
+    *rows, number, scale = spec.title_fields
+    y = top
+    for row in rows:
+        lines = wrap(row.value, width, _FIELD_VALUE_MM)
+        height = (
+            _FIELD_PAD_MM
+            + _FIELD_LABEL_MM
+            + len(lines) * _FIELD_VALUE_MM * _FIELD_LEADING
+            + _FIELD_PAD_MM
+        )
+        label = y - _FIELD_PAD_MM - _FIELD_LABEL_MM
+        sheet.text(left + _FIELD_PAD_MM, label, row.label, size=_FIELD_LABEL_MM)
+        for index, line in enumerate(lines):
+            baseline = label - (index + 1) * _FIELD_VALUE_MM * _FIELD_LEADING
+            sheet.text(left + _FIELD_PAD_MM, baseline, line, size=_FIELD_VALUE_MM)
+        y -= height
+        sheet.line(left, y, right, y, width=0.18)
+    split = left + (right - left) * 0.62
+    sheet.line(split, bottom, split, y, width=0.18)
+    for x0, cell, size in ((left, number, 7.0), (split, scale, 4.5)):
+        label = y - _FIELD_PAD_MM - _FIELD_LABEL_MM
+        sheet.text(x0 + _FIELD_PAD_MM, label, cell.label, size=_FIELD_LABEL_MM)
+        baseline = bottom + (label - bottom) / 2 - size * 0.35
+        sheet.text(x0 + _FIELD_PAD_MM, baseline, cell.value, size=size)
 
 
 # ---------------------------------------------------------------------------
