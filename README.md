@@ -44,8 +44,8 @@ uv run plannotation inspect M18-101.pdf
 - [The inspector](docs/inspector.md): one HTML file that draws a page's plannotation over
   the page.
 - [`plannotation infer`](docs/inference.md): guesses a plannotation for a PDF that has
-  none. It is tuned on the generated samples and recovers little from real drawings so
-  far.
+  none. It is tuned on the generated samples. On three real drawings it recovered almost
+  nothing: no sheet number, no elements.
 
 ## Documentation
 

@@ -56,12 +56,13 @@ authored one does: the right number linked to the wrong grids states a false dis
 With `--ifc`, every mark recovers its element's GlobalId and class.
 
 **Read these numbers for what they are.** The samples were drawn by this project's own
-exporter, so their conventions are the conventions inference was written against. A
-real office's drawings will do better or worse depending on how closely they follow the
-same habits: a title block in the bottom-right, grid bubbles as circles, marks with a
-recognisable prefix. Drop real drawings into `tests/fixtures/realworld/` (git-ignored by
-design) and the test suite checks that inference does not crash on them; it cannot check
-that it is right, because there is no answer key.
+exporter, so their conventions are the conventions inference was written against. On
+three real drawings from other sources (a school plan, a sports hall and a house, all
+openly licensed) it recovered almost nothing: no sheet number, no elements, at most one
+annotation, and one dimension of 0 mm that was false. Drop real drawings into
+`tests/fixtures/realworld/` (git-ignored by design) and the test suite checks that
+inference does not crash on them; it cannot check that it is right, because there is no
+answer key.
 
 ## Not implemented
 
