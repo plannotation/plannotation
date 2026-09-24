@@ -1977,19 +1977,18 @@ def _room_lines(
 
     Returns:
         Each variant as ``(part, line)`` pairs, the part being ``number``, ``name`` or
-        ``area``.
+        ``area``: every size of the full label, then every size without the name, then
+        the number alone.
     """
-    variants: list[list[tuple[str, Line]]] = []
+    full: list[list[tuple[str, Line]]] = []
     for big, small in _ROOM_SIZES:
-        full = [("number", Line(number, big, bold=True))] if number else []
-        full += [("name", Line(name, small))] if name else []
-        full += [("area", Line(area, small))] if area else []
-        variants.append(full)
-        if name and (number or area):
-            variants.append([part for part in full if part[0] != "name"])
-    if number:
-        variants.append([("number", Line(number, _ROOM_SIZES[-1][0], bold=True))])
-    return [variant for variant in variants if variant]
+        label = [("number", Line(number, big, bold=True))] if number else []
+        label += [("name", Line(name, small))] if name else []
+        label += [("area", Line(area, small))] if area else []
+        full.append(label)
+    nameless = [[part for part in label if part[0] != "name"] for label in full] if name else []
+    alone = [[("number", Line(number, _ROOM_SIZES[-1][0], bold=True))]] if number else []
+    return [variant for variant in (*full, *nameless, *alone) if variant]
 
 
 def _draw_rooms(
@@ -2006,8 +2005,9 @@ def _draw_rooms(
 
     A label goes where it fits inside the room clear of every line drawn there -- walls,
     doors and their swings, what is seen below the cut, grid and section lines -- and of
-    the other labels. Where the full label does not fit, a smaller one is tried, then
-    one without the name, then the number alone.
+    the other labels. Where the full label does not fit, a smaller one is tried; then
+    the full label over a grid line, which a label may cross where it must, rather than
+    lose the room's name; then one without the name, then the number alone.
 
     Args:
         sheet: The sheet being composed.
@@ -2029,10 +2029,10 @@ def _draw_rooms(
     others = [e for e in elements if e.ifc_class != "IfcSpace"]
     lines = [outline for e in others for outline in e.paper_outlines or []]
     lines += seen_lines
-    lines += [
-        a.geometry for a in drawn if a.geometry and a.annotation_type in ("grid", "sectionMark")
-    ]
-    obstacles = segments_of(lines)
+    lines += [a.geometry for a in drawn if a.geometry and a.annotation_type == "sectionMark"]
+    walls = segments_of(lines)
+    grids = segments_of([a.geometry for a in drawn if a.geometry and a.annotation_type == "grid"])
+    obstacles = np.vstack([walls, grids])
     placed: list[tuple[float, float, float, float]] = []
     annotations: list[Annotation] = []
     for space in sorted(spaces, key=lambda e: (e.name or "", e.local_id)):
@@ -2041,9 +2041,19 @@ def _draw_rooms(
         area = area_text(_property(space, rooms.area_property), rooms.area_unit)
         number, long_name = facts.names.get(space.ifc_guid or "", (space.name, None))
         own = segments_of([[*polygon, polygon[0]]])
-        for variant in _room_lines(number, long_name, area):
+        variants = _room_lines(number, long_name, area)
+        named = [v for v in variants if any(part == "name" for part, _ in v)]
+        rest = [v for v in variants if v not in named]
+        clear, over = np.vstack([obstacles, own]), np.vstack([walls, own])
+        attempts = [
+            *((v, clear) for v in named),
+            *((v, over) for v in named),
+            *((v, clear) for v in rest),
+            *((v, over) for v in rest),
+        ]
+        for variant, avoiding in attempts:
             texts = [line for _, line in variant]
-            centre = place_label(polygon, texts, np.vstack([obstacles, own]), placed)
+            centre = place_label(polygon, texts, avoiding, placed)
             if centre is None:
                 continue
             boxes = draw_label(sheet, centre, texts)

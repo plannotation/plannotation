@@ -296,7 +296,7 @@ class Line:
 
 
 #: The leading of a label, as a share of each line's size, and its clear margin.
-_LEADING, _LABEL_MARGIN_MM = 1.3, 0.6
+_LEADING, _LABEL_MARGIN_MM = 1.3, 0.8
 
 #: The step between the points a label is tried at, in millimetres.
 LABEL_STEP_MM = 0.5
