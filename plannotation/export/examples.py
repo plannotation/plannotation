@@ -178,7 +178,7 @@ M18_FIELDS = (
 )
 
 #: The title block's size on both sheets.
-M18_TITLE_BLOCK_MM = (180.0, 88.0)
+M18_TITLE_BLOCK_MM = (180.0, 64.0)
 
 
 def _m18_fields(drawing: str, sheet: str, scale: str) -> tuple[TitleField, ...]:
@@ -250,7 +250,7 @@ def draw_m18_plan(model_path: Path) -> tuple[BuiltModel, SheetSpec]:
         title=title,
         grids=grids,
         page_size="A1",
-        viewport_box=(20.0, 110.0, 821.0, 574.0),
+        viewport_box=(20.0, 30.0, 821.0, 574.0),
         title_fields=_m18_fields(title, "M18-101", "1:100"),
         dimension_offsets_mm=(20.0, 30.0),
         rooms=RoomLabels(area_property="AR_Ruum.120_Pindala"),
@@ -301,7 +301,7 @@ def draw_m18_section(model_path: Path) -> tuple[BuiltModel, SheetSpec]:
         grids=grid_axes_on(lines, cut),
         drawing_type="section",
         page_size="A2",
-        viewport_box=(20.0, 100.0, 394.0, 400.0),
+        viewport_box=(20.0, 80.0, 574.0, 400.0),
         title_fields=_m18_fields(title, "M18-301", "1:100"),
         view_title=ViewTitle(text=title, label="A", target_sheet="M18-101"),
     )

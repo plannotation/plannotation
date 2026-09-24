@@ -335,6 +335,8 @@ def place_label(
     lines: Sequence[Line],
     segments: NDArray[np.float64],
     placed: Sequence[Box],
+    *,
+    extra_width: float = 0.0,
 ) -> Point | None:
     """Find where a label fits inside a room, clear of everything drawn there.
 
@@ -347,6 +349,7 @@ def place_label(
         lines: The label's lines.
         segments: Every line drawn near the room, the room's own outline among them.
         placed: The boxes of the labels already placed.
+        extra_width: Room the label needs beside its text, for a symbol.
 
     Returns:
         The label's centre, or None where it fits nowhere.
@@ -362,7 +365,7 @@ def place_label(
         return None
     gx, gy = np.meshgrid(grid_x, grid_y)
     order = np.argsort((gx - target[0]) ** 2 + (gy - target[1]) ** 2, axis=None)
-    width = max(text_width(line.text, line.size, bold=line.bold) for line in lines)
+    width = max(text_width(line.text, line.size, bold=line.bold) for line in lines) + extra_width
     height = sum(line.size * _LEADING for line in lines)
     near = segments[
         ~(
@@ -439,6 +442,45 @@ def area_text(value: object, unit: str) -> str | None:
 # ---------------------------------------------------------------------------
 # Marks
 # ---------------------------------------------------------------------------
+#: A level mark's triangle: half its width and its height, in millimetres.
+LEVEL_TRIANGLE_MM = (1.3, 2.2)
+
+
+def draw_level_mark(
+    sheet: Sheet, start: Point, length: float, text: str, *, size: float = 2.5
+) -> tuple[Box, list[Point]]:
+    """Draw a level mark: a line, an open triangle standing on it, and the level beside.
+
+    The triangle's point touches the line, which is the height the mark states, and the
+    text stands on the line to the triangle's right.
+
+    Args:
+        sheet: The sheet being composed.
+        start: The line's left end, at the height it marks.
+        length: The line's length; at least as long as the text and the triangle.
+        text: The level as printed, such as ``+3,35``.
+        size: The text's size.
+
+    Returns:
+        The box of what was drawn, and the line.
+    """
+    x, y = start
+    half, height = LEVEL_TRIANGLE_MM
+    tip = x + 4.0
+    width = text_width(text, size)
+    end = max(x + length, tip + half + 1.0 + width)
+    sheet.line(x, y, end, y, width=MEDIUM_MM)
+    sheet.polyline(
+        [(tip - half, y + height), (tip + half, y + height), (tip, y)],
+        width=FINE_MM,
+        fill="#fff",
+        closed=True,
+    )
+    sheet.text(tip + half + 1.0, y + 0.6, text, size=size)
+    box = (x, y - 0.5, end, y + max(height, 0.6 + 0.76 * size))
+    return box, [(x, y), (end, y)]
+
+
 #: A section mark's bubble radius, and the length of its arrow beyond the bubble.
 MARK_RADIUS_MM, MARK_ARROW_MM = 4.5, 3.5
 

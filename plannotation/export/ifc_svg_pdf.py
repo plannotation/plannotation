@@ -42,6 +42,7 @@ from plannotation.errors import ExportError
 from plannotation.export.doors import door_swings
 from plannotation.export.drafting import (
     GRID_DASH,
+    LEVEL_TRIANGLE_MM,
     MARK_RADIUS_MM,
     NORTH_RADIUS_MM,
     Line,
@@ -51,6 +52,7 @@ from plannotation.export.drafting import (
     ViewTitle,
     area_text,
     draw_label,
+    draw_level_mark,
     draw_north_arrow,
     draw_scale_bar,
     draw_section_mark,
@@ -62,7 +64,7 @@ from plannotation.export.drafting import (
 )
 from plannotation.export.geometry import bounding_box, path_points, union_box
 from plannotation.export.paper import Affine, invert, paper_to_plane, plane_from_ifc_plane
-from plannotation.export.sheet import PAPER_SIZES, Sheet, frame_box, title_block_box
+from plannotation.export.sheet import PAPER_SIZES, Sheet, frame_box, text_width, title_block_box
 from plannotation.export.svg_render import RenderedView, render_view
 from plannotation.export.to_pdf import svg_to_pdf
 from plannotation.model import (
@@ -308,8 +310,8 @@ class ModelFacts:
         depths: Where a cutting plane was given, how far each product reaches along its
             normal, least and most, in metres from the plane: a product is cut when the
             two straddle zero.
-        outlines: Where a cutting plane was given, each product's convex outline seen
-            along its normal, in plane coordinates in metres.
+        outlines: Where a plan's cutting plane was given, each product's outlines as
+            seen from above, in plane coordinates in metres.
         north: True north in model x and y.
         names: Each space's ``Name`` and ``LongName``, by GlobalId.
     """
@@ -323,7 +325,7 @@ class ModelFacts:
     properties: dict[str, dict[str, dict[str, object]]] = field(default_factory=dict)
     extents: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = field(default_factory=dict)
     depths: dict[str, tuple[float, float]] = field(default_factory=dict)
-    outlines: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
+    outlines: dict[str, list[list[tuple[float, float]]]] = field(default_factory=dict)
     north: tuple[float, float] = (0.0, 1.0)
     names: dict[str, tuple[str | None, str | None]] = field(default_factory=dict)
 
@@ -595,17 +597,29 @@ def _annotate(  # noqa: PLR0913 - every annotation needs some of these
         overshoot=spec.grid_overshoot_mm or 0.0,
         dash=GRID_DASH if spec.presentation else None,
     )
-    levels = _draw_levels(sheet, built.levels, frame, left=content[0], datum=built.datum)
+    levels = _draw_levels(
+        sheet,
+        built.levels,
+        frame,
+        left=content[0],
+        datum=built.datum,
+        standing=spec.presentation,
+    )
     annotations += levels
     offsets = spec.dimension_offsets_mm
     annotations += _draw_grid_dimensions(sheet, spec.grids, frame, content, offsets)
     annotations += _draw_level_dimensions(sheet, levels, built.levels, content, offsets)
     if spec.callout_to is not None:
         annotations.append(_draw_callout(sheet, spec.callout_to, frame.viewport, box))
-    annotations += _draw_section_marks(sheet, spec.section_marks, frame, content)
+    annotations += _draw_section_marks(sheet, spec.section_marks, frame, elements)
     if spec.rooms is not None:
+        floor = (
+            (round(built.storey_elevation - built.datum, 6), built.storey_guid)
+            if built.is_plan and spec.presentation
+            else None
+        )
         annotations += _draw_rooms(
-            sheet, spec.rooms, elements, annotations, (seen_lines, facts), frame
+            sheet, spec.rooms, elements, annotations, (seen_lines, facts), frame, floor=floor
         )
     annotations += _draw_tags(sheet, elements, frame.viewport, content, annotations)
     axes = (plane[1], plane[2]) if built.is_plan else None
@@ -786,7 +800,8 @@ def read_model_facts(
         if chosen:
             properties[guid] = chosen
     projects = model.by_type("IfcProject")
-    extents, depths, outlines = _extents(model, include, plane)
+    horizontal = plane is not None and abs(plane.direction[2]) > 1.0 - 1e-6
+    extents, depths, outlines = _extents(model, include, plane, outlines=horizontal)
     return ModelFacts(
         unit_scale=float(unit.calculate_unit_scale(model)),
         sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
@@ -828,10 +843,12 @@ def _extents(
     model: Any,  # noqa: ANN401
     include: Sequence[str] | None = None,
     plane: SectionCut | None = None,
+    *,
+    outlines: bool = False,
 ) -> tuple[
     dict[str, tuple[tuple[float, ...], tuple[float, ...]]],
     dict[str, tuple[float, float]],
-    dict[str, list[tuple[float, float]]],
+    dict[str, list[list[tuple[float, float]]]],
 ]:
     """Measure every product: its world box, and against a plane, its depth and outline.
 
@@ -839,11 +856,13 @@ def _extents(
         model: The open ``ifcopenshell.file``.
         include: The products to measure, or None for all of them.
         plane: The cutting plane, or None.
+        outlines: Whether to find each product's outline as seen along the plane's
+            normal, which a plan needs for what it sees below the cut.
 
     Returns:
         World boxes in metres by GlobalId, then -- where a plane was given -- each
-        product's least and most distance along the plane's normal, and its convex
-        outline in plane coordinates.
+        product's least and most distance along the plane's normal, and where asked
+        its outline in plane coordinates.
     """
     geom = importlib.import_module("ifcopenshell.geom")
     settings = geom.settings()
@@ -854,7 +873,7 @@ def _extents(
         iterator = geom.iterator(settings, model, include=[model.by_guid(guid) for guid in include])
     extents: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = {}
     depths: dict[str, tuple[float, float]] = {}
-    outlines: dict[str, list[tuple[float, float]]] = {}
+    seen: dict[str, list[list[tuple[float, float]]]] = {}
     frame = None
     if plane is not None:
         x_axis, y_axis = plane.axes()
@@ -871,10 +890,101 @@ def _extents(
                 if frame is not None:
                     local = (points - frame[0]) @ frame[1]
                     depths[guid] = (float(local[:, 2].min()), float(local[:, 2].max()))
-                    outlines[guid] = convex_hull(local[:, :2])
+                    if outlines:
+                        faces = np.array(shape.geometry.faces, dtype=np.int64).reshape(-1, 3)
+                        seen[guid] = silhouette(local, faces) or [closed(convex_hull(local[:, :2]))]
             if not iterator.next():
                 break
-    return extents, depths, outlines
+    return extents, depths, seen
+
+
+#: How finely silhouette vertices are matched, in metres: a tenth of a millimetre.
+_WELD_M = 1e-4
+
+
+def closed(loop: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Return a polygon's vertices with the first repeated at the end.
+
+    Args:
+        loop: The vertices.
+
+    Returns:
+        The closed polyline.
+    """
+    return [*loop, loop[0]] if loop and loop[0] != loop[-1] else loop
+
+
+def silhouette(
+    local: NDArray[np.float64], faces: NDArray[np.int64]
+) -> list[list[tuple[float, float]]]:
+    """Return what a shape looks like from the viewer's side of a plane: its outlines.
+
+    The faces turned towards the viewer are projected onto the plane, and every edge two
+    of them share there is dropped; what is left is the outline of each region they
+    cover -- a slab's footprint with its notches, a flight of stairs as one shape, each
+    tread's nosing vanishing into the next tread's back edge.
+
+    Args:
+        local: The shape's vertices in plane coordinates, the third being the distance
+            towards the viewer.
+        faces: Its triangles, as vertex indices.
+
+    Returns:
+        Closed polylines in plane x and y; none for a shape with no face turned to the
+        viewer.
+    """
+    if not len(faces):
+        return []
+    corners = local[faces]
+    normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    lengths = np.linalg.norm(normals, axis=1)
+    facing = (lengths > 0) & (normals[:, 2] > 0.1 * np.where(lengths > 0, lengths, 1.0))
+    counts: dict[tuple[tuple[int, int], tuple[int, int]], int] = {}
+    keys = np.round(local[:, :2] / _WELD_M).astype(np.int64)
+    for triangle in faces[facing]:
+        ring = [(int(keys[i][0]), int(keys[i][1])) for i in triangle]
+        for a, b in ((ring[0], ring[1]), (ring[1], ring[2]), (ring[2], ring[0])):
+            if a != b:
+                edge = (a, b) if a < b else (b, a)
+                counts[edge] = counts.get(edge, 0) + 1
+    neighbours: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for a, b in sorted(edge for edge, count in counts.items() if count == 1):
+        neighbours.setdefault(a, []).append(b)
+        neighbours.setdefault(b, []).append(a)
+    loops: list[list[tuple[float, float]]] = []
+    for start in sorted(neighbours):
+        while neighbours[start]:
+            loop = [start]
+            current = start
+            while neighbours[current]:
+                following = neighbours[current].pop(0)
+                neighbours[following].remove(current)
+                loop.append(following)
+                current = following
+                if current == start:
+                    break
+            points = _simplified([(x * _WELD_M, y * _WELD_M) for x, y in loop])
+            if len(points) > 2:  # noqa: PLR2004 - a line is not an outline
+                loops.append(points)
+    return loops
+
+
+def _simplified(line: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Drop the vertices of a polyline that lie on the straight line through their neighbours.
+
+    Args:
+        line: The polyline.
+
+    Returns:
+        It, with only the vertices where it turns, and its ends.
+    """
+    kept = [line[0]]
+    for index in range(1, len(line) - 1):
+        (ax, ay), (bx, by), (cx, cy) = kept[-1], line[index], line[index + 1]
+        if abs((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) > _WELD_M * _WELD_M:
+            kept.append(line[index])
+    kept.append(line[-1])
+    return kept
 
 
 def convex_hull(points: NDArray[np.float64]) -> list[tuple[float, float]]:
@@ -1120,8 +1230,7 @@ def _seen_below(
         if depth[1] >= -_CUT_TOLERANCE_M:
             continue
         ifc_class, name = facts.classes[guid]
-        paper = [frame.paper(u, v) for u, v in outline]
-        paper.append(paper[0])
+        paper = [[frame.paper(u, v) for u, v in loop] for loop in outline]
         added.append(
             Element(
                 id=f"e-{len(drawn) + len(added):02d}",
@@ -1130,8 +1239,8 @@ def _seen_below(
                 name=name,
                 tag=facts.tags.get(guid),
                 viewport=frame.viewport,
-                paperBBox=bounding_box(paper),
-                paperOutlines=[paper],
+                paperBBox=bounding_box(point for loop in paper for point in loop),
+                paperOutlines=paper,
                 representation="projection",
                 properties=cast("dict[str, Any] | None", facts.properties.get(guid)),
                 provenance=Provenance.AUTHORED,
@@ -1357,7 +1466,13 @@ def level_text(elevation_m: float) -> str:
 
 
 def _draw_levels(
-    sheet: Sheet, levels: Sequence[Level], frame: _Frame, *, left: float, datum: float = 0.0
+    sheet: Sheet,
+    levels: Sequence[Level],
+    frame: _Frame,
+    *,
+    left: float,
+    datum: float = 0.0,
+    standing: bool = False,
 ) -> list[Annotation]:
     """Mark each storey's level beside a section, from the model's elevations.
 
@@ -1376,6 +1491,8 @@ def _draw_levels(
         frame: The view's placement.
         left: The drawing's left edge on the paper.
         datum: The z of the building's ±0,00 in model coordinates, in metres.
+        standing: Stand an open triangle on the line, point down, as a level mark on a
+            section is drawn; otherwise hang one below it, as the samples do.
 
     Returns:
         One ``level`` annotation per storey.
@@ -1388,12 +1505,15 @@ def _draw_levels(
         y = frame.paper_y(plane_y)
         above = round(level.elevation - datum, 6)
         text = level_text(above)
-        sheet.line(start, y, right, y, width=0.25)
-        marker = start + 4.0
-        sheet.line(marker - 1.5, y - 2.5, marker + 1.5, y - 2.5, width=0.18)
-        sheet.line(marker - 1.5, y - 2.5, marker, y, width=0.18)
-        sheet.line(marker + 1.5, y - 2.5, marker, y, width=0.18)
-        sheet.text(marker + 3.0, y + 0.8, text, size=2.5)
+        if standing:
+            draw_level_mark(sheet, (start, y), right - start, text)
+        else:
+            sheet.line(start, y, right, y, width=0.25)
+            marker = start + 4.0
+            sheet.line(marker - 1.5, y - 2.5, marker + 1.5, y - 2.5, width=0.18)
+            sheet.line(marker - 1.5, y - 2.5, marker, y, width=0.18)
+            sheet.line(marker + 1.5, y - 2.5, marker, y, width=0.18)
+            sheet.text(marker + 3.0, y + 0.8, text, size=2.5)
         annotations.append(
             Annotation(
                 id=f"lvl-{index}",
@@ -1784,40 +1904,45 @@ def _draw_callout(sheet: Sheet, target_sheet: str, viewport: str, box: Box) -> A
     )
 
 
+#: How much wider than its text a level mark is: the triangle, and a gap.
+LEVEL_SYMBOL_MM = 2 * LEVEL_TRIANGLE_MM[0] + 4.0
+
 #: How far beyond the drawing a section mark's bubble stands, edge to edge.
-_MARK_CLEARANCE_MM = 3.0
+_MARK_CLEARANCE_MM = 6.0
 
 
 def _draw_section_marks(
-    sheet: Sheet, marks: Sequence[SectionMark], frame: _Frame, content: Sequence[float]
+    sheet: Sheet, marks: Sequence[SectionMark], frame: _Frame, elements: Sequence[Element]
 ) -> list[Annotation]:
-    """Mark each section's cutting line at both ends of the drawing.
+    """Mark each section's cutting line at both ends, just clear of the building.
+
+    Each end stands beyond the last element the line crosses, so that its heavy stub
+    runs up to the building where the cut enters it, not to the edge of the sheet.
 
     Args:
         sheet: The sheet being composed.
         marks: The sections.
         frame: The view's placement.
-        content: The drawing's box on the paper.
+        elements: The elements drawn; spaces are passed over, since walls bound them.
 
     Returns:
         Two ``sectionMark`` annotations per section, each targeting the section's sheet.
     """
     annotations: list[Annotation] = []
     reach = MARK_RADIUS_MM + _MARK_CLEARANCE_MM
+    solid = [e.paper_bbox for e in elements if e.ifc_class != "IfcSpace"]
     for mark in marks:
         if mark.vertical:
             x = frame.paper_x(mark.position)
-            ends = [
-                ((x, content[3] + reach), (x, content[3])),
-                ((x, content[1] - reach), (x, content[1])),
-            ]
+            crossed = [box for box in solid if box[0] <= x <= box[2]] or solid
+            low, high = min(b[1] for b in crossed), max(b[3] for b in crossed)
+            ends = [((x, high + reach), (x, high)), ((x, low - reach), (x, low))]
             looking = (float(mark.looking), 0.0)
         else:
             y = frame.paper_y(mark.position)
-            ends = [
-                ((content[0] - reach, y), (content[0], y)),
-                ((content[2] + reach, y), (content[2], y)),
-            ]
+            crossed = [box for box in solid if box[1] <= y <= box[3]] or solid
+            low, high = min(b[0] for b in crossed), max(b[2] for b in crossed)
+            ends = [((low - reach, y), (low, y)), ((high + reach, y), (high, y))]
             looking = (0.0, float(mark.looking))
         for index, (centre, toward) in enumerate(ends, start=1):
             box, stub = draw_section_mark(sheet, centre, toward, looking, mark)
@@ -1874,6 +1999,8 @@ def _draw_rooms(
     drawn: list[Annotation],
     beyond: tuple[list[list[Point]], ModelFacts],
     frame: _Frame,
+    *,
+    floor: tuple[float, str | None] | None = None,
 ) -> list[Annotation]:
     """Label each room with its number, name and area, inside the room.
 
@@ -1890,6 +2017,8 @@ def _draw_rooms(
         beyond: The lines drawn beyond the cut, and what the model says, each room's
             ``LongName`` among it.
         frame: The view's placement.
+        floor: The storey's height above ±0,00 and its GlobalId, to mark its level in
+            the largest room; None for no level mark.
 
     Returns:
         A ``tag`` for each room's number and a ``text`` for its name and area, each
@@ -1939,7 +2068,60 @@ def _draw_rooms(
                     )
                 )
             break
+    if floor is not None and spaces:
+        largest = max(spaces, key=lambda e: max(map(_area, e.paper_outlines or [[]])))
+        polygon = [(p[0], p[1]) for p in max(largest.paper_outlines or [], key=_area)]
+        mark = _draw_floor_level(sheet, polygon, obstacles, placed, floor, frame)
+        if mark is not None:
+            annotations.append(mark)
     return annotations
+
+
+def _draw_floor_level(
+    sheet: Sheet,
+    polygon: list[Point],
+    obstacles: NDArray[np.float64],
+    placed: list[tuple[float, float, float, float]],
+    floor: tuple[float, str | None],
+    frame: _Frame,
+) -> Annotation | None:
+    """Mark a plan's floor level inside a room, clear of its label and its lines.
+
+    Args:
+        sheet: The sheet being composed.
+        polygon: The room's outline.
+        obstacles: Every line drawn near it.
+        placed: The labels already placed.
+        floor: The storey's height above ±0,00, in metres, and its GlobalId.
+        frame: The view's placement.
+
+    Returns:
+        The ``level`` annotation, or None where the mark fits nowhere in the room.
+    """
+    height, guid = floor
+    text = level_text(height)
+    line = Line(text, 2.2)
+    own = segments_of([[*polygon, polygon[0]]])
+    centre = place_label(
+        polygon, [line], np.vstack([obstacles, own]), placed, extra_width=LEVEL_SYMBOL_MM
+    )
+    if centre is None:
+        return None
+    width = text_width(text, line.size) + LEVEL_SYMBOL_MM
+    start = (centre[0] - width / 2.0, centre[1] - 1.1)
+    box, geometry = draw_level_mark(sheet, start, width, text, size=line.size)
+    placed.append(box)
+    return Annotation(
+        id="lvl-floor",
+        type="level",
+        viewport=frame.viewport,
+        paperBBox=(round(box[0], 3), round(box[1], 3), round(box[2], 3), round(box[3], 3)),
+        text=text,
+        elevation=height,
+        ifcGuid=guid,
+        geometry=[(round(x, 3), round(y, 3)) for x, y in geometry],
+        provenance=Provenance.AUTHORED,
+    )
 
 
 def _property(element: Element, path: str | None) -> object:
@@ -2008,7 +2190,9 @@ def _draw_view_furniture(
     """
     annotations: list[Annotation] = []
     scale = f"1:{spec.scale:.0f}"
-    baseline = content[1] - spec.dimension_offsets_mm[1] - 16.0
+    # Below the dimension chains, and below the grid lines' ends where they run past them.
+    below = max(spec.dimension_offsets_mm[1] + 16.0, (spec.grid_overshoot_mm or 0.0) + 12.0)
+    baseline = content[1] - below
     right = content[0]
     if spec.view_title is not None:
         title = spec.view_title

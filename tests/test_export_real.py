@@ -21,7 +21,9 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from plannotation.export.ifc_svg_pdf import ExportedSheet
     from plannotation.export.models import BuiltModel
+    from plannotation.model import Annotation, Element
 
 MOD_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 
@@ -36,55 +38,140 @@ needs_cairo = pytest.mark.skipif(
 RAISED_Z = 10.0
 
 
-def build_raised(out: Path, *, rotation: float = 0.0) -> BuiltModel:
-    """Build a one-room house whose ground floor stands at z = 10 m, turned by ``rotation``.
+def build_raised(
+    out: Path,
+    *,
+    rotation: float = 0.0,
+    guid_tags: bool = False,
+    roof: bool = False,
+) -> BuiltModel:
+    """Build a two-room house whose ground floor stands at z = 10 m, turned by ``rotation``.
 
-    A 6.0 by 4.0 metre room in 250 mm load-bearing walls, split by a 100 mm partition
-    that bears nothing, with a door in the front wall. The building's ±0,00 is at
-    z = 10 m, so the storey's ``Elevation`` is 0 while its placement is 10, as in
-    Maleva 18.
+    A 6.0 by 4.0 metre house in 250 mm load-bearing walls, split by a 100 mm partition
+    -- an ``IfcWallStandardCase`` -- that bears nothing. A left-hand door opens into
+    the left room from the south; the rooms are spaces "1" (Room, 9,5 m²) and "2"
+    (Store, whose area the model states as zero). A grid runs A and B along the long
+    walls and 1 and 2 along the short ones, and turns with the house. The building's
+    ±0,00 is at z = 10 m, so the storey's ``Elevation`` is 0 while its placement is 10,
+    as in Maleva 18.
 
     Args:
         out: Where to write the IFC file.
-        rotation: How far the house is turned about the origin, in degrees.
+        rotation: How far the house and its grid are turned about the origin, degrees.
+        guid_tags: Fill every wall's ``Tag`` with a GUID, as Archicad does.
+        roof: Add a storey at the top of the walls, for a section's second level.
 
     Returns:
         The model, set up for a plan of its ground floor along the model axes.
     """
-    ifcopenshell = pytest.importorskip("ifcopenshell")
+    pytest.importorskip("ifcopenshell")
+    import ifcopenshell
+    import ifcopenshell.api.aggregate
+    import ifcopenshell.api.geometry
+    import ifcopenshell.api.grid
+    import ifcopenshell.api.root
+    import ifcopenshell.api.spatial
+    import numpy as np
+
     from plannotation.export import models
 
     model = ifcopenshell.file(schema="IFC4")
-    body, _ = models._setup(model, "Raised House")
+    body, storey = models._setup(model, "Raised House")
     building = model.by_type("IfcBuilding")[0]
-    storey = models._storey(model, building, "Ground", RAISED_Z)
-    storey.Elevation = 0.0
+    raised = np.eye(4)
+    raised[2, 3] = RAISED_Z
+    ifcopenshell.api.geometry.edit_object_placement(
+        model, product=storey, matrix=raised, is_si=True
+    )
+    storey.Name, storey.Elevation = "Ground", 0.0
+    if roof:
+        upper = models._storey(model, building, "Roof", RAISED_Z + 2.8)
+        upper.Elevation = 2.8
 
     turn = math.radians(rotation)
 
     def world(x: float, y: float) -> tuple[float, float]:
         return (x * math.cos(turn) - y * math.sin(turn), x * math.sin(turn) + y * math.cos(turn))
 
-    walls = []
-    for name, (x, y), angle, length, thickness, bearing in (
-        ("South", (0.0, 0.0), 0.0, 6.0, 0.25, True),
-        ("East", (6.0, 0.0), 90.0, 4.0, 0.25, True),
-        ("North", (6.0, 4.0), 180.0, 6.0, 0.25, True),
-        ("West", (0.0, 4.0), 270.0, 4.0, 0.25, True),
-        ("Partition", (3.0, 0.25), 90.0, 3.5, 0.10, False),
+    walls = {}
+    for name, (x, y), angle, length, thickness, bearing, kind in (
+        ("South", (0.0, 0.0), 0.0, 6.0, 0.25, True, "IfcWall"),
+        ("East", (6.0, 0.0), 90.0, 4.0, 0.25, True, "IfcWall"),
+        ("North", (6.0, 4.0), 180.0, 6.0, 0.25, True, "IfcWall"),
+        ("West", (0.0, 4.0), 270.0, 4.0, 0.25, True, "IfcWall"),
+        ("Partition", (3.0, 0.25), 90.0, 3.5, 0.10, False, "IfcWallStandardCase"),
     ):
         wall = models._box(
             model,
             body,
             storey,
-            "IfcWall",
+            kind,
             name,
             at=(*world(x, y), RAISED_Z),
             size=(length, thickness, 2.8),
             rotation=angle + rotation,
         )
         _pset(model, wall, "Pset_WallCommon", {"LoadBearing": bearing})
-        walls.append(wall)
+        if guid_tags:
+            wall.Tag = "E3015C6C-82A0-94D5-92BB-FE54DA4A5EC5"
+        walls[name] = wall
+
+    door = models._filling(
+        model,
+        body,
+        storey,
+        "IfcDoor",
+        "Front door",
+        at=(*world(1.0, 0.0), RAISED_Z),
+        width=1.0,
+        height=2.1,
+        rotation=rotation,
+    )
+    door.OperationType = "SINGLE_SWING_LEFT"
+    models._opening(
+        model,
+        body,
+        walls["South"],
+        door,
+        at=(*world(1.0, -0.01), RAISED_Z),
+        size=(1.0, 0.27, 2.1),
+        rotation=rotation,
+    )
+
+    for number, long_name, area, (x0, x1) in (
+        ("1", "Room", "9,5", (0.25, 2.9)),
+        ("2", "Store", "0.000", (3.0, 5.75)),
+    ):
+        space = models._box(
+            model,
+            body,
+            None,
+            "IfcSpace",
+            number,
+            at=(*world(x0, 0.25), RAISED_Z),
+            size=(x1 - x0, 3.5, 2.6),
+            rotation=rotation,
+        )
+        space.LongName = long_name
+        ifcopenshell.api.aggregate.assign_object(model, products=[space], relating_object=storey)
+        _pset(model, space, "Ruum", {"Pindala": area})
+
+    grid = ifcopenshell.api.root.create_entity(model, ifc_class="IfcGrid", name="Grid")
+    ifcopenshell.api.geometry.edit_object_placement(model, product=grid, matrix=raised, is_si=True)
+    ifcopenshell.api.spatial.assign_container(model, products=[grid], relating_structure=storey)
+    for tag, uvw, start, end in (
+        ("A", "UAxes", (-1.0, 0.125), (7.0, 0.125)),
+        ("B", "UAxes", (-1.0, 3.875), (7.0, 3.875)),
+        ("1", "VAxes", (0.125, -1.0), (0.125, 5.0)),
+        ("2", "VAxes", (5.875, -1.0), (5.875, 5.0)),
+    ):
+        axis = ifcopenshell.api.grid.create_grid_axis(model, axis_tag=tag, uvw_axes=uvw, grid=grid)
+        ifcopenshell.api.grid.create_axis_curve(
+            model,
+            p1=np.array((*world(*start), RAISED_Z)),
+            p2=np.array((*world(*end), RAISED_Z)),
+            grid_axis=axis,
+        )
     models.reseed_guids(model, "raised")
     models.write_model(model, out)
     return models.BuiltModel(
@@ -147,7 +234,8 @@ class TestAStoreyAboveZeroIsCutAtItsOwnHeight:
         built = build_raised(tmp_path / "raised.ifc")
         exported = export_sheet(built, _spec(), generator_version="0.0.0-test")
         elements = exported.plannotation.elements or []
-        assert sorted(e.name or "" for e in elements) == [
+        walls = [e for e in elements if e.ifc_class.startswith("IfcWall")]
+        assert sorted(e.name or "" for e in walls) == [
             "East",
             "North",
             "Partition",
@@ -261,3 +349,575 @@ class TestTheRaisedHouseValidates:
         pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
         report = validate(pdf)
         assert [finding.code for finding in report.findings] == []
+
+
+def _drawn_plan(
+    tmp_path: Path, *, rotation: float = 0.0, guid_tags: bool = False, **changes: object
+) -> tuple[BuiltModel, ExportedSheet]:
+    """Draw the raised house's ground floor square to its grid, as the examples draw.
+
+    Args:
+        tmp_path: Where to build the model.
+        rotation: How far the house is turned, in degrees.
+        guid_tags: Fill every wall's ``Tag`` with a GUID.
+        **changes: Sheet spec fields to change from the full treatment.
+
+    Returns:
+        The model as drawn, and the exported sheet.
+    """
+    from dataclasses import replace
+
+    from plannotation.export.drafting import RoomLabels, SectionMark, ViewTitle
+    from plannotation.export.ifc_svg_pdf import export_sheet
+    from plannotation.export.views import (
+        building_datum,
+        find_storey,
+        grid_axes_on,
+        grid_lines,
+        open_model,
+        plan_along,
+        storey_products,
+    )
+
+    built = build_raised(tmp_path / "raised.ifc", rotation=rotation, guid_tags=guid_tags)
+    model = open_model(built.path)
+    storey = find_storey(model, "Ground")
+    lines = grid_lines(model)
+    cut = plan_along(lines, origin=("1", "A"), along="A", z=storey.z + 1.2)
+    built = replace(
+        built,
+        section=cut,
+        include=storey_products(model, storey),
+        datum=building_datum(model),
+    )
+    spec = _spec(
+        grids=grid_axes_on(lines, cut),
+        presentation=True,
+        grid_overshoot_mm=20.0,
+        rooms=RoomLabels(area_property="Ruum.Pindala"),
+        door_swings=True,
+        section_marks=(SectionMark(label="A", target_sheet="X-301", position=4.5),),
+        view_title=ViewTitle(text="Ground floor"),
+        north_arrow=True,
+        scale_bar=True,
+        page_size="A2",
+    )
+    return built, export_sheet(built, replace(spec, **changes), generator_version="0.0.0-test")
+
+
+def _by_class(exported: ExportedSheet, prefix: str) -> list[Element]:
+    """Return the elements whose class starts with a prefix.
+
+    Args:
+        exported: The exported sheet.
+        prefix: Such as ``IfcWall``.
+
+    Returns:
+        The elements.
+    """
+    return [e for e in exported.plannotation.elements or [] if e.ifc_class.startswith(prefix)]
+
+
+def _annotations(exported: ExportedSheet, kind: str) -> list[Annotation]:
+    """Return the annotations of one type.
+
+    Args:
+        exported: The exported sheet.
+        kind: The annotation type.
+
+    Returns:
+        The annotations.
+    """
+    return [a for a in exported.plannotation.annotations or [] if a.annotation_type == kind]
+
+
+@needs_ifc
+class TestTheModelIsReadInItsOwnTerms:
+    """Storeys, datum and grid come from the model, in metres, whatever its unit."""
+
+    def test_the_datum_is_where_the_storeys_elevation_is_measured_from(
+        self, tmp_path: Path
+    ) -> None:
+        """A storey at z = 10 m with Elevation 0 puts the building's ±0,00 at 10 m."""
+        from plannotation.export.views import building_datum, open_model, storey_levels
+
+        built = build_raised(tmp_path / "raised.ifc", roof=True)
+        model = open_model(built.path)
+        assert building_datum(model) == pytest.approx(RAISED_Z)
+        levels = storey_levels(model)
+        assert [(level.name, level.elevation) for level in levels] == [
+            ("Ground", RAISED_Z),
+            ("Roof", pytest.approx(RAISED_Z + 2.8)),
+        ]
+
+    def test_storeys_that_disagree_about_their_datum_are_refused(self, tmp_path: Path) -> None:
+        """No level could be printed on a building whose storeys disagree about ±0,00."""
+        from plannotation.errors import ExportError
+        from plannotation.export.views import building_datum, open_model
+
+        built = build_raised(tmp_path / "raised.ifc", roof=True)
+        model = open_model(built.path)
+        next(s for s in model.by_type("IfcBuildingStorey") if s.Name == "Roof").Elevation = 2.0
+        with pytest.raises(ExportError, match="disagree"):
+            building_datum(model)
+
+    def test_a_storey_holds_its_elements_and_spaces_but_no_voids(self, tmp_path: Path) -> None:
+        """Walls, the door and both rooms; not the opening the door fills, nor the grid."""
+        from plannotation.export.views import find_storey, open_model, storey_products
+
+        built = build_raised(tmp_path / "raised.ifc")
+        model = open_model(built.path)
+        held = storey_products(model, find_storey(model, "Ground"))
+        classes = sorted(model.by_guid(guid).is_a() for guid in held)
+        assert classes == ["IfcDoor", "IfcSpace", "IfcSpace"] + ["IfcWall"] * 4 + [
+            "IfcWallStandardCase"
+        ]
+        without = storey_products(model, find_storey(model, "Ground"), spaces=False)
+        assert len(without) == len(held) - 2
+
+    @pytest.mark.parametrize("rotation", [0.0, 30.0, -60.8])
+    def test_a_plan_along_the_grid_places_the_grid_square_to_the_paper(
+        self, tmp_path: Path, rotation: float
+    ) -> None:
+        """Grid 1 at plane x 0 and 2 at 5.75; A at plane y 0 and B at 3.75, however turned."""
+        from plannotation.export.views import grid_axes_on, grid_lines, open_model, plan_along
+
+        built = build_raised(tmp_path / "raised.ifc", rotation=rotation)
+        lines = grid_lines(open_model(built.path))
+        cut = plan_along(lines, origin=("1", "A"), along="A", z=11.2)
+        axes = {axis.axis: (axis.vertical, axis.position) for axis in grid_axes_on(lines, cut)}
+        assert axes["1"] == (True, pytest.approx(0.0, abs=1e-9))
+        assert axes["2"] == (True, pytest.approx(5.75))
+        assert axes["A"] == (False, pytest.approx(0.0, abs=1e-9))
+        assert axes["B"] == (False, pytest.approx(3.75))
+        x_axis, _ = cut.axes()
+        assert math.degrees(math.atan2(x_axis[1], x_axis[0])) == pytest.approx(rotation)
+
+    def test_a_section_between_two_axes_looks_towards_the_third(self, tmp_path: Path) -> None:
+        """Halfway between A and B, looking at A: grids 1 and 2 cross it, A and B do not."""
+        from plannotation.export.views import grid_axes_on, grid_lines, open_model, section_between
+
+        built = build_raised(tmp_path / "raised.ifc")
+        lines = grid_lines(open_model(built.path))
+        cut = section_between(lines, first="A", second="B", looking_to="A", datum=RAISED_Z)
+        assert cut.location[1] == pytest.approx(2.0)
+        # The viewer stands on B's side, looking towards A.
+        assert cut.direction == pytest.approx((0.0, 1.0, 0.0))
+        axes = {axis.axis: axis for axis in grid_axes_on(lines, cut)}
+        assert sorted(axes) == ["1", "2"]
+        assert axes["2"].position - axes["1"].position == pytest.approx(-5.75)
+
+
+@needs_ifc
+class TestARotatedPlanIsDrawnSquareToItsGrid:
+    """A plan along a grid the model places at an angle comes out square on the paper."""
+
+    @pytest.mark.parametrize("rotation", [0.0, 30.0])
+    def test_the_long_walls_run_along_the_paper(self, tmp_path: Path, rotation: float) -> None:
+        """At 1:50 the 6 m south wall is 120 mm long and 5 mm thick on the paper."""
+        _, exported = _drawn_plan(tmp_path, rotation=rotation)
+        south = next(e for e in _by_class(exported, "IfcWall") if e.name == "South")
+        x0, y0, x1, y1 = south.paper_bbox
+        assert (x1 - x0, y1 - y0) == (pytest.approx(120.0, abs=0.01), pytest.approx(5.0, abs=0.01))
+
+    def test_the_viewport_is_a_plan_on_the_grid_s_plane(self, tmp_path: Path) -> None:
+        """Its plane is the cut, 1.2 m above the storey, with the grid's x-axis."""
+        _, exported = _drawn_plan(tmp_path, rotation=30.0)
+        (viewport,) = exported.plannotation.viewports or []
+        assert viewport.kind == "plan"
+        assert viewport.local_id == "vp-plan"
+        assert viewport.plane is not None
+        assert viewport.plane.origin[2] == pytest.approx(RAISED_Z + 1.2)
+        assert viewport.plane.x_axis[:2] == pytest.approx(
+            (math.cos(math.radians(30)), math.sin(math.radians(30))), abs=1e-3
+        )
+
+    def test_only_the_storey_is_drawn(self, tmp_path: Path) -> None:
+        """Five walls, one door and two rooms, and nothing else."""
+        _, exported = _drawn_plan(tmp_path)
+        classes = sorted(e.ifc_class for e in exported.plannotation.elements or [])
+        assert classes == ["IfcDoor", "IfcSpace", "IfcSpace"] + ["IfcWall"] * 4 + [
+            "IfcWallStandardCase"
+        ]
+
+
+@needs_ifc
+class TestThePresentation:
+    """Presentation attributes on each group, since the serializer's CSS does not survive."""
+
+    @staticmethod
+    def _group(svg: str, guid: str) -> str:
+        """Return a product group's opening tag.
+
+        Args:
+            svg: The sheet.
+            guid: The product's GlobalId.
+
+        Returns:
+            The tag.
+        """
+        import re
+
+        match = re.search(rf'<g\b[^>]*ifc:guid="{re.escape(guid)}"[^>]*>', svg)
+        assert match is not None
+        return match.group(0)
+
+    def test_load_bearing_walls_are_solid_partitions_grey(self, tmp_path: Path) -> None:
+        """LoadBearing decides it, from Pset_WallCommon."""
+        _, exported = _drawn_plan(tmp_path)
+        for wall in _by_class(exported, "IfcWall"):
+            fill = "#9a9a9a" if wall.name == "Partition" else "#000"
+            assert f'fill="{fill}"' in self._group(exported.svg, wall.ifc_guid)
+
+    def test_doors_are_outlined_and_spaces_not_drawn(self, tmp_path: Path) -> None:
+        """A black blob where a door stands is not a door."""
+        _, exported = _drawn_plan(tmp_path)
+        (door,) = _by_class(exported, "IfcDoor")
+        assert 'fill="none"' in self._group(exported.svg, door.ifc_guid)
+        for space in _by_class(exported, "IfcSpace"):
+            assert 'stroke="none"' in self._group(exported.svg, space.ifc_guid)
+
+    def test_grid_lines_are_chain_lines(self, tmp_path: Path) -> None:
+        """Long dash, dot: a grid is not a wall."""
+        _, exported = _drawn_plan(tmp_path)
+        assert exported.svg.count("stroke-dasharray") >= 4
+
+    def test_without_it_the_serializer_s_paths_are_untouched(self, tmp_path: Path) -> None:
+        """The samples are drawn without it, and stay byte-identical."""
+        _, exported = _drawn_plan(tmp_path, presentation=False)
+        assert "#9a9a9a" not in exported.svg
+        assert "stroke-dasharray" not in exported.svg
+
+
+@needs_ifc
+class TestMarksShapedLikeGuidsAreNotMarks:
+    """Archicad writes its own GUID into Tag; no drawing prints that."""
+
+    @pytest.mark.parametrize(
+        ("tag", "kind"),
+        [
+            ("E3015C6C-82A0-94D5-92BB-FE54DA4A5EC5", "id"),
+            ("{E3015C6C-82A0-94D5-92BB-FE54DA4A5EC5}", "id"),
+            ("2O2Fr$t4X7Zf8NOew3FLOH", "id"),
+            ("Pos. 1", "mark"),
+            ("T1", "mark"),
+            ("W-12", "mark"),
+            ("  ", "id"),
+        ],
+    )
+    def test_is_mark(self, tag: str, kind: str) -> None:
+        """A UUID or a GlobalId is an id; anything a person would write is a mark."""
+        from plannotation.export.ifc_svg_pdf import is_mark
+
+        assert is_mark(tag, "0000000000000000000000") is (kind == "mark")
+
+    def test_a_tag_that_is_the_element_s_own_guid_is_no_mark(self) -> None:
+        """Whatever it looks like."""
+        from plannotation.export.ifc_svg_pdf import is_mark
+
+        assert not is_mark("A1", "A1")
+
+    def test_guid_tags_leave_no_mark_on_the_sheet(self, tmp_path: Path) -> None:
+        """No tag annotation, and no element claiming the GUID as its tag."""
+        _, exported = _drawn_plan(tmp_path, guid_tags=True)
+        assert all(e.tag is None for e in _by_class(exported, "IfcWall"))
+        assert "E3015C6C" not in exported.svg
+
+
+@needs_ifc
+class TestDoorSwings:
+    """The biggest tell of a machine-drawn plan is a door that does not open."""
+
+    def test_a_left_hand_door_hangs_at_its_origin_and_opens_to_positive_y(self) -> None:
+        """IFC's convention: seen along +y, the hinge is on the left."""
+        from plannotation.export.doors import local_swing
+
+        swing = local_swing("SINGLE_SWING_LEFT", 1.0, (0.0, 0.1))
+        assert swing is not None
+        (leaf,) = swing.leaves
+        assert leaf == ((0.0, 0.1), (0.0, pytest.approx(1.1)))
+        (arc,) = swing.arcs
+        assert arc[0] == pytest.approx((0.0, 1.1))
+        assert arc[-1] == pytest.approx((1.0, 0.1))
+        assert all(math.hypot(x, y - 0.1) == pytest.approx(1.0) for x, y in arc)
+
+    def test_a_right_hand_door_hangs_at_its_far_side(self) -> None:
+        """The mirror image."""
+        from plannotation.export.doors import local_swing
+
+        swing = local_swing("SINGLE_SWING_RIGHT", 0.9, (0.0, 0.0))
+        assert swing is not None
+        assert swing.leaves[0][0] == (0.9, 0.0)
+        assert swing.arcs[0][-1] == pytest.approx((0.0, 0.0))
+        assert all(y >= -1e-9 for _, y in swing.arcs[0])
+
+    def test_a_double_door_opens_two_leaves_split_as_its_panel_says(self) -> None:
+        """Hinged at both jambs, meeting where the first panel ends."""
+        from plannotation.export.doors import local_swing
+
+        swing = local_swing("DOUBLE_DOOR_SINGLE_SWING", 2.0, (0.0, 0.0), first_share=0.4)
+        assert swing is not None
+        assert [leaf[0] for leaf in swing.leaves] == [(0.0, 0.0), (2.0, 0.0)]
+        assert [leaf[1][1] for leaf in swing.leaves] == pytest.approx([0.8, 1.2])
+
+    def test_a_double_swing_door_sweeps_both_faces(self) -> None:
+        """And stays on the side of each face it swings from."""
+        from plannotation.export.doors import local_swing
+
+        swing = local_swing("DOUBLE_SWING_RIGHT", 1.0, (-0.1, 0.1))
+        assert swing is not None
+        above, below = swing.arcs
+        assert all(y >= 0.1 - 1e-9 for _, y in above)
+        assert all(y <= -0.1 + 1e-9 for _, y in below)
+
+    @pytest.mark.parametrize("operation", ["SLIDING_TO_LEFT", "USERDEFINED", "NOTDEFINED"])
+    def test_a_door_the_model_does_not_say_swings_gets_no_swing(self, operation: str) -> None:
+        """Drawing a guess would be a false statement about the building."""
+        from plannotation.export.doors import local_swing
+
+        assert local_swing(operation, 1.0, (0.0, 0.1)) is None
+
+    @pytest.mark.parametrize("rotation", [0.0, 30.0])
+    def test_the_front_door_opens_into_the_room(self, tmp_path: Path, rotation: float) -> None:
+        """Its arc lies inside the house, north of the south wall, hinged at grid 1's side."""
+        _, exported = _drawn_plan(tmp_path, rotation=rotation)
+        (door,) = _by_class(exported, "IfcDoor")
+        south = next(e for e in _by_class(exported, "IfcWall") if e.name == "South")
+        swing = door.paper_outlines[-2:]
+        points = [point for line in swing for point in line]
+        # A 1 m leaf at 1:50 reaches 20 mm into the room from the wall's inner face.
+        assert min(y for _, y in points) >= south.paper_bbox[1]
+        assert max(y for _, y in points) == pytest.approx(south.paper_bbox[3] + 20.0, abs=1.0)
+        hinge = swing[0][0]
+        assert hinge[0] == pytest.approx(min(x for x, _ in points), abs=0.01)
+        assert door.paper_bbox[3] >= max(y for _, y in points) - 0.001
+        assert 'stroke-width="0.1"' in exported.svg
+
+
+@needs_ifc
+class TestRoomLabels:
+    """Number, name and area, from the model, inside the room they name."""
+
+    def test_each_room_is_labelled_with_what_the_model_says(self, tmp_path: Path) -> None:
+        """Room 1 has all three; room 2's area is stated as zero and is left off."""
+        _, exported = _drawn_plan(tmp_path)
+        spaces = {e.local_id: e for e in _by_class(exported, "IfcSpace")}
+        labels = {
+            (spaces[a.shows.element].name, a.shows.property_name): a.text
+            for a in exported.plannotation.annotations or []
+            if a.shows is not None and a.shows.element in spaces
+        }
+        assert labels == {
+            ("1", "Name"): "1",
+            ("1", "LongName"): "Room",
+            ("1", "Ruum.Pindala"): "9,5 m²",
+            ("2", "Name"): "2",
+            ("2", "LongName"): "Store",
+        }
+
+    def test_the_number_is_a_tag_and_the_rest_text(self, tmp_path: Path) -> None:
+        """The number is the room's mark; name and area are what it says about itself."""
+        _, exported = _drawn_plan(tmp_path)
+        tags = {a.text for a in _annotations(exported, "tag")}
+        assert tags == {"1", "2"}
+
+    def test_every_label_is_inside_its_room_and_off_every_wall(self, tmp_path: Path) -> None:
+        """A label on a wall is black on black."""
+        from plannotation.export.drafting import overlaps
+
+        _, exported = _drawn_plan(tmp_path, rotation=30.0)
+        spaces = {e.local_id: e for e in _by_class(exported, "IfcSpace")}
+        walls = [e.paper_bbox for e in _by_class(exported, "IfcWall")]
+        for label in exported.plannotation.annotations or []:
+            if label.shows is None or label.shows.element not in spaces:
+                continue
+            room = spaces[label.shows.element].paper_bbox
+            x0, y0, x1, y1 = label.paper_bbox
+            assert room[0] <= x0 <= x1 <= room[2]
+            assert room[1] <= y0 <= y1 <= room[3]
+            assert not any(overlaps(label.paper_bbox, wall) for wall in walls)
+
+    def test_the_space_carries_the_property_its_area_label_shows(self, tmp_path: Path) -> None:
+        """So that PL-REF-012 finds the property set the label names."""
+        _, exported = _drawn_plan(tmp_path)
+        room = next(e for e in _by_class(exported, "IfcSpace") if e.name == "1")
+        assert room.pset("Ruum") == {"Pindala": "9,5"}
+
+    def test_the_floor_level_is_marked_relative_to_the_datum(self, tmp_path: Path) -> None:
+        """The ground floor stands at z = 10 m, which is ±0,00."""
+        _, exported = _drawn_plan(tmp_path)
+        (level,) = _annotations(exported, "level")
+        assert level.text == "±0,00"
+        assert level.elevation == 0
+        assert level.ifc_guid is not None
+
+
+class TestAreaText:
+    """An area prints as the model states it, and a zero area not at all."""
+
+    @pytest.mark.parametrize(
+        ("value", "printed"),
+        [
+            ("25,2", "25,2 m²"),
+            (25.23, "25,2 m²"),
+            (6, "6,0 m²"),
+            ("0.000", None),
+            (0.0, None),
+            (None, None),
+            ("n/a", None),
+            (True, None),
+        ],
+    )
+    def test_area_text(self, value: object, printed: str | None) -> None:
+        """Decimal comma, one place, the model's own text kept."""
+        from plannotation.export.drafting import area_text
+
+        assert area_text(value, "m²") == printed
+
+
+@needs_ifc
+class TestTheSheetsFurniture:
+    """Section marks, view title, north arrow and scale bar, each described."""
+
+    def test_the_section_is_marked_at_both_ends_clear_of_the_house(self, tmp_path: Path) -> None:
+        """Two marks targeting the section's sheet, neither on the house."""
+        from plannotation.export.drafting import overlaps
+
+        _, exported = _drawn_plan(tmp_path)
+        marks = _annotations(exported, "sectionMark")
+        assert len(marks) == 2
+        assert {(m.target.sheet_id, m.target.detail) for m in marks} == {("X-301", "A")}
+        walls = [e.paper_bbox for e in _by_class(exported, "IfcWall")]
+        for mark in marks:
+            assert not any(overlaps(mark.paper_bbox, wall) for wall in walls)
+        # Grid 1 is at plane x 0, the mark at 4.5 m: 90 mm to the right at 1:50.
+        (grid_1,) = [a for a in _annotations(exported, "grid") if a.axis == "1"]
+        assert marks[0].geometry[0][0] - grid_1.geometry[0][0] == pytest.approx(90.0, abs=0.01)
+
+    def test_a_section_s_title_calls_out_the_sheet_it_is_marked_on(self, tmp_path: Path) -> None:
+        """The bubble under Section A-A points back at the plan."""
+        from dataclasses import replace
+
+        from plannotation.export.drafting import ViewTitle
+        from plannotation.export.ifc_svg_pdf import export_sheet
+        from plannotation.export.views import (
+            grid_axes_on,
+            grid_lines,
+            open_model,
+            section_between,
+            storey_levels,
+        )
+
+        built = build_raised(tmp_path / "raised.ifc", roof=True)
+        model = open_model(built.path)
+        lines = grid_lines(model)
+        cut = section_between(lines, first="A", second="B", looking_to="A", datum=RAISED_Z)
+        built = replace(built, section=cut, cut_height=None, levels=storey_levels(model))
+        spec = _spec(
+            sheet_id="X-301",
+            drawing_type="section",
+            grids=grid_axes_on(lines, cut),
+            presentation=True,
+            view_title=ViewTitle(text="Section A-A", label="A", target_sheet="X-101"),
+            page_size="A2",
+        )
+        exported = export_sheet(built, spec, generator_version="0.0.0-test")
+        (callout,) = _annotations(exported, "callout")
+        assert callout.target.sheet_id == "X-101"
+        assert callout.text == "A"
+        levels = sorted((a.text, a.elevation) for a in _annotations(exported, "level"))
+        assert levels == [("+2,80", pytest.approx(2.8)), ("±0,00", 0)]
+        (viewport,) = exported.plannotation.viewports or []
+        assert viewport.kind == "section"
+
+    def test_north_points_where_the_model_says(self, tmp_path: Path) -> None:
+        """The house turned 30 degrees: north, the model's +y, leans 30 degrees right."""
+        _, exported = _drawn_plan(tmp_path, rotation=30.0)
+        (arrow,) = _annotations(exported, "northArrow")
+        (x0, y0), (x1, y1) = arrow.geometry
+        assert math.degrees(math.atan2(x1 - x0, y1 - y0)) == pytest.approx(30.0, abs=0.1)
+
+    def test_the_scale_bar_is_ten_metres_at_the_sheet_s_scale(self, tmp_path: Path) -> None:
+        """200 mm at 1:50."""
+        _, exported = _drawn_plan(tmp_path)
+        (bar,) = _annotations(exported, "scaleBar")
+        (x0, _), (x1, _) = bar.geometry
+        assert x1 - x0 == pytest.approx(200.0)
+        assert (bar.value, bar.unit) == (10, "m")
+
+
+@needs_ifc
+class TestTheGroundTruthCountsSubtypes:
+    """An IfcWallStandardCase is a wall."""
+
+    def test_is_subtype(self) -> None:
+        """In the model's own schema."""
+        from plannotation.export.ifc_svg_pdf import is_subtype
+
+        assert is_subtype("IFC2X3", "IfcWallStandardCase", "IfcWall")
+        assert is_subtype("IFC4", "IfcWall", "IfcWall")
+        assert not is_subtype("IFC4", "IfcWall", "IfcWallStandardCase")
+        assert not is_subtype("IFC4", "IfcNoSuchThing", "IfcWall")
+
+    def test_the_wall_count_includes_the_standard_case(self, tmp_path: Path) -> None:
+        """Four IfcWall and one IfcWallStandardCase are five walls."""
+        _, exported = _drawn_plan(tmp_path)
+        question = next(q for q in exported.ground_truth if "walls (IfcWall)" in str(q["question"]))
+        assert question["answer"] == 5
+
+
+class TestSilhouettes:
+    """What a plan sees of an element below its cut is its outline, not its hull."""
+
+    def test_an_l_shaped_slab_keeps_its_notch(self) -> None:
+        """Six corners, where the convex hull would have five."""
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import silhouette
+
+        # An L of two unit squares and one more, as two triangles each, facing up.
+        squares = [(0, 0), (1, 0), (0, 1)]
+        points: list[tuple[float, float, float]] = []
+        faces: list[tuple[int, int, int]] = []
+        for x, y in squares:
+            base = len(points)
+            points += [(x, y, 0.0), (x + 1, y, 0.0), (x + 1, y + 1, 0.0), (x, y + 1, 0.0)]
+            faces += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
+        (loop,) = silhouette(np.array(points), np.array(faces))
+        assert loop[0] == loop[-1]
+        assert sorted(set(loop)) == sorted(
+            {(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (1.0, 1.0), (1.0, 2.0), (0.0, 2.0)}
+        )
+
+    def test_faces_turned_away_are_not_seen(self) -> None:
+        """A face whose normal points down shows nothing from above."""
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import silhouette
+
+        points = np.array([(0, 0, 0), (1, 0, 0), (1, 1, 0)], dtype=float)
+        assert silhouette(points, np.array([(0, 2, 1)])) == []
+
+
+@needs_ifc
+@needs_cairo
+class TestTheDrawnPlanValidates:
+    """The full treatment still writes a plannotation the validator accepts."""
+
+    def test_square_to_the_world_there_are_no_findings(self, tmp_path: Path) -> None:
+        """Not even a warning."""
+        from plannotation.export.ifc_svg_pdf import write_sample
+        from plannotation.validate import validate
+
+        built, exported = _drawn_plan(tmp_path)
+        pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
+        assert [finding.code for finding in validate(pdf).findings] == []
+
+    def test_turned_only_the_rounded_axes_are_reported(self, tmp_path: Path) -> None:
+        """PL-GEO-010 until the validator allows for three-decimal rounding."""
+        from plannotation.export.ifc_svg_pdf import write_sample
+        from plannotation.validate import validate
+
+        built, exported = _drawn_plan(tmp_path, rotation=30.0)
+        pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
+        assert {finding.code for finding in validate(pdf).findings} <= {"PL-GEO-010"}

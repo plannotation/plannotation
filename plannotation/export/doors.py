@@ -15,8 +15,8 @@ instead, so the swing is constructed here from what the model says:
   the positive y-axis, which is the placement's origin, and ``SINGLE_SWING_RIGHT`` on
   the right, at ``OverallWidth`` -- on the door in IFC4 and on its ``IfcDoorStyle`` in
   IFC2X3;
-* the face the swing starts from, which is the door's own geometry at its furthest
-  towards positive y.
+* the face the swing starts from: the face of the wall the door stands in, or the
+  door's own geometry where that reaches further.
 
 This is IFC's convention as ``ifcopenshell.api.geometry.add_door_representation``
 reads it. A double door opens two leaves, split as the first panel's ``PanelWidth``
@@ -137,22 +137,71 @@ def _first_panel_share(door: Any) -> float:  # noqa: ANN401 - ifcopenshell is un
     return 0.5
 
 
-def _local_bounds(door: Any) -> tuple[float, float] | None:  # noqa: ANN401 - untyped here
-    """Return how far a door's geometry reaches along its own y-axis.
+def _local_bounds(door: Any, width: float, scale: float) -> tuple[float, float] | None:  # noqa: ANN401
+    """Return where the faces of a door's wall are, along the door's own y-axis.
+
+    The swing starts at the face of the wall, which is not always where the door's own
+    geometry ends: a door set in the middle of a thick wall stops short of both faces.
+    So the wall the door's opening cuts is measured too, beside the opening, and the
+    further of the two taken on each side.
 
     Args:
         door: The ``IfcDoor``.
+        width: Its width, in metres.
+        scale: The model's length unit in metres.
 
     Returns:
         ``(least, most)`` local y in metres, or None for a door with no geometry.
     """
     geom = _require("ifcopenshell.geom")
+    np = _require("numpy")
     try:
         shape = geom.create_shape(geom.settings(), door)
     except RuntimeError:
         return None
     ys = list(shape.geometry.verts)[1::3]
-    return (min(ys), max(ys)) if ys else None
+    if not ys:
+        return None
+    least, most = min(ys), max(ys)
+    host = _host(door)
+    if host is None:
+        return (least, most)
+    settings = geom.settings()
+    settings.set("use-world-coords", True)  # noqa: FBT003 - the wrapper is positional
+    try:
+        wall = geom.create_shape(settings, host)
+    except RuntimeError:
+        return (least, most)
+    matrix = np.array(
+        _require("ifcopenshell.util.placement").get_local_placement(door.ObjectPlacement)
+    )
+    matrix[:3, 3] *= scale
+    points = np.array(wall.geometry.verts, dtype=float).reshape(-1, 3)
+    local = (np.linalg.inv(matrix) @ np.c_[points, np.ones(len(points))].T).T
+    beside = local[(local[:, 0] > -_JAMB_M) & (local[:, 0] < width + _JAMB_M)]
+    if len(beside):
+        least = min(least, float(beside[:, 1].min()))
+        most = max(most, float(beside[:, 1].max()))
+    return (least, most)
+
+
+#: How far past the jambs the wall is measured, in metres.
+_JAMB_M = 0.05
+
+
+def _host(door: Any) -> Any:  # noqa: ANN401 - ifcopenshell is untyped here
+    """Return the wall a door's opening is cut in, if the model says.
+
+    Args:
+        door: The ``IfcDoor``.
+
+    Returns:
+        The wall, or None.
+    """
+    for fills in getattr(door, "FillsVoids", None) or ():
+        for voids in getattr(fills.RelatingOpeningElement, "VoidsElements", None) or ():
+            return voids.RelatingBuildingElement
+    return None
 
 
 def _arc(
@@ -243,13 +292,12 @@ def door_swings(
         if not door.OverallWidth:
             reasons[guid] = "no OverallWidth"
             continue
-        faces = _local_bounds(door)
+        width = float(door.OverallWidth) * scale
+        faces = _local_bounds(door, width, scale)
         if faces is None:
             reasons[guid] = "no geometry"
             continue
-        swing = local_swing(
-            operation, float(door.OverallWidth) * scale, faces, _first_panel_share(door)
-        )
+        swing = local_swing(operation, width, faces, _first_panel_share(door))
         if swing is None:  # pragma: no cover - every _SWINGS type swings
             continue
         matrix = placement.get_local_placement(door.ObjectPlacement)
