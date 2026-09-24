@@ -2118,7 +2118,7 @@ the document (6.5.5).
 | The index of a plannotated document | SWAPP's DocumentSet | The sheets one PDF carries |
 | `viewport` | SWAPP's ViewPort, an `IfcAnnotation` aggregated with `IfcRelAggregates`; in Bonsai, a drawing placed on the sheet by an `IfcDocumentReference` | Its box on the paper is `viewport.paperBBox` |
 | `viewport.plane`, `paperToPlane`, `scale` | SWAPP's View; in Bonsai, the `IfcAnnotation` with `ObjectType` `DRAWING` and its `EPset_Drawing` | The annotation's placement is `viewport.plane`; the scale in `EPset_Drawing` is `viewport.scale` |
-| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name` and `ifcGuid` are the storey's `Name` and `GlobalId`; `storey.elevation` is the z of its placement, which is its `Elevation` only where the building's ±0,00 is at z = 0 (3.6) |
+| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name` and `ifcGuid` are the storey's `Name` and `GlobalId`; `storey.elevation` is the z of the storey's floor in model coordinates (3.6): the z of its placement where the placement carries the level, and otherwise the z of the building's ±0,00 plus `Elevation`. It equals `Elevation` only where that ±0,00 is at z = 0 |
 | `element` | An `IfcProduct`, usually an `IfcElement` | `GlobalId`, the entity class, `PredefinedType`, `Name` and `Tag` map one to one |
 | `element.properties` | The element's property sets and quantity sets | Keyed by set name (`Pset_WallCommon`), then property name |
 | `shows.property` | `Tag`, an attribute, or a dotted `Pset_Name.Property` | A mark shows `Tag`; a member's cross-section shows `Pset_ColumnCommon.Reference` |
