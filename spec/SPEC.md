@@ -589,6 +589,15 @@ z = 0. The Maleva 18 model stands its ground floor at z = 14.30 m, so a plan of 
 floor cut 1.2 m above it has `storey.elevation` 14300 and a plane at z = 15500 in
 millimetres, and the floor's level mark reads ±0,00.
 
+**Level elevation.** A `level` annotation's `elevation` is the other number: the
+height its mark states, in metres, from the datum the mark states it from, which is
+the building's ±0,00 on most drawings and sea level on a site plan. Where the mark
+stands in the model is already given by its position on the paper, through its
+viewport's transform, and is not stated a second time. On a section of the Maleva 18
+model the mark reading +3,35 has `elevation` 3.35 and stands at z = 17.65 m. The
+marks of one section that share a datum therefore differ exactly as their heights on
+the plane do.
+
 ### 3.7 Page rotation
 
 `page.rotation` records the page's effective `/Rotate` value, normalised to one of
@@ -2124,7 +2133,7 @@ the document (6.5.5).
 | `shows.property` | `Tag`, an attribute, or a dotted `Pset_Name.Property` | A mark shows `Tag`; a member's cross-section shows `Pset_ColumnCommon.Reference` |
 | `annotation` | SWAPP's Annotation: an `IfcAnnotation`, aggregated under its view by `IfcRelAggregates` | `shows.element` records its `IfcRelAssignsToProduct` |
 | `annotation.type = dimension` | `IfcAnnotation` of type `DIMENSION` | `measures` names what it runs between |
-| `level` | `IfcAnnotation` of type `SECTION_LEVEL` or `PLAN_LEVEL` | `elevation` is in metres; `ifcGuid` names the storey or the level annotation |
+| `level` | `IfcAnnotation` of type `SECTION_LEVEL` or `PLAN_LEVEL` | `elevation` is the height the mark states, in metres (3.6), so a storey's mark measured from the building's ±0,00 carries the storey's `Elevation` in metres; `ifcGuid` names the storey or the level annotation |
 | `text`, `leader` | `IfcAnnotation` of type `TEXT`, `TEXT_LEADER` | Assigned to a product by `IfcRelAssignsToProduct`, which is what `shows.element` records |
 | `sectionMark` | `IfcAnnotation` of type `SECTION` | `target` names the sheet and viewport of the section it opens |
 | `grid` | `IfcGridAxis` of an `IfcGrid` | `AxisTag` → `axis` |

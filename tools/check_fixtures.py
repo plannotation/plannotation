@@ -45,8 +45,11 @@ specification, none could be -- a conforming plannotation may describe an unbuil
 building -- and a real project's drawings would trip several of them for good reasons.
 
 * **a level agrees with its own transform.** A level annotation's paper position, taken
-  through ``paperToPlane`` and the plane, must yield the elevation it prints. This is a
-  drafting convention (the tag sits at the height it names), not a format rule;
+  through ``paperToPlane`` and the plane, must yield the elevation it states. SPEC 3.6
+  measures that elevation from the mark's own datum, and every model here puts the
+  datum at z = 0, so the two are one number. This is a drafting convention (the tag
+  sits at the height it names) and a corpus one, not a format rule: Maleva 18 stands
+  its ±0,00 at z = 14.30 m and would fail it correctly drawn;
 * **a section mark lies on the plane of the section it opens.** Likewise;
 * **what a tag prints.** A tag showing ``Tag`` prints the element's tag exactly, and a
   tag showing a numeric property prints that number. Whether the element carries the
@@ -320,10 +323,12 @@ def check_identifiers_and_page_size(plannotation: Plannotation) -> list[str]:
 def check_levels(plannotation: Plannotation) -> list[str]:
     """Check that a level's elevation matches its viewport's transform.
 
-    A level annotation sits at a height in the model. Its viewport says what a paper
-    position means: ``paperToPlane`` gives the point on the plane, and the plane's
-    origin and axes give the point in the model. The world z of the annotation's own
-    paper position must therefore be the elevation it prints.
+    A level annotation states a height above its datum (SPEC 3.6), and every model in
+    this corpus puts that datum at z = 0. Its viewport says what a paper position
+    means: ``paperToPlane`` gives the point on the plane, and the plane's origin and
+    axes give the point in the model. The world z of the annotation's own paper
+    position must therefore be the elevation it states. The specification does not
+    require this; a model whose datum is elsewhere offsets every mark by its z.
 
     Args:
         plannotation: The plannotation to check.
