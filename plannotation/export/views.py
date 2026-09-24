@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from plannotation.errors import ExportError, MissingExtraError
-from plannotation.export.ifc_svg_pdf import GridAxis
+from plannotation.export.ifc_svg_pdf import GridAxis, open_ifc
 from plannotation.export.models import Level, SectionCut
 
 if TYPE_CHECKING:
@@ -88,7 +88,8 @@ def open_model(path: Path) -> Any:  # noqa: ANN401 - ifcopenshell is untyped her
     Returns:
         The ``ifcopenshell.file``.
     """
-    return _require("ifcopenshell").open(str(path))
+    _require("ifcopenshell")
+    return open_ifc(path)
 
 
 def unit_scale(model: Any) -> float:  # noqa: ANN401 - ifcopenshell is untyped here
@@ -520,23 +521,3 @@ def grid_axes_on(lines: Sequence[GridLine], cut: SectionCut) -> tuple[GridAxis, 
         px, py = sx + t * dx, sy + t * dy
         axes.append(GridAxis(line.tag, vertical=True, position=px * x_axis[0] + py * x_axis[1]))
     return tuple(axes)
-
-
-def true_north(model: Any) -> tuple[float, float]:  # noqa: ANN401 - ifcopenshell is untyped here
-    """Return the direction of true north in model coordinates.
-
-    Args:
-        model: The ``ifcopenshell.file``.
-
-    Returns:
-        A unit ``(x, y)``: the model context's ``TrueNorth``, or +y where it states none.
-    """
-    for context in model.by_type("IfcGeometricRepresentationContext"):
-        if context.is_a("IfcGeometricRepresentationSubContext"):
-            continue
-        north = getattr(context, "TrueNorth", None)
-        if north is not None:
-            x, y = (float(value) for value in north.DirectionRatios[:2])
-            length = math.hypot(x, y)
-            return (x / length, y / length)
-    return (0.0, 1.0)

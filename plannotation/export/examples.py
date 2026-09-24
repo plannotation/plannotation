@@ -48,6 +48,7 @@ from plannotation.errors import ExportError
 from plannotation.export.drafting import RoomLabels, SectionMark, ViewTitle
 from plannotation.export.ifc_svg_pdf import SheetSpec, TitleField, export_sheet
 from plannotation.export.models import BuiltModel
+from plannotation.export.sheet import PAPER_SIZES
 from plannotation.export.to_pdf import svg_to_pdf
 from plannotation.export.views import (
     building_datum,
@@ -483,8 +484,6 @@ def _paper_name(width_mm: float, height_mm: float) -> str:
     Returns:
         ``A1`` and so on, or the size in millimetres for a page that is none of them.
     """
-    from plannotation.export.sheet import PAPER_SIZES  # noqa: PLC0415 - a leaf lookup
-
     for name, (width, height) in PAPER_SIZES.items():
         if {round(width), round(height)} == {round(width_mm), round(height_mm)}:
             return name
