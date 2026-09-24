@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = Path(__file__).parent / "fixtures" / "site-examples"
+#: How a credit begins: Plannotation drew the sheets, not the model's author.
+CREDIT = "Drawn and annotated by Plannotation"
 
 
 def _load() -> ModuleType:
@@ -132,13 +134,31 @@ class TestTheLandingPageShowsTheExamples:
         assert 'src="examples/A-301.png" width="3" height="2"' in page
 
     def test_one_source_is_credited_once(self, site: Path) -> None:
-        """With the licence and a link to both, as CC BY asks."""
+        """As CC BY asks: title, copyright, licence, links to both, and what changed.
+
+        The author made the model, not the sheets, and endorses nothing.
+        """
         page = landing(site)
-        assert page.count("Drawn from") == 1
+        assert page.count(CREDIT) == 1
         assert (
-            'Drawn from <a href="https://example.org/model">Test model</a> by Test Author, '
-            '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.'
+            f'{CREDIT} from <a href="https://example.org/model">Test model</a> (changes made);'
+            " model &copy; Test Author, "
+            '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. '
+            "Not drawn or endorsed by Test Author."
         ) in page
+        assert "via" not in page
+
+    def test_a_source_can_say_where_the_model_came_from(self, tmp_path: Path) -> None:
+        """``source.via``, when the model was obtained from someone other than its author."""
+        examples = examples_copy(tmp_path)
+        index = json.loads((examples / "index.json").read_text("utf-8"))
+        for entry in index["examples"]:
+            entry["source"]["via"] = "Sample Files & Co."
+        (examples / "index.json").write_text(json.dumps(index), "utf-8")
+        stage_site.stage(tmp_path / "site", examples)
+        assert "model &copy; Test Author, via Sample Files &amp; Co., <a " in landing(
+            tmp_path / "site"
+        )
 
     def test_several_sources_are_credited_on_each_card(self, tmp_path: Path) -> None:
         """Each sheet then names its own."""
@@ -151,8 +171,9 @@ class TestTheLandingPageShowsTheExamples:
         }
         stage_site.stage(tmp_path / "site", examples_copy(tmp_path, {"source": other}))
         page = landing(tmp_path / "site")
-        assert page.count("Drawn from") == 2
-        assert "Other model</a> by Other Author" in page
+        assert page.count(CREDIT) == 2
+        assert "Other model</a> (changes made); model &copy; Other Author," in page
+        assert "Not drawn or endorsed by Other Author." in page
         assert page.index("Test model") < page.index("A-301") < page.index("Other model")
 
     def test_a_shared_link_shows_the_first_example(self, site: Path) -> None:
@@ -192,7 +213,7 @@ class TestWithoutExamples:
         stage_site.stage(tmp_path)
         page = landing(tmp_path)
         assert '<ul class="sheets">' not in page
-        assert "Drawn from" not in page
+        assert CREDIT not in page
         assert "og:image" not in page
         assert "curl" not in page
         assert "uv run plannotation inspect drawing.plannotated.pdf" in page
@@ -212,6 +233,19 @@ class TestTheIndexIsChecked:
             ({"png": "A-301.jpg"}, "must be a .png file name"),
             ({"png": "missing.png"}, "does not exist"),
             ({"source": {"title": "t", "url": "u", "author": "a", "license": "l"}}, "license_url"),
+            (
+                {
+                    "source": {
+                        "title": "t",
+                        "url": "https://example.org/",
+                        "author": "a",
+                        "license": "l",
+                        "license_url": "https://example.org/",
+                        "via": "",
+                    }
+                },
+                "source.via must be a non-empty string",
+            ),
             (
                 {
                     "source": {

@@ -62,6 +62,8 @@ EXAMPLE_FIELDS: dict[str, type] = {
     "source": dict,
 }
 SOURCE_FIELDS = ("title", "url", "author", "license", "license_url")
+#: Said when present: where the model was obtained, when that is not its author.
+SOURCE_OPTIONAL = ("via",)
 TYPE_NAMES = {str: "a string", int: "an integer", dict: "an object"}
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -152,7 +154,7 @@ def _check_example(entry: object, where: str, directory: Path) -> None:
             msg = f"{where}.{field}: {directory / name} does not exist"
             raise SiteError(msg)
     source = entry["source"]
-    for field in SOURCE_FIELDS:
+    for field in SOURCE_FIELDS + tuple(key for key in SOURCE_OPTIONAL if key in source):
         if not isinstance(source.get(field), str) or not source[field]:
             msg = f"{where}.source.{field} must be a non-empty string"
             raise SiteError(msg)
@@ -239,12 +241,25 @@ def _count(number: int, noun: str) -> str:
 
 
 def _credit(source: dict[str, str]) -> str:
-    """Attribute one source as its licence asks: title, author, licence, and links."""
+    """Credit one source as CC BY asks, and say who made the drawings.
+
+    CC BY wants the title, the copyright notice, the licence, links to the source and
+    the licence, and a note that the material was changed, and it forbids implying
+    that the author endorses the result. The author made the model, not these sheets.
+
+    Args:
+        source: An entry's ``source``.
+
+    Returns:
+        The credit, as HTML.
+    """
     esc = html.escape
+    via = f", via {esc(source['via'])}" if source.get("via") else ""
     return (
-        f'Drawn from <a href="{esc(source["url"])}">{esc(source["title"])}</a> '
-        f'by {esc(source["author"])}, <a href="{esc(source["license_url"])}">'
-        f"{esc(source['license'])}</a>."
+        f'Drawn and annotated by Plannotation from <a href="{esc(source["url"])}">'
+        f"{esc(source['title'])}</a> (changes made); model &copy; {esc(source['author'])}"
+        f'{via}, <a href="{esc(source["license_url"])}">{esc(source["license"])}</a>. '
+        f"Not drawn or endorsed by {esc(source['author'])}."
     )
 
 
