@@ -262,7 +262,7 @@
       "rule": "geometric.plane-axes-unit-length",
       "severity": "error",
       "spec": "SPEC 3.6, 4.4 (6)",
-      "violates": "SPEC 3.6: xAxis and yAxis MUST be unit vectors, to within 1e-6. Scale is already carried by paperToPlane, and an axis of another length would state it a second time."
+      "violates": "SPEC 3.6: xAxis and yAxis MUST be unit vectors, to within the sqrt(3) x 0.0005 that three-decimal rounding explains. Scale is already carried by paperToPlane, and an axis of another length would state it a second time. This one is 1.002 long."
     },
     {
       "buildsThroughModel": true,
@@ -277,7 +277,7 @@
       "rule": "geometric.plane-axes-orthogonal",
       "severity": "error",
       "spec": "SPEC 3.6, 4.4 (6)",
-      "violates": "SPEC 3.6: xAxis and yAxis MUST be mutually orthogonal, to within 1e-6. Their dot product here is 0.28."
+      "violates": "SPEC 3.6: xAxis and yAxis MUST be mutually orthogonal, to within the dot product of about 0.0017 that three-decimal rounding explains. Their dot product here is 0.28."
     },
     {
       "buildsThroughModel": true,
