@@ -24,17 +24,42 @@ exercise nothing beyond L2.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import importlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from html import escape
 from itertools import pairwise
 from typing import TYPE_CHECKING, Any, cast, get_args
 
+import numpy as np
+
 from plannotation.constants import SCHEMA_VERSION
 from plannotation.errors import ExportError
+from plannotation.export.doors import door_swings
+from plannotation.export.drafting import (
+    GRID_DASH,
+    MARK_RADIUS_MM,
+    NORTH_RADIUS_MM,
+    Line,
+    Point,
+    RoomLabels,
+    SectionMark,
+    ViewTitle,
+    area_text,
+    draw_label,
+    draw_north_arrow,
+    draw_scale_bar,
+    draw_section_mark,
+    draw_view_title,
+    place_label,
+    present,
+    segments_of,
+    style_of,
+)
 from plannotation.export.geometry import bounding_box, path_points, union_box
 from plannotation.export.paper import Affine, invert, paper_to_plane, plane_from_ifc_plane
 from plannotation.export.sheet import PAPER_SIZES, Sheet, frame_box, title_block_box
@@ -66,11 +91,13 @@ from plannotation.svg.carrier import uuid_from_guid
 from plannotation.units import length_unit_for
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from datetime import datetime
     from pathlib import Path
 
-    from plannotation.export.models import BuiltModel, Level
+    from numpy.typing import NDArray
+
+    from plannotation.export.models import BuiltModel, Level, SectionCut
     from plannotation.model import Discipline
 
 #: A paper bounding box, ``(x0, y0, x1, y1)`` in millimetres.
@@ -205,6 +232,21 @@ class SheetSpec:
             the compact one: project, title, sheet number, scale and revision.
         title_block_mm: The title block's width and height; None for
             :data:`plannotation.export.sheet.TITLE_BLOCK_MM`.
+        presentation: Draw as an architect would: cut structure solid, partitions grey,
+            everything else cut in outline, spaces unfilled, what lies beyond the cut
+            in fine lines, grids as chain lines. Without it the serializer's paths keep
+            SVG's default, filled black, which is what the samples were drawn with.
+        grid_overshoot_mm: How far grid lines run beyond the drawing, with the bubble
+            beyond that; None to run them across the whole viewport.
+        dimension_offsets_mm: How far from the drawing the two dimension chains run.
+        rooms: How to label the rooms, or None for no room labels.
+        door_swings: Draw each swinging door open with the arc of its leaf.
+        section_marks: The sections whose cutting lines a plan marks.
+        view_title: The title under the view, or None for none.
+        north_arrow: Draw a north arrow turned to the model's true north.
+        scale_bar: Draw a scale bar beside the view title.
+        psets: Property sets to read besides the common ones; the room labels' area
+            property set is read whatever this says.
     """
 
     sheet_id: str
@@ -221,6 +263,16 @@ class SheetSpec:
     wording: Wording = field(default_factory=Wording)
     title_fields: tuple[TitleField, ...] = ()
     title_block_mm: tuple[float, float] | None = None
+    presentation: bool = False
+    grid_overshoot_mm: float | None = None
+    dimension_offsets_mm: tuple[float, float] = (10.0, 22.0)
+    rooms: RoomLabels | None = None
+    door_swings: bool = False
+    section_marks: tuple[SectionMark, ...] = ()
+    view_title: ViewTitle | None = None
+    north_arrow: bool = False
+    scale_bar: bool = False
+    psets: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -248,9 +300,18 @@ class ModelFacts:
         schema: The model's IFC schema, such as ``IFC4`` or ``IFC2X3``.
         project: The ``IfcProject``'s name, or None.
         classes: Each building element's IFC class and name, by GlobalId.
-        tags: Each product's ``Tag``, by GlobalId.
-        properties: Each product's common property sets, by GlobalId.
+        tags: Each product's ``Tag``, by GlobalId, where it is a mark: a tag shaped like
+            a GUID is an authoring tool's internal id, not a mark anyone reads.
+        properties: Each product's common property sets, and any other property set
+            asked for, by GlobalId.
         extents: Each product's world bounding box in metres, by GlobalId.
+        depths: Where a cutting plane was given, how far each product reaches along its
+            normal, least and most, in metres from the plane: a product is cut when the
+            two straddle zero.
+        outlines: Where a cutting plane was given, each product's convex outline seen
+            along its normal, in plane coordinates in metres.
+        north: True north in model x and y.
+        names: Each space's ``Name`` and ``LongName``, by GlobalId.
     """
 
     unit_scale: float
@@ -261,6 +322,22 @@ class ModelFacts:
     tags: dict[str, str] = field(default_factory=dict)
     properties: dict[str, dict[str, dict[str, object]]] = field(default_factory=dict)
     extents: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = field(default_factory=dict)
+    depths: dict[str, tuple[float, float]] = field(default_factory=dict)
+    outlines: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
+    north: tuple[float, float] = (0.0, 1.0)
+    names: dict[str, tuple[str | None, str | None]] = field(default_factory=dict)
+
+    def is_a(self, ifc_class: str, ancestor: str) -> bool:
+        """Say whether a class is another, or a subtype of it, in this model's schema.
+
+        Args:
+            ifc_class: The class.
+            ancestor: The class it may be, or descend from.
+
+        Returns:
+            True when an ``ifc_class`` is an ``ancestor``.
+        """
+        return is_subtype(self.schema, ifc_class, ancestor)
 
 
 @dataclass(frozen=True)
@@ -300,6 +377,19 @@ class _Frame:
             Paper y in millimetres.
         """
         return invert(self.transform, 0.0, plane_y_m / self.unit_scale)[1]
+
+    def paper(self, plane_x_m: float, plane_y_m: float) -> tuple[float, float]:
+        """Return the paper point of a plane point, given in metres.
+
+        Args:
+            plane_x_m: The plane x in metres.
+            plane_y_m: The plane y in metres.
+
+        Returns:
+            The paper point in millimetres, rounded as the format serialises it.
+        """
+        x, y = invert(self.transform, plane_x_m / self.unit_scale, plane_y_m / self.unit_scale)
+        return (round(x, 3), round(y, 3))
 
 
 def viewport_box(
@@ -350,7 +440,8 @@ def export_sheet(
     width_mm, height_mm = PAPER_SIZES[spec.page_size]
     box = spec.viewport_box or viewport_box(width_mm, height_mm, spec.title_block_mm)
     plan = built.is_plan
-    facts = read_model_facts(built.path)
+    psets = (*spec.psets, *_area_pset(spec.rooms))
+    facts = read_model_facts(built.path, include=built.include, plane=built.section, psets=psets)
     view = render_view(
         built.path,
         scale_denominator=spec.scale,
@@ -378,57 +469,22 @@ def export_sheet(
         origin_z=origin[2],
     )
 
-    elements = _elements(view, height_mm, offset, facts, built, frame.viewport)
-    group = _view_group(view.svg)
-    if built.section is None:
-        seen, markup = _projections(
-            facts, built, frame, (origin, x_axis, y_axis), elements, (*offset, height_mm)
-        )
-        elements += seen
-        group = group[: -len("</g>")] + markup + "</g>"
+    plane = (origin, x_axis, y_axis)
+    elements, group = _draw_view(view, spec, built, facts, frame, plane, (*offset, height_mm))
     sheet.group(group, transform=f"translate({offset[0]},{offset[1]})")
     if not elements:
         msg = f"sheet {spec.sheet_id} drew no elements; the view would be empty"
         raise ExportError(msg)
-    content = union_box(element.paper_bbox for element in elements)
-
-    annotations: list[Annotation] = []
-    annotations += _draw_grids(sheet, spec.grids, frame, box)
-    levels = _draw_levels(sheet, built.levels, frame, left=content[0], datum=built.datum)
-    annotations += levels
-    annotations += _draw_grid_dimensions(sheet, spec.grids, frame, content)
-    annotations += _draw_level_dimensions(sheet, levels, built.levels, content)
-    if spec.callout_to is not None:
-        annotations.append(_draw_callout(sheet, spec.callout_to, frame.viewport, box))
-    annotations += _draw_tags(sheet, elements, frame.viewport, content, annotations)
+    seen_lines = _seen_lines(view.svg, height_mm, offset)
+    annotations = _annotate(
+        sheet, spec, built, facts, frame, box, elements, plane=plane, seen_lines=seen_lines
+    )
     project = spec.project or (Project(name=facts.project) if facts.project else None)
     _draw_title_block(sheet, spec, project)
 
     boxes = [element.paper_bbox for element in elements]
     boxes += [a.paper_bbox for a in annotations if a.viewport == frame.viewport]
-    viewport = Viewport(
-        id=frame.viewport,
-        name=spec.title,
-        kind="plan" if plan else "section",
-        scale=spec.scale,
-        paperBBox=union_box(boxes),
-        plane=Plane(
-            origin=(origin[0], origin[1], origin[2]),
-            xAxis=(x_axis[0], x_axis[1], x_axis[2]),
-            yAxis=(y_axis[0], y_axis[1], y_axis[2]),
-        ),
-        paperToPlane=transform,
-        cutHeight=(built.cut_height or 0.0) / facts.unit_scale if plan else None,
-        storey=(
-            Storey(
-                ifcGuid=built.storey_guid,
-                name=built.storey_name,
-                elevation=built.storey_elevation / facts.unit_scale,
-            )
-            if plan
-            else None
-        ),
-    )
+    viewport = _viewport(built, spec, frame, facts.unit_scale, plane, boxes)
     plannotation = Plannotation(
         plannotation=SCHEMA_VERSION,
         generator=Generator(name="plannotation", version=generator_version),
@@ -457,18 +513,250 @@ def export_sheet(
     return ExportedSheet(
         svg=sheet.render(),
         plannotation=plannotation,
-        ground_truth=tuple(_ground_truth(plannotation, spec.sheet_id, spec.grids)),
+        ground_truth=tuple(_ground_truth(plannotation, spec.sheet_id, spec.grids, facts.is_a)),
     )
+
+
+def _draw_view(
+    view: RenderedView,
+    spec: SheetSpec,
+    built: BuiltModel,
+    facts: ModelFacts,
+    frame: _Frame,
+    plane: tuple[list[float], list[float], list[float]],
+    placement: tuple[float, float, float],
+) -> tuple[list[Element], str]:
+    """Describe what the serializer drew, add what it leaves out, and style it.
+
+    Args:
+        view: The rendered view.
+        spec: The sheet.
+        built: The model and where it is cut.
+        facts: What the model says.
+        frame: The view's placement.
+        plane: The plane's origin and axes, in model units.
+        placement: The view group's offset on the sheet, x and y, and the sheet's height.
+
+    Returns:
+        The elements, and the view group to place on the sheet.
+    """
+    offset, height = (placement[0], placement[1]), placement[2]
+    elements = _elements(view, height, offset, facts, built, frame.viewport)
+    group = _view_group(view.svg)
+    if built.section is None:
+        seen, markup = _projections(facts, built, frame, plane, elements, placement)
+        elements += seen
+        group = group[: -len("</g>")] + markup + "</g>"
+    elif built.is_plan:
+        elements += _seen_below(facts, built, frame, elements)
+    if spec.door_swings and built.is_plan:
+        group = _draw_swings(group, elements, built, frame, placement)
+    if spec.presentation:
+        group = present(group, _styles(elements, facts))
+    return elements, group
+
+
+def _annotate(  # noqa: PLR0913 - every annotation needs some of these
+    sheet: Sheet,
+    spec: SheetSpec,
+    built: BuiltModel,
+    facts: ModelFacts,
+    frame: _Frame,
+    box: Box,
+    elements: list[Element],
+    *,
+    plane: tuple[list[float], list[float], list[float]],
+    seen_lines: list[list[Point]],
+) -> list[Annotation]:
+    """Draw every annotation around and in the view, in the order they must avoid each other.
+
+    Args:
+        sheet: The sheet being composed.
+        spec: The sheet.
+        built: The model and where it is cut.
+        facts: What the model says.
+        frame: The view's placement.
+        box: The viewport's paper box.
+        elements: The elements drawn.
+        plane: The plane's origin and axes.
+        seen_lines: The lines drawn beyond the cut.
+
+    Returns:
+        The annotations.
+    """
+    content = union_box(element.paper_bbox for element in elements)
+    annotations: list[Annotation] = []
+    annotations += _draw_grids(
+        sheet,
+        spec.grids,
+        frame,
+        box,
+        content=content if spec.grid_overshoot_mm is not None else None,
+        overshoot=spec.grid_overshoot_mm or 0.0,
+        dash=GRID_DASH if spec.presentation else None,
+    )
+    levels = _draw_levels(sheet, built.levels, frame, left=content[0], datum=built.datum)
+    annotations += levels
+    offsets = spec.dimension_offsets_mm
+    annotations += _draw_grid_dimensions(sheet, spec.grids, frame, content, offsets)
+    annotations += _draw_level_dimensions(sheet, levels, built.levels, content, offsets)
+    if spec.callout_to is not None:
+        annotations.append(_draw_callout(sheet, spec.callout_to, frame.viewport, box))
+    annotations += _draw_section_marks(sheet, spec.section_marks, frame, content)
+    if spec.rooms is not None:
+        annotations += _draw_rooms(
+            sheet, spec.rooms, elements, annotations, (seen_lines, facts), frame
+        )
+    annotations += _draw_tags(sheet, elements, frame.viewport, content, annotations)
+    axes = (plane[1], plane[2]) if built.is_plan else None
+    annotations += _draw_view_furniture(sheet, spec, facts, frame, content, axes=axes)
+    return annotations
+
+
+def _viewport(
+    built: BuiltModel,
+    spec: SheetSpec,
+    frame: _Frame,
+    unit_scale: float,
+    plane: tuple[list[float], list[float], list[float]],
+    boxes: Sequence[Sequence[float]],
+) -> Viewport:
+    """Describe the view: where it sits, what plane it shows, and at what scale.
+
+    Args:
+        built: The model and where it is cut.
+        spec: The sheet.
+        frame: The view's placement.
+        unit_scale: The model's length unit in metres.
+        plane: The plane's origin and axes, in model units.
+        boxes: The boxes of everything that belongs to the view.
+
+    Returns:
+        The viewport.
+    """
+    origin, x_axis, y_axis = plane
+    plan = built.is_plan
+    return Viewport(
+        id=frame.viewport,
+        name=spec.title,
+        kind="plan" if plan else "section",
+        scale=spec.scale,
+        paperBBox=union_box(boxes),
+        plane=Plane(
+            origin=(origin[0], origin[1], origin[2]),
+            xAxis=(x_axis[0], x_axis[1], x_axis[2]),
+            yAxis=(y_axis[0], y_axis[1], y_axis[2]),
+        ),
+        paperToPlane=frame.transform,
+        cutHeight=(built.cut_height or 0.0) / unit_scale if plan else None,
+        storey=(
+            Storey(
+                ifcGuid=built.storey_guid,
+                name=built.storey_name,
+                elevation=built.storey_elevation / unit_scale,
+            )
+            if plan
+            else None
+        ),
+    )
+
+
+def _area_pset(rooms: RoomLabels | None) -> tuple[str, ...]:
+    """Return the property set a room label's area is read from, if it has one.
+
+    Args:
+        rooms: How rooms are labelled.
+
+    Returns:
+        The property set's name, alone, or nothing.
+    """
+    if rooms is None or rooms.area_property is None or "." not in rooms.area_property:
+        return ()
+    return (rooms.area_property.split(".", 1)[0],)
 
 
 # ---------------------------------------------------------------------------
 # The model
 # ---------------------------------------------------------------------------
-def read_model_facts(model_path: Path) -> ModelFacts:
-    """Read the unit, hash, marks, common property sets and extents out of a model.
+#: A ``Tag`` shaped like a GUID -- ``3F2504E0-4F89-11D3-9A0C-0305E82C3301`` or an IFC
+#: GlobalId -- which authoring tools write there when nobody gave the element a mark.
+_GUID_TAG = re.compile(
+    r"\{?[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}?"
+    r"|[0-3][0-9A-Za-z_$]{21}"
+)
+
+
+def open_ifc(path: Path) -> Any:  # noqa: ANN401 - ifcopenshell is untyped here
+    """Open an IFC file.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The ``ifcopenshell.file``.
+    """
+    return importlib.import_module("ifcopenshell").open(str(path))
+
+
+def is_mark(tag: str, guid: str) -> bool:
+    """Say whether a ``Tag`` is a mark a drawing prints, rather than an internal id.
+
+    Archicad fills every element's ``Tag`` with its own GUID. Printed beside each wall,
+    that is noise; asked about, it is a question nobody could answer from the sheet.
+
+    Args:
+        tag: The ``Tag``.
+        guid: The element's GlobalId.
+
+    Returns:
+        False for a tag that is the GlobalId or shaped like a GUID.
+    """
+    stripped = tag.strip()
+    return bool(stripped) and stripped != guid and _GUID_TAG.fullmatch(stripped) is None
+
+
+@functools.cache
+def is_subtype(schema: str, ifc_class: str, ancestor: str) -> bool:
+    """Say whether a class is another, or a subtype of it, in a schema.
+
+    Args:
+        schema: The schema's name, such as ``IFC2X3``.
+        ifc_class: The class.
+        ancestor: The class it may be, or descend from.
+
+    Returns:
+        True when it is; a class the schema does not know is only itself.
+    """
+    if ifc_class.lower() == ancestor.lower():
+        return True
+    wrapper = importlib.import_module("ifcopenshell.ifcopenshell_wrapper")
+    try:
+        declaration = wrapper.schema_by_name(schema).declaration_by_name(ifc_class)
+    except (RuntimeError, IndexError):
+        return False
+    while declaration is not None:
+        if declaration.name().lower() == ancestor.lower():
+            return True
+        declaration = declaration.supertype()
+    return False
+
+
+def read_model_facts(
+    model_path: Path,
+    *,
+    include: Sequence[str] | None = None,
+    plane: SectionCut | None = None,
+    psets: Sequence[str] = (),
+) -> ModelFacts:
+    """Read the unit, hash, marks, property sets and extents out of a model.
 
     Args:
         model_path: The IFC file.
+        include: The products whose geometry is measured; None for all of them.
+        plane: A cutting plane to measure each product against, for its depth and its
+            outline along the plane's normal.
+        psets: Property sets to read besides the common ones, such as a model's own
+            room data.
 
     Returns:
         The facts.
@@ -481,20 +769,24 @@ def read_model_facts(model_path: Path) -> ModelFacts:
     properties: dict[str, dict[str, dict[str, object]]] = {}
     classes = {
         str(element.GlobalId): (str(element.is_a()), element.Name or None)
-        for element in model.by_type("IfcBuildingElement")
+        for element in model.by_type("IfcElement")
+        if not element.is_a("IfcFeatureElementSubtraction")
     }
+    wanted = set(psets)
     for product in model.by_type("IfcProduct"):
         guid = str(product.GlobalId)
-        if getattr(product, "Tag", None):
-            tags[guid] = str(product.Tag)
-        common = {
+        tag = getattr(product, "Tag", None)
+        if tag and is_mark(str(tag), guid):
+            tags[guid] = str(tag)
+        chosen = {
             name: {key: value for key, value in values.items() if key != "id"}
             for name, values in util_element.get_psets(product).items()
-            if name.startswith("Pset_") and name.endswith("Common")
+            if (name.startswith("Pset_") and name.endswith("Common")) or name in wanted
         }
-        if common:
-            properties[guid] = common
+        if chosen:
+            properties[guid] = chosen
     projects = model.by_type("IfcProject")
+    extents, depths, outlines = _extents(model, include, plane)
     return ModelFacts(
         unit_scale=float(unit.calculate_unit_scale(model)),
         sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
@@ -503,36 +795,115 @@ def read_model_facts(model_path: Path) -> ModelFacts:
         classes=classes,
         tags=tags,
         properties=properties,
-        extents=_extents(model),
+        extents=extents,
+        depths=depths,
+        outlines=outlines,
+        north=_true_north(model),
+        names={
+            str(space.GlobalId): (space.Name or None, space.LongName or None)
+            for space in model.by_type("IfcSpace")
+        },
     )
 
 
-def _extents(model: Any) -> dict[str, tuple[tuple[float, ...], tuple[float, ...]]]:  # noqa: ANN401
-    """Return every product's world bounding box, in metres.
+def _true_north(model: Any) -> tuple[float, float]:  # noqa: ANN401 - ifcopenshell is untyped
+    """Return true north in model x and y.
 
     Args:
         model: The open ``ifcopenshell.file``.
 
     Returns:
-        ``(minimum, maximum)`` corners by GlobalId.
+        The model context's ``TrueNorth``, as a unit vector, or +y where none is stated.
+    """
+    for context in model.by_type("IfcGeometricRepresentationContext"):
+        north = getattr(context, "TrueNorth", None)
+        if north is not None and not context.is_a("IfcGeometricRepresentationSubContext"):
+            x, y = (float(value) for value in north.DirectionRatios[:2])
+            length = (x * x + y * y) ** 0.5
+            return (x / length, y / length)
+    return (0.0, 1.0)
+
+
+def _extents(
+    model: Any,  # noqa: ANN401
+    include: Sequence[str] | None = None,
+    plane: SectionCut | None = None,
+) -> tuple[
+    dict[str, tuple[tuple[float, ...], tuple[float, ...]]],
+    dict[str, tuple[float, float]],
+    dict[str, list[tuple[float, float]]],
+]:
+    """Measure every product: its world box, and against a plane, its depth and outline.
+
+    Args:
+        model: The open ``ifcopenshell.file``.
+        include: The products to measure, or None for all of them.
+        plane: The cutting plane, or None.
+
+    Returns:
+        World boxes in metres by GlobalId, then -- where a plane was given -- each
+        product's least and most distance along the plane's normal, and its convex
+        outline in plane coordinates.
     """
     geom = importlib.import_module("ifcopenshell.geom")
     settings = geom.settings()
     settings.set("use-world-coords", True)  # noqa: FBT003 - the wrapper is positional
-    iterator = geom.iterator(settings, model, exclude=["IfcOpeningElement"])
+    if include is None:
+        iterator = geom.iterator(settings, model, exclude=["IfcOpeningElement"])
+    else:
+        iterator = geom.iterator(settings, model, include=[model.by_guid(guid) for guid in include])
     extents: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = {}
+    depths: dict[str, tuple[float, float]] = {}
+    outlines: dict[str, list[tuple[float, float]]] = {}
+    frame = None
+    if plane is not None:
+        x_axis, y_axis = plane.axes()
+        normal = np.cross(x_axis, y_axis)
+        frame = (np.array(plane.location), np.array([x_axis, y_axis, normal]).T)
     if iterator.initialize():
         while True:
             shape = iterator.get()
-            verts = list(shape.geometry.verts)
-            points = [verts[index : index + 3] for index in range(0, len(verts), 3)]
-            if points:
-                low = tuple(min(point[axis] for point in points) for axis in range(3))
-                high = tuple(max(point[axis] for point in points) for axis in range(3))
-                extents[str(shape.guid)] = (low, high)
+            points = np.array(shape.geometry.verts, dtype=np.float64).reshape(-1, 3)
+            if len(points):
+                guid = str(shape.guid)
+                low, high = points.min(axis=0), points.max(axis=0)
+                extents[guid] = (tuple(map(float, low)), tuple(map(float, high)))
+                if frame is not None:
+                    local = (points - frame[0]) @ frame[1]
+                    depths[guid] = (float(local[:, 2].min()), float(local[:, 2].max()))
+                    outlines[guid] = convex_hull(local[:, :2])
             if not iterator.next():
                 break
-    return extents
+    return extents, depths, outlines
+
+
+def convex_hull(points: NDArray[np.float64]) -> list[tuple[float, float]]:
+    """Return the convex hull of some points, anticlockwise, by Andrew's monotone chain.
+
+    Args:
+        points: An ``(n, 2)`` array.
+
+    Returns:
+        The hull's vertices, not repeating the first.
+    """
+    unique = sorted({(round(float(x), 4), round(float(y), 4)) for x, y in points})
+    if len(unique) < 3:  # noqa: PLR2004 - a hull of fewer points is those points
+        return unique
+
+    def cross(o: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    upper: list[tuple[float, float]] = []
+    for point in unique:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0:  # noqa: PLR2004
+            lower.pop()
+        lower.append(point)
+    for point in reversed(unique):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0:  # noqa: PLR2004
+            upper.pop()
+        upper.append(point)
+    return lower[:-1] + upper[:-1]
 
 
 def _representation(guid: str, facts: ModelFacts, built: BuiltModel) -> Representation | None:
@@ -546,11 +917,14 @@ def _representation(guid: str, facts: ModelFacts, built: BuiltModel) -> Represen
     Returns:
         ``cut`` or ``projection``, or None when the model gives no geometry.
     """
+    tolerance = _CUT_TOLERANCE_M
+    depth = facts.depths.get(guid)
+    if depth is not None:
+        return "cut" if depth[0] <= tolerance and depth[1] >= -tolerance else "projection"
     extent = facts.extents.get(guid)
     if extent is None:
         return None
     low, high = extent
-    tolerance = _CUT_TOLERANCE_M
     if built.section is None:
         cut = built.storey_elevation + (built.cut_height or 0.0)
         return "cut" if low[2] - tolerance <= cut <= high[2] + tolerance else "projection"
@@ -718,6 +1092,163 @@ def _projections(
     return added, "".join(markup)
 
 
+def _seen_below(
+    facts: ModelFacts, built: BuiltModel, frame: _Frame, drawn: list[Element]
+) -> list[Element]:
+    """Describe what a plan through an explicit plane sees below its cut.
+
+    The serializer draws those lines itself -- a stair, a low railing, the floor slab
+    -- but as anonymous paths in one group, so they are described here from the model:
+    every product of the drawing that lies wholly below the cut, with its outline as
+    seen from above. Nothing is drawn, because the serializer already drew it.
+
+    Args:
+        facts: What the model says, measured against the plan's plane.
+        built: The model and what is drawn of it.
+        frame: The view's placement.
+        drawn: The elements the cut passes through.
+
+    Returns:
+        One ``projection`` element per product seen below the cut.
+    """
+    seen = {element.ifc_guid for element in drawn}
+    added: list[Element] = []
+    for guid in sorted(built.include or facts.depths):
+        depth, outline = facts.depths.get(guid), facts.outlines.get(guid)
+        if guid in seen or guid not in facts.classes or depth is None or not outline:
+            continue
+        if depth[1] >= -_CUT_TOLERANCE_M:
+            continue
+        ifc_class, name = facts.classes[guid]
+        paper = [frame.paper(u, v) for u, v in outline]
+        paper.append(paper[0])
+        added.append(
+            Element(
+                id=f"e-{len(drawn) + len(added):02d}",
+                ifcGuid=guid,
+                ifcClass=ifc_class,
+                name=name,
+                tag=facts.tags.get(guid),
+                viewport=frame.viewport,
+                paperBBox=bounding_box(paper),
+                paperOutlines=[paper],
+                representation="projection",
+                properties=cast("dict[str, Any] | None", facts.properties.get(guid)),
+                provenance=Provenance.AUTHORED,
+            )
+        )
+    return added
+
+
+def _draw_swings(
+    group: str,
+    elements: list[Element],
+    built: BuiltModel,
+    frame: _Frame,
+    placement: tuple[float, float, float],
+) -> str:
+    """Draw each swinging door open, with its arc, and make the swing part of the door.
+
+    The swing goes into the door's own group, where an SVG reader finds it with the
+    door, and into the door's outlines and box, because it is how the door is drawn.
+
+    Args:
+        group: The view group.
+        elements: The elements drawn, whose doors gain their swings.
+        built: The model and its plan's plane.
+        frame: The view's placement.
+        placement: The view group's offset on the sheet, x and y, and the sheet's height.
+
+    Returns:
+        The view group with the swings drawn.
+    """
+    doors = {e.ifc_guid: e for e in elements if e.ifc_guid and e.ifc_class.startswith("IfcDoor")}
+    if not doors or built.section is None:
+        return group
+    swings, _ = door_swings(open_ifc(built.path), doors)
+    x_axis, y_axis = built.section.axes()
+    ox, oy, _ = built.section.location
+    offset_x, offset_y, height = placement
+
+    def paper(point: tuple[float, float]) -> tuple[float, float]:
+        dx, dy = point[0] - ox, point[1] - oy
+        return frame.paper(dx * x_axis[0] + dy * x_axis[1], dx * y_axis[0] + dy * y_axis[1])
+
+    def path(line: Sequence[tuple[float, float]]) -> str:
+        return " ".join(
+            f"{'M' if index == 0 else 'L'}{x - offset_x:.3f},{height - y - offset_y:.3f}"
+            for index, (x, y) in enumerate(line)
+        )
+
+    for guid, swing in swings.items():
+        door = doors[guid]
+        leaves = [[paper(point) for point in line] for line in swing.leaves]
+        arcs = [[paper(point) for point in line] for line in swing.arcs]
+        markup = "".join(
+            f'<path d="{path(line)}" fill="none" stroke-width="{width}"/>'
+            for lines, width in ((leaves, "0.18"), (arcs, "0.1"))
+            for line in lines
+        )
+        found = re.search(rf'<g\b[^>]*ifc:guid="{re.escape(guid)}"[^>]*>', group)
+        if found is not None:
+            close = group.index("</g>", found.end())
+            group = group[:close] + markup + group[close:]
+        outlines = [*(door.paper_outlines or []), *leaves, *arcs]
+        door.paper_outlines = outlines
+        door.paper_bbox = bounding_box(point for line in outlines for point in line)
+    return group
+
+
+def _styles(elements: list[Element], facts: ModelFacts) -> dict[str, str]:
+    """Decide how each cut element is drawn: solid, grey, outlined or not at all.
+
+    Args:
+        elements: The elements drawn.
+        facts: What the model says about each, its load-bearing property among it.
+
+    Returns:
+        A key of :data:`plannotation.export.drafting.STYLES` by GlobalId.
+    """
+    styles: dict[str, str] = {}
+    for element in elements:
+        if element.ifc_guid is None:
+            continue
+        bearing = None
+        for name, values in (element.properties or {}).items():
+            if name.endswith("Common") and isinstance(values, dict):
+                value = values.get("LoadBearing")
+                if isinstance(value, bool):
+                    bearing = value
+        styles[element.ifc_guid] = style_of(
+            element.ifc_class, load_bearing=bearing, is_a=facts.is_a
+        )
+    return styles
+
+
+def _seen_lines(svg: str, height_mm: float, offset: tuple[float, float]) -> list[list[Point]]:
+    """Read the lines the serializer draws beyond the cut, on the paper.
+
+    They belong to no product, and a label laid over one is as unreadable as one laid
+    over a wall.
+
+    Args:
+        svg: The serializer's output.
+        height_mm: The sheet height.
+        offset: Where the view group sits on the sheet.
+
+    Returns:
+        One polyline per path of the projection group.
+    """
+    start = svg.find('<g class="projection">')
+    if start == -1:
+        return []
+    body = svg[start : svg.find("</g>", start)]
+    return [
+        path_points(d, page_height_mm=height_mm, offset=offset)
+        for d in re.findall(r'\bd="([^"]+)"', body)
+    ]
+
+
 def _reference(element: Element) -> tuple[str, str] | None:
     """Return the property path and value of an element's cross-section, if it has one.
 
@@ -738,7 +1269,14 @@ def _reference(element: Element) -> tuple[str, str] | None:
 # Drawing
 # ---------------------------------------------------------------------------
 def _draw_grids(
-    sheet: Sheet, grids: tuple[GridAxis, ...], frame: _Frame, box: Box
+    sheet: Sheet,
+    grids: tuple[GridAxis, ...],
+    frame: _Frame,
+    box: Box,
+    *,
+    content: Sequence[float] | None = None,
+    overshoot: float = 0.0,
+    dash: Sequence[float] | None = None,
 ) -> list[Annotation]:
     """Draw the grid lines and their bubbles, and describe them.
 
@@ -746,13 +1284,22 @@ def _draw_grids(
         sheet: The sheet being composed.
         grids: The grid lines.
         frame: The view's placement.
-        box: The viewport's paper box, which the lines span.
+        box: The viewport's paper box, which the lines span unless ``content`` is given.
+        content: The drawing's box; when given, each line runs ``overshoot`` beyond it
+            and its bubble sits past that.
+        overshoot: How far a line runs beyond the drawing, in millimetres.
+        dash: The chain line's pattern, or None for a continuous line.
 
     Returns:
         One ``grid`` annotation per line.
     """
     annotations: list[Annotation] = []
     low_x, low_y, high_x, high_y = box
+    if content is not None:
+        low_x = content[0] - overshoot - BUBBLE_OFFSET_MM - 4.0
+        low_y = content[1] - overshoot - 4.0
+        high_x = content[2] + overshoot + 4.0
+        high_y = content[3] + overshoot + BUBBLE_OFFSET_MM + 4.0
     for grid in grids:
         if grid.vertical:
             x = frame.paper_x(grid.position)
@@ -763,7 +1310,10 @@ def _draw_grids(
             y = frame.paper_y(grid.position)
             start, end = (low_x + 4.0 + BUBBLE_OFFSET_MM, y), (high_x - 4.0, y)
             bubble = (start[0] - BUBBLE_RADIUS_MM, y)
-        sheet.line(*start, *end, width=0.18)
+        if dash is None:
+            sheet.line(*start, *end, width=0.18)
+        else:
+            sheet.line(*start, *end, width=0.13, dash=dash)
         sheet.circle(*bubble, BUBBLE_RADIUS_MM)
         sheet.text(bubble[0], bubble[1] - 1.2, grid.axis, size=3.5, anchor="middle")
         annotations.append(
@@ -916,7 +1466,11 @@ def _dimension(
 
 
 def _draw_grid_dimensions(
-    sheet: Sheet, grids: tuple[GridAxis, ...], frame: _Frame, content: Sequence[float]
+    sheet: Sheet,
+    grids: tuple[GridAxis, ...],
+    frame: _Frame,
+    content: Sequence[float],
+    offsets: tuple[float, float] = DIMENSION_OFFSETS_MM,
 ) -> list[Annotation]:
     """Dimension each bay between consecutive grid lines, then the overall run.
 
@@ -928,6 +1482,7 @@ def _draw_grid_dimensions(
         grids: The grid lines.
         frame: The view's placement.
         content: The drawing's box on the paper; the chains run just outside it.
+        offsets: How far from the drawing the bay chain and the overall dimension run.
 
     Returns:
         The ``dimension`` annotations, one chain per direction.
@@ -939,7 +1494,7 @@ def _draw_grid_dimensions(
         if len(line) > 2:  # noqa: PLR2004 - an overall dimension needs more than one bay
             pairs.append((line[0], line[-1]))
         for index, (first, second) in enumerate(pairs):
-            outward = DIMENSION_OFFSETS_MM[0 if index < len(line) - 1 else 1]
+            outward = offsets[0 if index < len(line) - 1 else 1]
             if vertical:
                 y = content[1] - outward
                 start = (frame.paper_x(first.position), y)
@@ -948,10 +1503,11 @@ def _draw_grid_dimensions(
                 x = content[2] + outward
                 start = (x, frame.paper_y(first.position))
                 end = (x, frame.paper_y(second.position))
+            joint = "" if len(first.axis) == len(second.axis) == 1 else "-"
             annotations.append(
                 _dimension(
                     sheet,
-                    f"a-dim-{first.axis}{second.axis}",
+                    f"a-dim-{first.axis}{joint}{second.axis}",
                     start,
                     end,
                     abs(second.position - first.position) * 1000.0,
@@ -963,7 +1519,11 @@ def _draw_grid_dimensions(
 
 
 def _draw_level_dimensions(
-    sheet: Sheet, marks: list[Annotation], levels: Sequence[Level], content: Sequence[float]
+    sheet: Sheet,
+    marks: list[Annotation],
+    levels: Sequence[Level],
+    content: Sequence[float],
+    offsets: tuple[float, float] = DIMENSION_OFFSETS_MM,
 ) -> list[Annotation]:
     """Dimension each storey height between level marks, then the overall height.
 
@@ -972,6 +1532,7 @@ def _draw_level_dimensions(
         marks: The level annotations, in the order of ``levels``.
         levels: The storeys they mark.
         content: The drawing's box on the paper; the chain runs to its right.
+        offsets: How far from the drawing the storey chain and the overall run.
 
     Returns:
         The ``dimension`` annotations; none when there are fewer than two levels.
@@ -981,14 +1542,14 @@ def _draw_level_dimensions(
     if len(levels) > 2:  # noqa: PLR2004 - an overall dimension needs more than one storey
         pairs.append((0, len(levels) - 1))
     for index, (low, high) in enumerate(pairs):
-        outward = DIMENSION_OFFSETS_MM[0 if index < len(levels) - 1 else 1]
+        outward = offsets[0 if index < len(levels) - 1 else 1]
         x = content[2] + outward
         start = (x, (marks[low].paper_bbox[1] + marks[low].paper_bbox[3]) / 2.0)
         end = (x, (marks[high].paper_bbox[1] + marks[high].paper_bbox[3]) / 2.0)
         annotations.append(
             _dimension(
                 sheet,
-                f"a-dim-lvl-{low}{high}",
+                f"a-dim-lvl-{low}{'' if high < 10 else '-'}{high}",  # noqa: PLR2004 - digits
                 start,
                 end,
                 (levels[high].elevation - levels[low].elevation) * 1000.0,
@@ -1223,6 +1784,320 @@ def _draw_callout(sheet: Sheet, target_sheet: str, viewport: str, box: Box) -> A
     )
 
 
+#: How far beyond the drawing a section mark's bubble stands, edge to edge.
+_MARK_CLEARANCE_MM = 3.0
+
+
+def _draw_section_marks(
+    sheet: Sheet, marks: Sequence[SectionMark], frame: _Frame, content: Sequence[float]
+) -> list[Annotation]:
+    """Mark each section's cutting line at both ends of the drawing.
+
+    Args:
+        sheet: The sheet being composed.
+        marks: The sections.
+        frame: The view's placement.
+        content: The drawing's box on the paper.
+
+    Returns:
+        Two ``sectionMark`` annotations per section, each targeting the section's sheet.
+    """
+    annotations: list[Annotation] = []
+    reach = MARK_RADIUS_MM + _MARK_CLEARANCE_MM
+    for mark in marks:
+        if mark.vertical:
+            x = frame.paper_x(mark.position)
+            ends = [
+                ((x, content[3] + reach), (x, content[3])),
+                ((x, content[1] - reach), (x, content[1])),
+            ]
+            looking = (float(mark.looking), 0.0)
+        else:
+            y = frame.paper_y(mark.position)
+            ends = [
+                ((content[0] - reach, y), (content[0], y)),
+                ((content[2] + reach, y), (content[2], y)),
+            ]
+            looking = (0.0, float(mark.looking))
+        for index, (centre, toward) in enumerate(ends, start=1):
+            box, stub = draw_section_mark(sheet, centre, toward, looking, mark)
+            annotations.append(
+                Annotation(
+                    id=f"a-sec-{mark.label}-{index}",
+                    type="sectionMark",
+                    viewport=frame.viewport,
+                    paperBBox=box,
+                    text=mark.label,
+                    target=Target(sheetId=mark.target_sheet, detail=mark.label),
+                    geometry=[(round(p[0], 3), round(p[1], 3)) for p in stub],
+                    provenance=Provenance.AUTHORED,
+                )
+            )
+    return annotations
+
+
+#: The sizes a room label is tried at, largest first: number, then name and area.
+_ROOM_SIZES = ((2.8, 2.2), (2.2, 1.8))
+
+
+def _room_lines(
+    number: str | None, name: str | None, area: str | None
+) -> list[list[tuple[str, Line]]]:
+    """Return the ways a room's label may be set, fullest first.
+
+    Args:
+        number: The room's number, its ``Name``.
+        name: Its name, its ``LongName``.
+        area: Its area as printed.
+
+    Returns:
+        Each variant as ``(part, line)`` pairs, the part being ``number``, ``name`` or
+        ``area``.
+    """
+    variants: list[list[tuple[str, Line]]] = []
+    for big, small in _ROOM_SIZES:
+        full = [("number", Line(number, big, bold=True))] if number else []
+        full += [("name", Line(name, small))] if name else []
+        full += [("area", Line(area, small))] if area else []
+        variants.append(full)
+        if name and (number or area):
+            variants.append([part for part in full if part[0] != "name"])
+    if number:
+        variants.append([("number", Line(number, _ROOM_SIZES[-1][0], bold=True))])
+    return [variant for variant in variants if variant]
+
+
+def _draw_rooms(
+    sheet: Sheet,
+    rooms: RoomLabels,
+    elements: list[Element],
+    drawn: list[Annotation],
+    beyond: tuple[list[list[Point]], ModelFacts],
+    frame: _Frame,
+) -> list[Annotation]:
+    """Label each room with its number, name and area, inside the room.
+
+    A label goes where it fits inside the room clear of every line drawn there -- walls,
+    doors and their swings, what is seen below the cut, grid and section lines -- and of
+    the other labels. Where the full label does not fit, a smaller one is tried, then
+    one without the name, then the number alone.
+
+    Args:
+        sheet: The sheet being composed.
+        rooms: How rooms are labelled.
+        elements: The elements drawn, the rooms among them.
+        drawn: The annotations already on the sheet.
+        beyond: The lines drawn beyond the cut, and what the model says, each room's
+            ``LongName`` among it.
+        frame: The view's placement.
+
+    Returns:
+        A ``tag`` for each room's number and a ``text`` for its name and area, each
+        showing the property it prints.
+    """
+    seen_lines, facts = beyond
+    spaces = [e for e in elements if e.ifc_class == "IfcSpace" and e.paper_outlines]
+    others = [e for e in elements if e.ifc_class != "IfcSpace"]
+    lines = [outline for e in others for outline in e.paper_outlines or []]
+    lines += seen_lines
+    lines += [
+        a.geometry for a in drawn if a.geometry and a.annotation_type in ("grid", "sectionMark")
+    ]
+    obstacles = segments_of(lines)
+    placed: list[tuple[float, float, float, float]] = []
+    annotations: list[Annotation] = []
+    for space in sorted(spaces, key=lambda e: (e.name or "", e.local_id)):
+        outline = max(space.paper_outlines or [], key=_area)
+        polygon = [(p[0], p[1]) for p in outline]
+        area = area_text(_property(space, rooms.area_property), rooms.area_unit)
+        number, long_name = facts.names.get(space.ifc_guid or "", (space.name, None))
+        own = segments_of([[*polygon, polygon[0]]])
+        for variant in _room_lines(number, long_name, area):
+            texts = [line for _, line in variant]
+            centre = place_label(polygon, texts, np.vstack([obstacles, own]), placed)
+            if centre is None:
+                continue
+            boxes = draw_label(sheet, centre, texts)
+            placed.append(bounding_box([corner for box in boxes for corner in (box[:2], box[2:])]))
+            for (part, line), box in zip(variant, boxes, strict=True):
+                annotations.append(
+                    Annotation(
+                        id=f"a-room-{space.local_id}" + ("" if part == "number" else f"-{part}"),
+                        type="tag" if part == "number" else "text",
+                        viewport=frame.viewport,
+                        paperBBox=box,
+                        text=line.text,
+                        shows=Shows(
+                            element=space.local_id,
+                            property={
+                                "number": "Name",
+                                "name": "LongName",
+                                "area": rooms.area_property,
+                            }[part],
+                        ),
+                        provenance=Provenance.AUTHORED,
+                    )
+                )
+            break
+    return annotations
+
+
+def _property(element: Element, path: str | None) -> object:
+    """Return one property of an element, named ``PsetName.Property``.
+
+    Args:
+        element: The element.
+        path: The property's dotted name, or None.
+
+    Returns:
+        Its value, or None where the element does not carry it.
+    """
+    if not path or "." not in path:
+        return None
+    pset, _, name = path.partition(".")
+    values = element.pset(pset)
+    return None if values is None else values.get(name)
+
+
+def _area(outline: Sequence[Sequence[float]]) -> float:
+    """Return the area a closed outline encloses, by the shoelace formula.
+
+    Args:
+        outline: Its vertices.
+
+    Returns:
+        The area, unsigned.
+    """
+    points = list(outline)
+    return (
+        abs(
+            sum(
+                a[0] * b[1] - b[0] * a[1]
+                for a, b in zip(points, [*points[1:], points[0]], strict=True)
+            )
+        )
+        / 2.0
+    )
+
+
+def _draw_view_furniture(
+    sheet: Sheet,
+    spec: SheetSpec,
+    facts: ModelFacts,
+    frame: _Frame,
+    content: Sequence[float],
+    *,
+    axes: tuple[Sequence[float], Sequence[float]] | None,
+) -> list[Annotation]:
+    """Draw the view's title, its scale bar and, on a plan, the north arrow.
+
+    The title goes under the drawing, below the dimension chains; the scale bar beside
+    it; the north arrow above the drawing's right-hand end.
+
+    Args:
+        sheet: The sheet being composed.
+        spec: What the sheet carries.
+        facts: What the model says, true north among it.
+        frame: The view's placement.
+        content: The drawing's box on the paper.
+        axes: A plan's plane x- and y-axis, which place north on its paper; None for a
+            section, which has no north arrow.
+
+    Returns:
+        The title's callout and text, the scale bar and the north arrow, as annotations.
+    """
+    annotations: list[Annotation] = []
+    scale = f"1:{spec.scale:.0f}"
+    baseline = content[1] - spec.dimension_offsets_mm[1] - 16.0
+    right = content[0]
+    if spec.view_title is not None:
+        title = spec.view_title
+        name, bubble, scale_box = draw_view_title(sheet, content[0], baseline, title, scale)
+        right = max(name[2], scale_box[2])
+        if bubble is not None and title.target_sheet:
+            annotations.append(
+                Annotation(
+                    id="a-view-callout",
+                    type="callout",
+                    viewport=frame.viewport,
+                    paperBBox=bubble,
+                    text=title.label,
+                    target=Target(sheetId=title.target_sheet, detail=title.label),
+                    provenance=Provenance.AUTHORED,
+                )
+            )
+        for identifier, text, box in (
+            ("a-view-title", title.text, name),
+            ("a-view-scale", scale, scale_box),
+        ):
+            annotations.append(
+                Annotation(
+                    id=identifier,
+                    type="text",
+                    viewport=frame.viewport,
+                    paperBBox=(box[0], box[1], box[2], box[3]),
+                    text=text,
+                    provenance=Provenance.AUTHORED,
+                )
+            )
+    if spec.scale_bar:
+        box, axis, text = draw_scale_bar(sheet, right + 20.0, baseline - 3.5, spec.scale)
+        annotations.append(
+            Annotation(
+                id="a-scale-bar",
+                type="scaleBar",
+                viewport=frame.viewport,
+                paperBBox=box,
+                text=text,
+                value=10,
+                unit="m",
+                geometry=axis,
+                provenance=Provenance.AUTHORED,
+            )
+        )
+    if spec.north_arrow and axes is not None and spec.grid_overshoot_mm is not None:
+        north = _north_on_paper(facts, axes)
+        centre = (
+            content[2] + spec.grid_overshoot_mm + NORTH_RADIUS_MM + 16.0,
+            content[3] + spec.grid_overshoot_mm - NORTH_RADIUS_MM,
+        )
+        box, axis = draw_north_arrow(sheet, centre, north)
+        annotations.append(
+            Annotation(
+                id="a-north",
+                type="northArrow",
+                viewport=frame.viewport,
+                paperBBox=box,
+                text="N",
+                geometry=[(round(p[0], 3), round(p[1], 3)) for p in axis],
+                provenance=Provenance.AUTHORED,
+            )
+        )
+    return annotations
+
+
+def _north_on_paper(
+    facts: ModelFacts, axes: tuple[Sequence[float], Sequence[float]]
+) -> tuple[float, float]:
+    """Return the direction of true north on a plan's paper.
+
+    A plan's paper runs along its plane's axes, x to the right and y up, so north on the
+    paper is north's components along those two.
+
+    Args:
+        facts: What the model says, true north among it.
+        axes: The plan's plane x- and y-axis.
+
+    Returns:
+        A unit vector on the paper.
+    """
+    north = facts.north
+    x = north[0] * axes[0][0] + north[1] * axes[0][1]
+    y = north[0] * axes[1][0] + north[1] * axes[1][1]
+    length = math.hypot(x, y) or 1.0
+    return (x / length, y / length)
+
+
 def _draw_title_block(sheet: Sheet, spec: SheetSpec, project: Project | None) -> None:
     """Draw the title block: the compact one, or labelled fields when the spec has them.
 
@@ -1327,7 +2202,10 @@ def _draw_title_fields(sheet: Sheet, box: Box, spec: SheetSpec) -> None:
 # Ground truth
 # ---------------------------------------------------------------------------
 def _ground_truth(
-    plannotation: Plannotation, sheet_id: str, grids: tuple[GridAxis, ...]
+    plannotation: Plannotation,
+    sheet_id: str,
+    grids: tuple[GridAxis, ...],
+    is_a: Callable[[str, str], bool] | None = None,
 ) -> list[Question]:
     """Derive questions whose answers come from the model, not from the drawing.
 
@@ -1336,17 +2214,27 @@ def _ground_truth(
     easier, not possible. The exception is the GlobalId of a marked element: only the
     plannotation carries it, and those questions say so with ``requiresPlannotation``.
 
+    A count counts subtypes: an ``IfcWallStandardCase`` is a wall, and a sheet of 140
+    of them answering "how many walls" with the 12 plain ``IfcWall`` among them would
+    make a benchmark mark every correct reader wrong.
+
     Args:
         plannotation: The sheet's plannotation.
         sheet_id: The sheet number.
         grids: The grid lines.
+        is_a: Says whether a class is a given class or a subtype of it; None matches
+            classes exactly.
 
     Returns:
         One question per fact worth asking about, in a stable order.
     """
     elements = plannotation.elements or []
     annotations = plannotation.annotations or []
-    drawn = {element.ifc_class for element in elements}
+
+    def counted(ifc_class: str) -> int:
+        match = is_a or (lambda cls, ancestor: cls == ancestor)
+        return sum(1 for element in elements if match(element.ifc_class, ifc_class))
+
     questions: list[Question] = [
         {
             "sheet": sheet_id,
@@ -1354,10 +2242,10 @@ def _ground_truth(
             "question": (
                 f"How many {_PLURAL[ifc_class]} ({ifc_class}) are drawn on sheet {sheet_id}?"
             ),
-            "answer": sum(1 for element in elements if element.ifc_class == ifc_class),
+            "answer": counted(ifc_class),
         }
         for ifc_class in _PLURAL
-        if ifc_class in drawn or ifc_class == "IfcWall"
+        if counted(ifc_class) or ifc_class == "IfcWall"
     ]
     questions += [
         {

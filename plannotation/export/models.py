@@ -242,6 +242,37 @@ class SectionCut:
     direction: tuple[float, float, float]
     x_axis: tuple[float, float, float]
 
+    def axes(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """Return the plane's x- and y-axis as the serializer lays them on the paper.
+
+        The y-axis is the normal crossed with the x-axis, so that x, y and the normal are
+        a right-handed frame whose normal points at the viewer.
+
+        Returns:
+            ``(x_axis, y_axis)``, unit vectors.
+        """
+        x_axis = _unit(self.x_axis)
+        normal = _unit(self.direction)
+        y_axis = (
+            normal[1] * x_axis[2] - normal[2] * x_axis[1],
+            normal[2] * x_axis[0] - normal[0] * x_axis[2],
+            normal[0] * x_axis[1] - normal[1] * x_axis[0],
+        )
+        return x_axis, _unit(y_axis)
+
+
+def _unit(vector: tuple[float, float, float]) -> tuple[float, float, float]:
+    """Return a vector scaled to unit length.
+
+    Args:
+        vector: A 3-vector.
+
+    Returns:
+        It, of length 1.
+    """
+    length = sum(component * component for component in vector) ** 0.5
+    return (vector[0] / length, vector[1] / length, vector[2] / length)
+
 
 @dataclass(frozen=True)
 class BuiltModel:
