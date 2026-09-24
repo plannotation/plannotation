@@ -19,6 +19,10 @@ them the landing page leaves the examples out and says the rest.
 Every relative ``href`` and ``src`` in the staged HTML, and the ``pdf`` a link hands
 the inspector, must reach a staged file, or nothing is staged as done.
 
+A later step that needs the layout, such as the one that renders the staged Markdown,
+reads it from :func:`plan` with the same examples; calling :func:`stage` again without
+them would put back a landing page with no examples.
+
 Usage:
     python tools/stage_site.py [OUT] [--examples DIR]     # default OUT: site/
 """
@@ -43,6 +47,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO_ROOT / "plannotation" / "schema"
 LANDING = REPO_ROOT / "web" / "index.html"
 INSPECTOR = REPO_ROOT / "inspector" / "index.html"
+
+#: Where the landing page is served.
+HOME = Path("index.html")
 
 #: Where the examples are served. The inspector's EXAMPLES constant is ``../examples/``
 #: from ``inspector/``, which is this directory.
@@ -402,45 +409,83 @@ def broken_links(out: Path, staged: set[str]) -> list[str]:
     return broken
 
 
+def _copies(examples: Path | None, entries: list[dict[str, Any]]) -> list[tuple[Path, Path]]:
+    """List the files staged as they are, each with the path it is staged at.
+
+    Args:
+        examples: The examples directory, absolute, or None.
+        entries: Its index's entries; empty for none.
+
+    Returns:
+        Each source and its path relative to the site root.
+    """
+    copies = [
+        (schema, site_path(json.loads(schema.read_text("utf-8"))["$id"]))
+        for schema in sorted(SCHEMA_DIR.glob("*.json"))
+    ]
+    copies += [
+        (REPO_ROOT / "spec" / "SPEC.md", site_path(SPEC_URI) / "index.md"),
+        (INSPECTOR, Path("inspector") / "index.html"),
+    ]
+    if examples is not None:
+        copies.append((examples / "index.json", EXAMPLES / "index.json"))
+        for entry in entries:
+            copies += [(examples / entry[kind], EXAMPLES / entry[kind]) for kind in ("pdf", "png")]
+    return copies
+
+
+def plan(examples: Path | None = None) -> list[tuple[Path, Path]]:
+    """Say where :func:`stage` puts every file, and write nothing.
+
+    For a later step that needs the layout of a site already staged. Staging again to
+    learn it is not harmless: the landing page is made from the examples it is given,
+    so a second call without them would take the cards off it.
+
+    Args:
+        examples: The examples directory, or None for a site without examples.
+
+    Returns:
+        What :func:`stage` returns for the same examples: each source, as an absolute
+        path, and its path relative to the site root. The landing page comes last; its
+        source is the template it is filled in from.
+
+    Raises:
+        SiteError: If the examples index is malformed.
+    """
+    examples = examples.resolve() if examples is not None else None
+    entries = read_examples(examples) if examples is not None else []
+    return [*_copies(examples, entries), (LANDING, HOME)]
+
+
 def stage(out: Path, examples: Path | None = None) -> list[tuple[Path, Path]]:
     """Put every public file in its place under ``out``.
 
     Args:
         out: The site root to write.
-        examples: The directory ``make examples`` wrote, or None to leave them out.
+        examples: The examples directory, or None to leave them out.
 
     Returns:
-        Each source and the path it was staged at, relative to ``out``.
+        Each source, as an absolute path, and the path it was staged at, relative to
+        ``out``; the same list :func:`plan` returns.
 
     Raises:
         SiteError: If an example is malformed, or a staged page links to a file that
             was not staged.
     """
+    examples = examples.resolve() if examples is not None else None
     entries = read_examples(examples) if examples is not None else []
-    plan = [
-        (schema, site_path(json.loads(schema.read_text("utf-8"))["$id"]))
-        for schema in sorted(SCHEMA_DIR.glob("*.json"))
-    ]
-    plan += [
-        (REPO_ROOT / "spec" / "SPEC.md", site_path(SPEC_URI) / "index.md"),
-        (INSPECTOR, Path("inspector") / "index.html"),
-    ]
-    if examples is not None:
-        plan.append((examples / "index.json", EXAMPLES / "index.json"))
-        for entry in entries:
-            plan += [(examples / entry[kind], EXAMPLES / entry[kind]) for kind in ("pdf", "png")]
-    for source, target in plan:
+    staged = _copies(examples, entries)
+    for source, target in staged:
         (out / target).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, out / target)
     sizes = [png_size(examples / entry["png"]) for entry in entries] if examples else []
-    page = landing(LANDING.read_text("utf-8"), entries, sizes)
-    (out / "index.html").write_text(page, "utf-8")
-    plan.append((LANDING, Path("index.html")))
-    broken = broken_links(out, {target.as_posix() for _, target in plan})
+    (out / HOME).write_text(landing(LANDING.read_text("utf-8"), entries, sizes), "utf-8")
+    staged.append((LANDING, HOME))
+    broken = broken_links(out, {target.as_posix() for _, target in staged})
     if broken:
         msg = "links to nothing staged:\n  " + "\n  ".join(broken)
         raise SiteError(msg)
-    return plan
+    return staged
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -460,11 +505,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     out = Path(args.out)
     try:
-        plan = stage(out, args.examples)
+        staged = stage(out, args.examples)
     except SiteError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    for source, target in plan:
+    for source, target in staged:
         shown = source.relative_to(REPO_ROOT) if source.is_relative_to(REPO_ROOT) else source
         print(f"{shown.as_posix()} -> {(out / target).as_posix()}")
     print(f"staged in {out}/ -- publish with GitHub Pages at {BASE_URL}")

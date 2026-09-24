@@ -351,6 +351,36 @@ class TestEveryLinkLands:
             stage_site.stage(tmp_path / "site", FIXTURE)
 
 
+class TestThePlan:
+    """The layout, for a step that runs after the staging and must not stage again."""
+
+    def test_it_is_what_staging_returns_and_it_writes_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The same pairs, in the same order, and not a file written."""
+        monkeypatch.chdir(tmp_path)
+        planned = stage_site.plan(FIXTURE)
+        assert not any(tmp_path.iterdir())
+        assert planned == stage_site.stage(tmp_path / "site", FIXTURE)
+        assert planned[-1] == (stage_site.LANDING, Path("index.html"))
+
+    def test_its_sources_are_absolute_when_the_examples_path_is_not(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """So a caller can take each one relative to the repository."""
+        monkeypatch.chdir(FIXTURE.parent)
+        planned = stage_site.plan(Path(FIXTURE.name))
+        assert all(source.is_absolute() for source, _ in planned)
+        assert (FIXTURE.resolve() / "A-101.pdf", Path("examples/A-101.pdf")) in planned
+
+    def test_staging_again_with_the_same_examples_keeps_the_cards(self, site: Path) -> None:
+        """Only a second call without the examples would take them off."""
+        first = landing(site)
+        stage_site.stage(site, FIXTURE)
+        assert landing(site) == first
+        assert '<ul class="sheets">' in first
+
+
 class TestTheCommand:
     """``python tools/stage_site.py OUT --examples DIR``."""
 
