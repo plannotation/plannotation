@@ -722,7 +722,7 @@ of user space, `UserUnit` 1. It carries one viewport:
   "paperBBox": [20, 20, 320, 260],
   "paperToPlane": [0.05, 0, 0, 0.05, -3, -2.25],
   "plane": {
-    "origin": [0, 0, 3],
+    "origin": [0, 0, 4.2],
     "xAxis": [1, 0, 0],
     "yAxis": [0, 1, 0]
   },
@@ -735,10 +735,10 @@ of user space, `UserUnit` 1. It carries one viewport:
 ```
 
 and `model.lengthUnit` is `"m"`. The view is a plan of the storey whose floor is at
-3.000 m, cut 1.200 m above it, drawn at 1:50 — confirmed by
-`k = √(0.05 × 0.05) = 0.05` and `S = 0.05 × 1000 = 50`, which agrees with `scale`.
-The plan is seen from above, because `xAxis × yAxis = [0, 0, 1]` points at the
-observer.
+3.000 m, cut 1.200 m above it, so its plane lies at 4.200 m (3.6). It is drawn at
+1:50 — confirmed by `k = √(0.05 × 0.05) = 0.05` and `S = 0.05 × 1000 = 50`, which
+agrees with `scale`. The plan is seen from above, because `xAxis × yAxis = [0, 0, 1]`
+points at the observer.
 
 The members above are in ascending name order and the numbers carry no needless
 decimals, as 3.8 requires. The arrays are shown inline for legibility only: in the
@@ -782,10 +782,10 @@ and the inverse checks: `det = 0.0025`, `x = 0.05 × (5.420 + 3) / 0.0025 = 168.
 **4. Plane to model.** By 3.6:
 
 ```
-P = [0, 0, 3] + 5.420 × [1, 0, 0] + 4.310 × [0, 1, 0] = [5.420, 4.310, 3.000]
+P = [0, 0, 4.2] + 5.420 × [1, 0, 0] + 4.310 × [0, 1, 0] = [5.420, 4.310, 4.200]
 ```
 
-The wall corner is at model coordinates (5.420, 4.310, 3.000) metres. Because the
+The wall corner is at model coordinates (5.420, 4.310, 4.200) metres. Because the
 plan is a cut, the corner as drawn is the wall's footprint at the cut, and its
 model Z is the plane's, not the wall's.
 
