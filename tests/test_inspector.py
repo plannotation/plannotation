@@ -196,6 +196,27 @@ class TestItFitsTheScreen:
         """An address that cannot be opened gets a note, not a blank stage."""
         assert "Could not open ${name}: ${error.message}" in html()
 
+    def test_a_failure_forgets_the_last_drawing(self) -> None:
+        """No empty box the size of the last drawing, and no tooltip for what was in it.
+
+        This only reads the source; docs/inspector.md's manual check tries it.
+        """
+        failure = re.search(
+            r"\} catch \(error\) \{\n    if \(opening !== state\.opening\) return;\n.*?\n  \}\n",
+            html(),
+            re.DOTALL,
+        )
+        assert failure is not None
+        for reset in (
+            "state.ticket++",
+            "state.task?.cancel()",
+            "hit: []",
+            "size: null",
+            'canvas.style.width = canvas.style.height = ""',
+            'el("tip").style.display = "none"',
+        ):
+            assert reset in failure.group(0)
+
 
 def _stage_site() -> ModuleType:
     """Load tools/stage_site.py, which is a script rather than a module.

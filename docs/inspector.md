@@ -63,14 +63,16 @@ right, so that part is checked by hand against the samples:
    should download one row per item.
 9. Repeat with `positionsplan` (sixteen structural members, each with its
    cross-section) and `section` (walls and slabs on two storeys, and three levels).
+10. With a drawing open, choose a file that is not a PDF. A note should say why it
+    could not be opened, and no empty box or tooltip should be left from the drawing.
 
 And on the site, with the examples staged (`make examples docs`, then
 `python -m http.server -d site`):
 
-10. `/inspector/` opens the first example, fitted to the width and sharp.
-11. Choosing the other example from the picker opens it and puts its `?pdf=` in the
+11. `/inspector/` opens the first example, fitted to the width and sharp.
+12. Choosing the other example from the picker opens it and puts its `?pdf=` in the
     address; `?pdf=https://example.com/x.pdf` is refused with a note.
-12. On a phone, the page does not scroll sideways, and tapping an outline shows its
+13. On a phone, the page does not scroll sideways, and tapping an outline shows its
     tooltip until the next tap.
 
 The three samples as the inspector draws them, plannotations over the pages:

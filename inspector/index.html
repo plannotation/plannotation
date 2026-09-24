@@ -193,10 +193,17 @@ async function open(source, name, page = 1) {
     await render();
   } catch (error) {
     if (opening !== state.opening) return;
+    // Forget the last drawing entirely: its size, its hit boxes and any render still
+    // running, or its box stays on the stage and hovering it names what is gone.
+    state.ticket++;
+    state.task?.cancel();
     state.doc?.destroy();
-    state.doc = null;
-    state.plannotations = new Map();
-    for (const canvas of [el("paper"), el("overlay")]) canvas.width = canvas.height = 0;
+    Object.assign(state, { doc: null, plannotations: new Map(), hit: [], size: null, selected: null });
+    for (const canvas of [el("paper"), el("overlay")]) {
+      canvas.width = canvas.height = 0;
+      canvas.style.width = canvas.style.height = "";
+    }
+    el("tip").style.display = "none";
     el("pager").textContent = "no document";
     el("note").textContent = `Could not open ${name}: ${error.message}`;
     describe();
