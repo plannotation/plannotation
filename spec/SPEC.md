@@ -519,7 +519,7 @@ length other than one would express it a second time and the two statements coul
 disagree.
 
 An oblique axis has no exact spelling at the three decimals of 3.8: a plan turned
-29.18° to follow its building's grid has `xAxis` `[0.873, −0.487, 0]`, which is
+29.17° to follow its building's grid has `xAxis` `[0.873, −0.487, 0]`, which is
 0.99965 long. Both requirements therefore hold to within what that rounding
 explains, and a validator MUST report an axis or a pair beyond it:
 

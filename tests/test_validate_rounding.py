@@ -35,8 +35,10 @@ from plannotation.validate.geometry import norm
 if TYPE_CHECKING:
     from plannotation.model import Plannotation
 
-#: The angle between the Maleva 18 building's grid and its model's axes, in degrees.
-MALEVA_ANGLE = 29.18
+#: The angle between the Maleva 18 building's grid and its model's axes, in degrees, as
+#: the model places its IfcGrid: cos and sin round to 0.873 and 0.487, where 29.18 would
+#: give 0.488.
+MALEVA_ANGLE = 29.17
 
 
 def serialised(viewport: dict[str, Any], *, unit: str = "m") -> Plannotation:
@@ -118,7 +120,7 @@ class TestAnObliqueViewValidates:
     """A view that follows the building rather than the model's axes is ordinary."""
 
     def test_a_plan_turned_to_its_grid_validates(self) -> None:
-        """The Maleva 18 case: a plan turned 29.18 degrees to follow the building."""
+        """The Maleva 18 case: a plan turned 29.17 degrees to follow the building."""
         x_axis, y_axis = turned(-MALEVA_ANGLE)
         plannotation = serialised(
             {
@@ -131,7 +133,9 @@ class TestAnObliqueViewValidates:
         )
         plane = plannotation.viewports[0].plane if plannotation.viewports else None
         assert plane is not None
-        # The rounding is really there: the serialised axis is not unit to 1e-6.
+        # It is the axis the Maleva plan writes, and the rounding is really there: the
+        # serialised axis is not unit to 1e-6.
+        assert tuple(plane.x_axis) == pytest.approx((0.873, -0.487, 0))
         assert abs(norm(plane.x_axis) - 1.0) > 1e-4
         assert codes(plannotation) == []
 
@@ -259,7 +263,7 @@ class TestScaleAllowsForRounding:
         )
 
     def test_a_rotated_transform_at_its_own_scale_validates(self) -> None:
-        """At 1:100 in metres and 29.18 degrees the rounded transform is at 1:99.85."""
+        """At 1:100 in metres and 29.17 degrees the rounded transform is at 1:99.85."""
         assert codes(self._rotated(100, MALEVA_ANGLE)) == []
 
     @pytest.mark.parametrize("scale", [20, 50, 100, 200, 500])

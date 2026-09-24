@@ -51,7 +51,7 @@ Section 3.8 rounds every number to three decimals, and four rules here test numb
 for an exact relation: a plane axis of unit length (PL-GEO-010), two axes at right
 angles (PL-GEO-011), ``scale`` against the transform (PL-GEO-008), and the plane
 origin against ``storey.elevation + cutHeight`` (PL-GEO-012). An oblique axis has no
-exact three-decimal spelling: a plan turned 29.18 degrees to follow its building's
+exact three-decimal spelling: a plan turned 29.17 degrees to follow its building's
 grid has ``xAxis`` ``[0.873, -0.487, 0]``, which is 0.99965 long. Each of those rules
 therefore allows for everything rounding can explain, by a bound derived from
 :data:`ROUNDING`, the most that rounding moves one number, and by nothing more.
