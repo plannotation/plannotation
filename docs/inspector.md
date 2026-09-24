@@ -28,11 +28,9 @@ Served from a site, the inspector opens the PDF its address names:
 be on the same site; anything else is refused with a note. Choosing a sheet or turning a
 page updates the address, so it can be shared.
 
-Where `../examples/index.json` exists, as it does on
-[plannotation.github.io](https://plannotation.github.io/inspector/), a picker lists the
-example sheets and the first opens by default. A copy kept next to the drawings has
-neither and opens files from its button, which reads them in the browser and uploads
-nothing.
+Where `../examples/index.json` exists, a picker lists the example sheets and the first
+opens by default. Without it, as in a copy kept next to the drawings, the inspector opens
+files from its button, which reads them in the browser and uploads nothing.
 
 ## What it reads
 
@@ -66,7 +64,9 @@ right, so that part is checked by hand against the samples:
 10. With a drawing open, choose a file that is not a PDF. A note should say why it
     could not be opened, and no empty box or tooltip should be left from the drawing.
 
-And on the site, with the examples staged (`make examples docs`, then
+And on the site, staged with an examples directory
+(`uv run python tools/stage_site.py site --examples DIR`, where DIR holds the
+`index.json` and files that `tools/stage_site.py` describes; then
 `python -m http.server -d site`):
 
 11. `/inspector/` opens the first example, fitted to the width and sharp.

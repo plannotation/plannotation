@@ -12,9 +12,11 @@ and from :data:`plannotation.constants.SPEC_URI`, never spelled out a second tim
 * ``inspector/index.html`` -> ``inspector/index.html``, served as it is;
 * ``<examples>/index.json`` and each example's PDF and PNG -> ``examples/``.
 
-The examples are what ``make examples`` writes. The landing page gets one card per
-example, and the inspector's picker reads the same ``examples/index.json``. Without
-them the landing page leaves the examples out and says the rest.
+An examples directory holds ``index.json``, whose entries :data:`EXAMPLE_FIELDS`
+describes, and each sheet's plannotated PDF and its PNG thumbnail beside it. The
+landing page gets one card per example, and the inspector's picker reads the same
+``examples/index.json``. Without examples the landing page leaves them out, and its
+command to run builds a sample instead.
 
 Every relative ``href`` and ``src`` in the staged HTML, and the ``pdf`` a link hands
 the inspector, must reach a staged file, or nothing is staged as done.
@@ -73,6 +75,12 @@ SOURCE_FIELDS = ("title", "url", "author", "license", "license_url")
 SOURCE_OPTIONAL = ("via",)
 TYPE_NAMES = {str: "a string", int: "an integer", dict: "an object"}
 
+#: With no examples to download, the landing page has the reader build a sample, which
+#: needs the exporter's extras and a system Cairo, and inspect that.
+SAMPLE_BUILD = "uv run --all-extras plannotation samples build\n"
+SAMPLE_PDF = "samples/floorplan/sheet.plannotated.pdf"
+CAIRO = ' and <a href="https://www.cairographics.org/download/">Cairo</a>'
+
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 #: The signature and the IHDR chunk up to the height: all a size needs.
 PNG_HEAD = 24
@@ -102,7 +110,7 @@ def site_path(url: str) -> Path:
 
 
 def read_examples(directory: Path) -> list[dict[str, Any]]:
-    """Read and check ``index.json`` in the directory ``make examples`` wrote.
+    """Read and check ``index.json`` in an examples directory.
 
     Args:
         directory: The examples directory.
@@ -275,7 +283,8 @@ def landing(template: str, examples: list[dict[str, Any]], sizes: list[tuple[int
 
     Every value from the examples index is HTML-escaped where it goes in. Sheets from
     one source share one attribution under the cards; sheets from several sources each
-    carry their own. With no examples, the examples block is left out.
+    carry their own. With no examples, the examples block is left out, and the command
+    to run builds a sample to inspect instead of downloading the first example.
 
     Args:
         template: ``web/index.html``.
@@ -317,8 +326,9 @@ def landing(template: str, examples: list[dict[str, Any]], sizes: list[tuple[int
     first = examples[0] if examples else None
     values = {
         "og": "",
-        "fetch": "",
-        "inspect": "drawing.plannotated.pdf",
+        "needs": CAIRO,
+        "fetch": esc(SAMPLE_BUILD),
+        "inspect": esc(SAMPLE_PDF),
         "spec": esc(f"{site_path(SPEC_URI).as_posix()}/"),
         "schemas": ",\n    ".join(
             f'<a href="{esc(target.as_posix())}">'
@@ -336,6 +346,7 @@ def landing(template: str, examples: list[dict[str, Any]], sizes: list[tuple[int
             f'<meta property="og:image" content="{esc(image)}">\n'
             '<meta name="twitter:card" content="summary_large_image">\n'
         )
+        values["needs"] = ""
         values["fetch"] = esc(f"curl -O {served}/{quote(first['pdf'])}\n")
         values["inspect"] = esc(first["pdf"])
     section = above + (credit_line if shared else "") + below if first else ""
@@ -500,7 +511,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("out", nargs="?", default="site", help="site root (default: site)")
     parser.add_argument(
-        "--examples", type=Path, help="the directory `make examples` wrote (default: none)"
+        "--examples",
+        type=Path,
+        help="a directory of example sheets: index.json, and each PDF and PNG (default: none)",
     )
     args = parser.parse_args(argv)
     out = Path(args.out)

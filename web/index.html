@@ -57,6 +57,7 @@
 <header class="wrap">
   <h1>Plannotation</h1>
   <nav>
+    <a href="inspector/">Inspector</a>
     <a href="{{spec}}">Spec</a>
     <a href="https://github.com/plannotation/plannotation">GitHub</a>
   </nav>
@@ -84,10 +85,12 @@
 <!-- /credits -->
 <!-- /examples -->
   <h2>Run it</h2>
-  <p>Not on PyPI yet. From a clone, with <a href="https://docs.astral.sh/uv/">uv</a>:</p>
+  <p>Not on PyPI yet. From a clone, with <a href="https://docs.astral.sh/uv/">uv</a>{{needs}}:</p>
 <pre><code>git clone https://github.com/plannotation/plannotation
 cd plannotation
 {{fetch}}uv run plannotation inspect {{inspect}}</code></pre>
+  <p>To see the plannotation over the page, open the PDF in the
+  <a href="inspector/">inspector</a>. It reads the file in the browser and uploads nothing.</p>
 </main>
 
 <footer class="wrap muted">

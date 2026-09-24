@@ -118,7 +118,7 @@ bench-dry: samples ## Say how many benchmark questions would reach the API; ask 
 
 # Every schema is staged at the path of its own $id and the spec at SPEC_URI, both
 # read from the code, so the published layout cannot drift from what documents
-# declare. The landing page shows the examples once `make examples` has drawn them.
+# declare. The landing page shows the example sheets in examples/, if there are any.
 docs: ## Stage the landing page, inspector, examples, schemas and spec into site/
 	$(RUN) python tools/stage_site.py site $(if $(wildcard examples/index.json),--examples examples)
 

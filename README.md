@@ -13,9 +13,6 @@ not change, pixel for pixel.
 The JSON travels inside the PDF as a PDF 2.0 associated file with a PDF Declaration, the
 way ZUGFeRD invoices carry their XML.
 
-[plannotation.github.io](https://plannotation.github.io) shows sheets drawn from a real
-building's IFC model. Open one in the inspector to see its plannotation over the page.
-
 **Status: draft 0.1.** The format may change before 1.0
 ([versioning](spec/SPEC.md#8-versioning-policy)). Nothing is on PyPI yet.
 
@@ -25,13 +22,19 @@ building's IFC model. Open one in the inspector to see its plannotation over the
 
 ## Try it
 
-From a clone, with [uv](https://docs.astral.sh/uv/):
+From a clone, with [uv](https://docs.astral.sh/uv/) and Cairo (`brew install cairo`,
+`apt-get install libcairo2`):
 
 ```bash
 git clone https://github.com/plannotation/plannotation && cd plannotation
-curl -O https://plannotation.github.io/examples/M18-101.pdf
-uv run plannotation inspect M18-101.pdf
+uv run --all-extras plannotation samples build
+uv run plannotation inspect samples/floorplan/sheet.plannotated.pdf
 ```
+
+`samples build` draws three sample sheets from IFC models it generates. To see a
+plannotation over its page, open the PDF in the
+[inspector](https://plannotation.github.io/inspector/); it reads the file in the browser
+and uploads nothing.
 
 ## What is here
 

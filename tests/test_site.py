@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """The public site as tools/stage_site.py stages it: the landing page and its examples.
 
-The fixture in ``tests/fixtures/site-examples`` stands in for what ``make examples``
-writes: an ``index.json`` and, per sheet, a PDF and a thumbnail. Its PDFs are never
+The fixture in ``tests/fixtures/site-examples`` stands in for an examples directory:
+an ``index.json`` and, per sheet, a PDF and a thumbnail. Its PDFs are never
 opened, so they are stand-ins; its PNGs are real, so their sizes can be read.
 """
 
@@ -188,6 +188,8 @@ class TestTheLandingPageShowsTheExamples:
         assert f"curl -O {BASE_URL}/examples/A-101.pdf\nuv run plannotation inspect A-101.pdf" in (
             page
         )
+        assert "samples build" not in page
+        assert "Cairo" not in page, "inspecting a downloaded PDF needs no Cairo"
 
     def test_no_placeholder_is_left(self, site: Path) -> None:
         """Every ``{{...}}`` in the template is filled, and no block marker is left."""
@@ -206,7 +208,7 @@ class TestTheLandingPageShowsTheExamples:
 
 
 class TestWithoutExamples:
-    """``make docs`` before ``make examples``: the rest of the page still stands."""
+    """A site staged with no examples: the rest of the page still stands, and works."""
 
     def test_the_examples_are_left_out(self, tmp_path: Path) -> None:
         """No cards, no credit, no preview image, and nothing staged under examples/."""
@@ -216,8 +218,26 @@ class TestWithoutExamples:
         assert CREDIT not in page
         assert "og:image" not in page
         assert "curl" not in page
-        assert "uv run plannotation inspect drawing.plannotated.pdf" in page
         assert not (tmp_path / "examples").exists()
+
+    def test_the_command_to_run_builds_a_sample_to_inspect(self, tmp_path: Path) -> None:
+        """Every line of it runs in a fresh clone; the build says so if Cairo is missing.
+
+        The path is where ``plannotation samples build`` writes the floor plan.
+        """
+        stage_site.stage(tmp_path)
+        page = landing(tmp_path)
+        assert (
+            "cd plannotation\n"
+            "uv run --all-extras plannotation samples build\n"
+            "uv run plannotation inspect samples/floorplan/sheet.plannotated.pdf</code>"
+        ) in page
+        assert '>uv</a> and <a href="https://www.cairographics.org/download/">Cairo</a>:' in page
+
+    def test_the_inspector_is_linked(self, tmp_path: Path) -> None:
+        """It opens a reader's own PDF with no examples to pick from."""
+        stage_site.stage(tmp_path)
+        assert landing(tmp_path).count('href="inspector/"') == 2
 
 
 class TestTheIndexIsChecked:
