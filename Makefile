@@ -13,6 +13,7 @@ MCP_PKG        := plannotation_mcp
 COV_MIN_CORE   ?= 85
 COV_MIN_INFER  ?= 70
 SAMPLES_DIR    ?= samples
+EXAMPLES_DIR   ?= examples
 BENCH_MODEL    ?= claude-opus-5
 BENCH_N        ?= 100
 
@@ -32,7 +33,7 @@ endif
 
 
 .PHONY: help install lock sync fmt fmt-check lint typecheck test fixtures check \
-        cov licenses samples samples-check bench bench-dry docs inspector hooks precommit \
+        cov licenses samples samples-check examples bench bench-dry docs inspector hooks precommit \
         build clean distclean version
 
 help: ## Show this help
@@ -101,6 +102,13 @@ samples-check: samples ## Build the samples and validate every one of them
 	  $(RUN) plannotation validate $(SAMPLES_DIR)/$$name/sheet.plannotated.pdf >/dev/null \
 	    && echo "valid" || exit 1; \
 	done
+
+# Real buildings, drawn from openly licensed IFC models (docs/examples.md). Each model
+# is pinned by URL, size and SHA-256 and downloaded once into .cache/examples/, or the
+# directory PLANNOTATION_EXAMPLES_CACHE names; a file whose hash differs is refused.
+# Needs the svg and ifc extras. Rebuilding writes byte-identical files.
+examples: ## Build the real example sheets (downloads the pinned models once)
+	$(RUN) python tools/build_examples.py --out $(EXAMPLES_DIR)
 
 # The only target that calls a paid API. It needs ANTHROPIC_API_KEY in the
 # environment or in .env (git-ignored), and only for questions whose response is not

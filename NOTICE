@@ -41,6 +41,19 @@ Plannotation deliberately does NOT depend on PyMuPDF (AGPL-3.0) or any other
 AGPL-licensed component.
 
 --------------------------------------------------------------------------------
+Example drawings
+--------------------------------------------------------------------------------
+
+`make examples` draws sheets from third-party IFC models, which it downloads and
+which are not included in this repository or its distributions. The drawings are
+adaptations of those models and carry their credit:
+
+  * Maleva 18 seniors' apartment building, Tallinn. IFC model (c) Esplan OÜ
+    (esplan.ee), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), via
+    buildingSMART Community Sample Test Files. Drawings rendered and annotated
+    from the model by Plannotation (changes made). Not an Esplan drawing.
+
+--------------------------------------------------------------------------------
 Normative references
 --------------------------------------------------------------------------------
 

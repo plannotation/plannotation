@@ -40,6 +40,7 @@ import shutil
 import tempfile
 import urllib.request
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -65,7 +66,6 @@ from plannotation.pdf import embed
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from datetime import datetime
 
     from plannotation.model import Plannotation
 
@@ -76,6 +76,10 @@ CACHE_ENV = "PLANNOTATION_EXAMPLES_CACHE"
 
 #: Where the models are cached when nothing else is said: git-ignored, like all of .cache.
 DEFAULT_CACHE = Path(".cache") / "examples"
+
+#: The timestamp every example is stamped with, so that a rebuild is byte-identical:
+#: the day the examples were first drawn, not the day they are rebuilt.
+EXAMPLES_DATE = datetime(2026, 9, 24, tzinfo=UTC)
 
 #: How wide the thumbnails are, in pixels.
 THUMBNAIL_WIDTH_PX = 1200
