@@ -196,6 +196,11 @@ jobs:
           PLANNOTATION_EXAMPLES_CACHE: .cache/examples
         run: uv run --no-sync pytest -q tests/test_examples_real.py
 
+      - name: Build the site with the sheets, as Pages builds it
+        # Stages everything with the examples, checks every link, and renders the
+        # Markdown; the site itself is not kept.
+        run: make site
+
       - name: Upload the sheets
         # Also when the check fails: the sheets are what to look at then.
         if: always()
