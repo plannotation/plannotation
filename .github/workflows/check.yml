@@ -5,7 +5,9 @@
 # Installs every extra, builds the reference samples, then runs exactly the
 # `make check` a developer runs locally:
 #   ruff format --check  ->  ruff check  ->  mypy --strict  ->  pytest -q
-# Nothing is duplicated here, so the two cannot drift apart.
+# Nothing is duplicated here, so the two cannot drift apart. A second job draws the
+# real example sheets on Linux, as the Pages build does, and validates each against
+# the model it was drawn from (`make examples-check`).
 #
 # No secrets are used and none are needed.
 #
@@ -138,3 +140,61 @@ jobs:
         # The hardest constraint in the project: no AGPL, no PyMuPDF, and no
         # unacknowledged copyleft anywhere in the installed closure.
         run: uv run --no-sync python tools/audit_licenses.py
+
+  examples:
+    # Linux has no Helvetica, which the sheets are set in, so tools/linux_fonts.sh
+    # pins its metric twin before anything is drawn. The sheets are uploaded so that
+    # they can be compared with a build made elsewhere.
+    name: examples / ubuntu-latest / py3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      UV_PYTHON: "3.12"
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python 3.12
+        uses: astral-sh/setup-uv@v10.1.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install libcairo, and set Helvetica as Liberation Sans
+        run: |
+          if ! ldconfig -p 2>/dev/null | grep -q 'libcairo\.so\.2'; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends libcairo2
+          fi
+          sh tools/linux_fonts.sh
+
+      - name: Restore the pinned models
+        # The model is served from Git LFS, billed to buildingSMART, so it is fetched
+        # once and then cached. The key follows the file that pins it; an older entry
+        # is fine to restore, because fetch() re-checks each file's size and SHA-256.
+        uses: actions/cache@v6
+        with:
+          path: .cache/examples
+          key: examples-${{ hashFiles('plannotation/export/examples.py') }}
+          restore-keys: examples-
+
+      - name: Install the locked dependencies
+        run: uv sync --locked --all-packages --all-extras --dev
+
+      - name: Build the example sheets and validate each against its model
+        run: make examples-check
+
+      - name: Upload the sheets
+        # Also when the check fails: the sheets are what to look at then.
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: examples-linux
+          path: examples/
+          retention-days: 14
