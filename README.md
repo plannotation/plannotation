@@ -20,6 +20,8 @@ The [site](https://plannotation.github.io/) shows a plan and a section of a real
 drawn and plannotated from its openly licensed IFC model; [docs/examples.md](docs/examples.md)
 says how.
 
+![M18-101 in the inspector: the plannotation's outlines over the ground floor plan, one door's class, name and GlobalId in its tooltip](docs/img/inspector-m18-101.png)
+
 <!-- `make bench` writes its measured table between these markers. -->
 <!-- BENCHMARK:START -->
 <!-- BENCHMARK:END -->
