@@ -5,6 +5,7 @@ from a real building's model, through the same exporter, with nothing special-ca
 
 ```bash
 make examples          # downloads the pinned model once, then builds examples/
+make examples-check    # builds them, then validates each sheet against the model
 ```
 
 | Sheet | Drawing | Paper |
@@ -28,7 +29,8 @@ credit; the drawings are Plannotation's, not Esplan's.
   halfway between grids 4 and 5, looking towards grid 1.
 - **Writes**, per sheet, `<sheet>.pdf` (plannotated) and `<sheet>.png` (1200 px, the
   plannotation's outlines drawn in the inspector's colours), and one `index.json`.
-  A rebuild is byte-identical.
+  A rebuild on the same machine is byte-identical. The sheets are set in Helvetica; on
+  Linux, `tools/linux_fonts.sh` sets it as Liberation Sans, which has its metrics.
 
 ## What is read from the model
 
@@ -38,7 +40,8 @@ roof's layers, doors' operation types, spaces' `Name`, `LongName` and area
 structure and grey partitions, door swings, room labels, a floor level, chain-line grids
 with bay dimensions, level marks relative to ±0,00, section marks, north arrow and scale
 bar. What each view sees beyond its cut is described element by element, from the lines
-the drawing shows: a product hidden behind another is left out.
+the drawing shows: a product hidden behind another is left out, and one the plane cuts
+is described twice, as cut and by what of it shows beyond the cut.
 
 ## Known limits
 
@@ -46,5 +49,3 @@ the drawing shows: a product hidden behind another is left out.
   outlined.
 - No ground line: the model's site carries no terrain.
 - Doors the model calls sliding or user-defined get no swing.
-- The validator on `main` reports PL-GEO-010 for the rotated plane axes, which the
-  plannotation rounds to three decimals.

@@ -3,6 +3,7 @@
 | Document | What it covers |
 | --- | --- |
 | [`../spec/SPEC.md`](../spec/SPEC.md) | The normative specification. |
+| [`examples.md`](examples.md) | The real example sheets: the model, the build, what is drawn and its limits. |
 | [`inspector.md`](inspector.md) | The single-file inspector, `plannotation inspect`, and the manual test protocol. |
 | [`mcp.md`](mcp.md) | The MCP server: tools, resources, safety, and host configuration. |
 | [`inference.md`](inference.md) | Reconstructing plannotations for legacy PDFs, and how well it works. |

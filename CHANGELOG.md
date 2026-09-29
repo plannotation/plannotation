@@ -13,6 +13,12 @@ lives in [`spec/SPEC.md`](spec/SPEC.md).
 
 ### Added
 
+- **Real examples.** `make examples` draws a plan and a section of the Maleva 18
+  apartment building in Tallinn from its pinned, openly licensed IFC model, and
+  `make examples-check` validates each sheet against it; CI runs both on Linux.
+- **Site.** A landing page showing the examples, built by `make site` as GitHub Pages
+  builds it. The inspector opens a sheet from a link (`?pdf=`), fits the page to the
+  screen and works on phones.
 - **Authoring tools — SVG and Bonsai.** `plannotation.svg` reads the IFC identity an
   IfcOpenShell SVG already carries — each product's GlobalId and class, each view's
   `ifc:matrix3` and `ifc:plane` — through every unit, `viewBox`, nested viewport and
@@ -80,6 +86,15 @@ lives in [`spec/SPEC.md`](spec/SPEC.md).
 
 - The project was called PlanLabel until it was renamed Plannotation, before the
   first release; nothing was ever published under the old name.
+
+### Fixed
+
+- The validator re-measures dimensions in metres whatever the model's unit, and allows
+  for the three-decimal rounding of plane axes. SPEC states what a storey's and a
+  level's elevation are measured from.
+- The exporter cuts a storey at its own height, describes what a view sees beyond its
+  cut from the lines it draws, fills a roof's concrete, and records each ring of a drawn
+  product as its own outline.
 
 ### Decided
 

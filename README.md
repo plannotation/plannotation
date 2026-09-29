@@ -16,6 +16,10 @@ way ZUGFeRD invoices carry their XML.
 **Status: draft 0.1.** The format may change before 1.0
 ([versioning](spec/SPEC.md#8-versioning-policy)). Nothing is on PyPI yet.
 
+The [site](https://plannotation.github.io/) shows a plan and a section of a real building,
+drawn and plannotated from its openly licensed IFC model; [docs/examples.md](docs/examples.md)
+says how.
+
 <!-- `make bench` writes its measured table between these markers. -->
 <!-- BENCHMARK:START -->
 <!-- BENCHMARK:END -->
@@ -29,9 +33,11 @@ From a clone, with [uv](https://docs.astral.sh/uv/) and Cairo (`brew install cai
 git clone https://github.com/plannotation/plannotation && cd plannotation
 uv run --all-extras plannotation samples build
 uv run plannotation inspect samples/floorplan/sheet.plannotated.pdf
+make examples
 ```
 
-`samples build` draws three sample sheets from IFC models it generates. To see a
+`samples build` draws three sample sheets from IFC models it generates; `make examples`
+draws the site's plan and section from their pinned model. To see a
 plannotation over its page, open the PDF in the
 [inspector](https://plannotation.github.io/inspector/); it reads the file in the browser
 and uploads nothing.
