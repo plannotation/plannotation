@@ -45,6 +45,7 @@ from plannotation.export.drafting import (
     LEVEL_TRIANGLE_MM,
     MARK_RADIUS_MM,
     NORTH_RADIUS_MM,
+    STYLES,
     Line,
     Point,
     RoomLabels,
@@ -288,6 +289,27 @@ class SheetSpec:
     north_arrow: bool = False
     scale_bar: bool = False
     psets: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Refuse a material style that names no style, or whose pattern does not compile.
+
+        Otherwise the mistake would surface only when a cut part first matched it, if
+        ever, deep inside drawing a model.
+
+        Raises:
+            ExportError: If a style is not a key of
+                :data:`plannotation.export.drafting.STYLES`, or a pattern is not a
+                regular expression.
+        """
+        for pattern, key in self.material_styles:
+            if key not in STYLES:
+                msg = f"material_styles: {key!r} is no style; the styles are {sorted(STYLES)}"
+                raise ExportError(msg)
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                msg = f"material_styles: {pattern!r} is no regular expression: {error}"
+                raise ExportError(msg) from error
 
 
 @dataclass(frozen=True)

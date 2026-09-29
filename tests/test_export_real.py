@@ -1052,6 +1052,32 @@ class TestARoofIsDrawnAsItsLayersAreMade:
         assert _material_names(part) == ("Mineral wool",)
 
 
+class TestMaterialStylesAreCheckedWhenTheSpecIsMade:
+    """A mistyped style or pattern is refused at once, not when a part first matches it."""
+
+    def test_none_by_default(self) -> None:
+        """No material is drawn as structure unless the sheet says so."""
+        assert _spec().material_styles == ()
+
+    @pytest.mark.parametrize(
+        ("styles", "complaint"),
+        [
+            (((r"(?i)betoon", "Solid"),), "'Solid' is no style"),
+            (((r"(?i)(betoon", "solid"),), "is no regular expression"),
+        ],
+    )
+    def test_a_bad_entry_is_refused(
+        self, styles: tuple[tuple[str, str], ...], complaint: str
+    ) -> None:
+        """Naming the entry that is wrong."""
+        import re
+
+        from plannotation.errors import ExportError
+
+        with pytest.raises(ExportError, match=re.escape(complaint)):
+            _spec(material_styles=styles)
+
+
 #: Concrete first, then wool; and the other way round.
 _CONCRETE_FIRST = ((r"(?i)concrete", "solid"), (r"(?i)wool", "partition"))
 _WOOL_FIRST = tuple(reversed(_CONCRETE_FIRST))
