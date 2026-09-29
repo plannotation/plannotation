@@ -65,7 +65,7 @@ from plannotation.model import (
 )
 from plannotation.pdf import embed
 from plannotation.validate import carrier, geometric, ifc, provenance, referential, schema, verapdf
-from plannotation.validate.codes import finding
+from plannotation.validate.codes import RULES, finding
 from plannotation.validate.report import PageSummary, Report
 
 if TYPE_CHECKING:
@@ -793,9 +793,10 @@ def _check_model(
         Every cross-check violation.
     """
     if model is None:
+        codes = [code for code in RULES if code.startswith("PL-IFC-")]
         notes.append(
-            "the model cross-check (PL-IFC-001 to PL-IFC-003) was not run; pass "
-            "--ifc MODEL.ifc to run it"
+            f"the model cross-check ({codes[0]} to {codes[-1]}) was not run; pass "
+            f"--ifc MODEL.ifc to run it"
         )
         return []
     findings: list[Finding] = []

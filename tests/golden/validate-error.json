@@ -20,7 +20,7 @@
   "notes": [
     "the veraPDF pass (PL-PDF-001) was not run: it needs a PDF",
     "target.pdfPage (PL-REF-006) and the page block against its page (PL-GEO-001) were not checked: there is no document to check them against",
-    "the model cross-check (PL-IFC-001 to PL-IFC-003) was not run; pass --ifc MODEL.ifc to run it"
+    "the model cross-check (PL-IFC-001 to PL-IFC-004) was not run; pass --ifc MODEL.ifc to run it"
   ],
   "pages": [
     {

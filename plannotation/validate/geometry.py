@@ -27,6 +27,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+#: Floating-point slack on a comparison made exactly at a tolerance, relative to the
+#: size of the numbers compared. Far below anything three decimals can express.
+_FLOAT_SLACK = 1e-9
+
 __all__ = [
     "apply_affine",
     "bbox_centre",
@@ -120,30 +124,39 @@ def determinant(matrix: Sequence[float]) -> float:
     return a * d - b * c
 
 
-def is_similarity(matrix: Sequence[float], *, tolerance: float = 1e-9) -> bool:
-    """Report whether an affine's linear part is a similarity.
+def is_similarity(matrix: Sequence[float], *, spread: float = 0.0) -> bool:
+    """Report whether an affine's linear part is a similarity, to within a spread.
 
     A similarity is a uniform scale with a rotation, possibly with a reflection, which
     is what an authoring tool produces for an ordinary viewport. Specification 3.5
     recovers the drawing scale from one and says a validator MUST NOT check ``scale``
     against a transform that is not one, because then no scale can be recovered at all.
 
+    In the ``[a, b, c, d]`` order of 3.5 a rotation has ``a = d`` and ``c = -b``, and
+    a reflection ``a = -d`` and ``c = b``. Some similarity lies within ``spread`` of
+    every coefficient exactly when one of those pairs of equations holds to within
+    twice the spread, which is the test made here. A serialised transform is rounded
+    by 3.8, and the spread is how far that rounding may have moved each coefficient.
+
     Args:
         matrix: The affine ``[a, b, c, d, e, f]``.
-        tolerance: How far the two column lengths may differ, and how far from
-            perpendicular the columns may be, both relative to the larger column.
+        spread: How far each coefficient may be from the similarity's.
 
     Returns:
-        True when the images of the two axes are perpendicular and of equal length.
+        True when some similarity lies within the spread of every coefficient. The
+        zero matrix is not one: it has no scale to recover.
     """
     a, b, c, d, _e, _f = matrix
-    first, second = math.hypot(a, b), math.hypot(c, d)
-    scale = max(first, second)
-    if scale == 0.0:
+    size = max(abs(a), abs(b), abs(c), abs(d))
+    if size == 0.0:
         return False
-    return (
-        abs(first - second) <= tolerance * scale and abs(a * c + b * d) <= tolerance * scale * scale
-    )
+    # Two serialised coefficients routinely differ by exactly twice the spread, since
+    # both sit on the three-decimal grid, and binary floating point must not decide
+    # which side of the boundary that falls: 0.049 - 0.048 is 0.0010000000000000009.
+    reach = 2.0 * spread + _FLOAT_SLACK * size
+    rotation = abs(a - d) <= reach and abs(b + c) <= reach
+    reflection = abs(a + d) <= reach and abs(b - c) <= reach
+    return rotation or reflection
 
 
 def bbox_centre(box: Sequence[float]) -> tuple[float, float]:

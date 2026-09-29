@@ -44,6 +44,21 @@ The three rules that are not errors
 * **PL-GEO-013**, ``paperToPlane`` without ``model.lengthUnit``, *is* an error: 3.5
   states it as a writer MUST, and without the unit a reader may not report any distance
   derived from the transform as a length, which is most of what a transform is for.
+
+Relations among rounded numbers
+-------------------------------
+Section 3.8 rounds every number to three decimals, and four rules here test numbers
+for an exact relation: a plane axis of unit length (PL-GEO-010), two axes at right
+angles (PL-GEO-011), ``scale`` against the transform (PL-GEO-008), and the plane
+origin against ``storey.elevation + cutHeight`` (PL-GEO-012). An oblique axis has no
+exact three-decimal spelling: a plan turned 29.17 degrees to follow its building's
+grid has ``xAxis`` ``[0.873, -0.487, 0]``, which is 0.99965 long. Each of those rules
+therefore allows for everything rounding can explain, by a bound derived from
+:data:`ROUNDING`, the most that rounding moves one number, and by nothing more.
+
+The determinant rules and the bounding-box rules are not relaxed. A reader inverts the
+transform the file holds, so its determinant is a fact about the file; and rounding is
+monotonic, so it can neither reverse a box nor move one out of a box that held it.
 """
 
 from __future__ import annotations
@@ -53,6 +68,7 @@ from typing import TYPE_CHECKING, Final
 
 from plannotation.errors import PlannotationMismatchError
 from plannotation.pdf.embed import PAGE_DIMENSION_TOLERANCE_MM, check_plannotations_against
+from plannotation.units import COORD_DECIMALS
 from plannotation.validate.codes import finding
 from plannotation.validate.geometry import (
     contains,
@@ -82,6 +98,9 @@ __all__ = [
     "LENGTH_TOLERANCE_RATIO",
     "METRES_PER_MODEL_UNIT",
     "MM_PER_MODEL_UNIT",
+    "ORTHOGONALITY_TOLERANCE",
+    "ROUNDING",
+    "SCALE_ROUNDING",
     "SCALE_TOLERANCE_RATIO",
     "check_geometry",
     "check_page_against_document",
@@ -98,19 +117,51 @@ __all__ = [
 #: that can stop agreeing.
 GEOMETRIC_TOLERANCE_MM: Final = PAGE_DIMENSION_TOLERANCE_MM
 
-#: How far a plane axis may be from unit length, and from perpendicular -- section 3.6.
-AXIS_TOLERANCE: Final = 1e-6
+#: The most that serialising moves one number: half a unit in the last of the three
+#: decimals section 3.8 keeps. Every tolerance on a relation among serialised numbers
+#: below is derived from it.
+ROUNDING: Final = 0.5 * 10.0**-COORD_DECIMALS
 
-#: How far ``paperToPlane`` and ``scale`` may disagree -- section 3.5's 0.1 per cent.
+#: How far a plane axis may be from unit length -- section 3.6.
+#:
+#: Rounding each of three components by up to :data:`ROUNDING` moves a vector by at most
+#: ``sqrt(3) * ROUNDING``, and changes its length by no more than it moves it. An axis
+#: along a model axis gains nothing from this: the nearest three-decimal lengths either
+#: side of 1 are 0.001 away, which is outside it.
+AXIS_TOLERANCE: Final = math.sqrt(3.0) * ROUNDING
+
+#: How far the dot product of a plane's axes may be from zero -- section 3.6.
+#:
+#: Unit axes ``u`` and ``v`` with ``u . v = 0``, moved by rounding to ``u + e`` and
+#: ``v + f``, have the dot product ``u . f + e . v + e . f``. Each of ``e`` and ``f`` is
+#: at most ``sqrt(3) * ROUNDING`` long, so that is at most
+#: ``2 * sqrt(3) * ROUNDING + 3 * ROUNDING**2``.
+ORTHOGONALITY_TOLERANCE: Final = 2.0 * math.sqrt(3.0) * ROUNDING + 3.0 * ROUNDING**2
+
+#: How far ``paperToPlane`` and ``scale`` may disagree -- section 3.5's 0.1 per cent,
+#: before rounding is allowed for.
 SCALE_TOLERANCE_RATIO: Final = 1e-3
 
-#: Slack on ``plane.origin`` against ``storey.elevation + cutHeight``, in model units.
+#: How far rounding may move the ``k`` a scale is recovered from, in model length units
+#: per paper millimetre -- section 3.5.
 #:
-#: Absolute, because coordinates are serialised at three decimals and any real
-#: disagreement is therefore at least 0.001 in the model's own unit; this is
-#: floating-point slack and nothing more. The relative companion below keeps it honest
-#: on a model whose coordinates are large, such as a site plan in millimetres.
-CUT_HEIGHT_TOLERANCE: Final = 1e-6
+#: Rounding the four coefficients of the linear part by up to :data:`ROUNDING` each adds
+#: an error of spectral norm at most ``2 * ROUNDING``. That bounds how far each singular
+#: value moves, and ``k = sqrt(|det|)`` lies between the two. It is 1 in the scale
+#: denominator for a model in metres and 0.001 for one in millimetres: an unrotated
+#: transform at a standard scale is exact and loses nothing, and a rotated one in metres
+#: is not, because its coefficients carry a sine and a cosine.
+SCALE_ROUNDING: Final = 2.0 * ROUNDING
+
+#: How far ``plane.origin`` along the view normal may be from ``storey.elevation +
+#: cutHeight``, in model length units -- section 3.6.
+#:
+#: Rounding moves the elevation and the cut height by up to :data:`ROUNDING` each, and
+#: the origin's component along the unit normal ``n`` by up to
+#: ``ROUNDING * (|nx| + |ny| + |nz|)``, which is at most ``sqrt(3) * ROUNDING``. On a
+#: plan the normal is the z axis and all three numbers are multiples of 0.001, so a
+#: disagreement of 0.001 passes and one of 0.002 does not.
+CUT_HEIGHT_TOLERANCE: Final = (2.0 + math.sqrt(3.0)) * ROUNDING
 
 #: Relative tolerance on a dimension's value against the length it is drawn at.
 LENGTH_TOLERANCE_RATIO: Final = 0.01
@@ -430,7 +481,9 @@ def _check_scale(
     Section 3.5 recovers ``k = sqrt(|det|)`` model length units per paper millimetre
     and ``S = k * (millimetres per model length unit)``, and only where the linear part
     is a similarity: where it is not, ``k`` is undefined, ``scale`` stands alone and a
-    validator MUST NOT check it against the transform.
+    validator MUST NOT check it against the transform. Both tests allow for rounding: a
+    rotated similarity need not round to an exact one, and rounding moves ``k`` by up
+    to :data:`SCALE_ROUNDING`.
 
     Args:
         viewport: The viewport.
@@ -441,12 +494,15 @@ def _check_scale(
         source: Which document it is, for the finding.
 
     Returns:
-        A single finding when the two disagree by more than 0.1 per cent.
+        A single finding when the two disagree by more than 0.1 per cent plus what
+        rounding explains.
     """
-    if viewport.scale is None or not is_similarity(matrix):
+    if viewport.scale is None or not is_similarity(matrix, spread=ROUNDING):
         return []
-    recovered = math.sqrt(det) * MM_PER_MODEL_UNIT[unit]
-    if abs(recovered - viewport.scale) <= SCALE_TOLERANCE_RATIO * viewport.scale:
+    mm_per_unit = MM_PER_MODEL_UNIT[unit]
+    recovered = math.sqrt(det) * mm_per_unit
+    tolerance = SCALE_TOLERANCE_RATIO * viewport.scale + SCALE_ROUNDING * mm_per_unit
+    if abs(recovered - viewport.scale) <= tolerance:
         return []
     return [
         finding(
@@ -454,7 +510,8 @@ def _check_scale(
             message=(
                 f"viewport {viewport.local_id!r}: paperToPlane is a similarity at "
                 f"1:{recovered:g} in {unit}, but the viewport declares "
-                f"1:{viewport.scale:g}; 3.5 allows them to differ by 0.1 per cent"
+                f"1:{viewport.scale:g}; 3.5 allows them to differ by 0.1 per cent plus "
+                f"what three-decimal rounding explains, {tolerance:.3g} here"
             ),
             path=path,
             source=source,
@@ -464,6 +521,9 @@ def _check_scale(
 
 def _check_plane_axes(plannotation: Plannotation, *, source: str) -> list[Finding]:
     """Check that every plane's axes are unit vectors and mutually orthogonal.
+
+    Both to within bounds on what rounding to three decimals can do:
+    :data:`AXIS_TOLERANCE` and :data:`ORTHOGONALITY_TOLERANCE`.
 
     Args:
         plannotation: The plannotation.
@@ -488,22 +548,24 @@ def _check_plane_axes(plannotation: Plannotation, *, source: str) -> list[Findin
                     "PL-GEO-010",
                     message=(
                         f"viewport {viewport.local_id!r}: plane {member} {list(axis)} has "
-                        f"length {length:.6g}; scale is carried by paperToPlane, so an "
-                        f"axis of another length states it a second time"
+                        f"length {length:.6g}, further from 1 than three-decimal rounding "
+                        f"explains ({AXIS_TOLERANCE:.3g}); scale is carried by "
+                        f"paperToPlane, so an axis of another length states it a second time"
                     ),
                     path=f"{base}/{member}",
                     source=source,
                 )
             )
         product = dot(plane.x_axis, plane.y_axis)
-        if abs(product) > AXIS_TOLERANCE:
+        if abs(product) > ORTHOGONALITY_TOLERANCE:
             found.append(
                 finding(
                     "PL-GEO-011",
                     message=(
                         f"viewport {viewport.local_id!r}: plane xAxis {list(plane.x_axis)} "
                         f"and yAxis {list(plane.y_axis)} have dot product {product:.6g}; "
-                        f"3.6 requires them to be orthogonal to within {AXIS_TOLERANCE:g}"
+                        f"3.6 requires them to be orthogonal to within what three-decimal "
+                        f"rounding explains ({ORTHOGONALITY_TOLERANCE:.3g})"
                     ),
                     path=base,
                     source=source,
@@ -518,7 +580,8 @@ def _check_cut_heights(plannotation: Plannotation, *, source: str) -> list[Findi
     For a cut view the drawing plane is the cutting plane, and ``cutHeight`` is the
     cut's height above ``storey.elevation`` -- German practice's *Schnitthoehe 1,20 m
     ueber OKFF*. Where both are present, the plane origin's component along the view
-    normal must be their sum.
+    normal must be their sum, to within :data:`CUT_HEIGHT_TOLERANCE`, which bounds how
+    far rounding the three numbers can separate them.
 
     Args:
         plannotation: The plannotation.
@@ -540,7 +603,7 @@ def _check_cut_heights(plannotation: Plannotation, *, source: str) -> list[Findi
         unit_normal = tuple(component / length for component in normal)
         along = dot(plane.origin, unit_normal)
         expected = elevation + viewport.cut_height
-        if math.isclose(along, expected, rel_tol=1e-9, abs_tol=CUT_HEIGHT_TOLERANCE):
+        if abs(along - expected) <= CUT_HEIGHT_TOLERANCE:
             continue
         found.append(
             finding(

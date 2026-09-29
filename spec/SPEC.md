@@ -493,10 +493,19 @@ S = k × (millimetres per model length unit)    the scale denominator
 
 For `k = 0.05` with `model.lengthUnit = "m"`, `S = 0.05 × 1000 = 50`: the view is
 at 1:50. Where a viewport carries both `scale` and `paperToPlane`, and the linear
-part is a similarity, the two MUST agree to within 0.1 %; a validator MUST report
-a disagreement. Where the linear part is not a similarity, `k` is undefined and no
+part is a similarity, the two MUST agree to within 0.1 % of `scale` plus what
+rounding explains (3.8). Rounding each coefficient by up to 0.0005 moves `k` by at
+most 2 × 0.0005 = 0.001, which is 1 in `S` for a model in metres, 0.01 in
+centimetres and 0.001 in millimetres. A validator MUST report a larger
+disagreement. Where the linear part is not a similarity, `k` is undefined and no
 scale can be recovered; `scale` then stands alone and a validator MUST NOT check
 it against the transform.
+
+In the component order above, a similarity has `a = d` and `c = −b` (a rotation)
+or `a = −d` and `c = b` (a reflection). Rounding need not keep those equalities
+exact, so a serialised transform is a similarity where some similarity lies within
+0.0005 of each of its coefficients: where `|a − d|` and `|b + c|`, or `|a + d|` and
+`|b − c|`, are both at most 0.001.
 
 ### 3.6 The model plane
 
@@ -504,10 +513,24 @@ A viewport's `plane` gives the model-space plane the view projects onto, as an
 `origin` and two axis directions `xAxis` and `yAxis`, all `vec3` in the model's
 length unit (the axes being directions, their unit is immaterial).
 
-`xAxis` and `yAxis` MUST be unit vectors and MUST be mutually orthogonal, each to
-within 1 × 10⁻⁶. The requirement exists because scale is already carried by
-`paperToPlane`: axes of a length other than one would express it a second time and
-the two statements could disagree.
+`xAxis` and `yAxis` MUST be unit vectors and MUST be mutually orthogonal. The
+requirement exists because scale is already carried by `paperToPlane`: axes of a
+length other than one would express it a second time and the two statements could
+disagree.
+
+An oblique axis has no exact spelling at the three decimals of 3.8: a plan turned
+29.17° to follow its building's grid has `xAxis` `[0.873, −0.487, 0]`, which is
+0.99965 long. Both requirements therefore hold to within what that rounding
+explains, and a validator MUST report an axis or a pair beyond it:
+
+- each axis's length is within √3 × 0.0005 ≈ 0.00087 of 1: rounding three
+  components by up to 0.0005 each moves a vector by at most that, and so changes
+  its length by no more;
+- `|xAxis · yAxis|` is at most 2√3 × 0.0005 + 3 × 0.0005² ≈ 0.0017, which bounds the
+  dot product rounding can give two orthogonal unit vectors.
+
+An axis along a model axis, such as `[1, 0, 0]`, is exact at three decimals and
+gains nothing from this: 0.999 and 1.001 are both outside it.
 
 Plane coordinates `(X, Y)` — the output of `paperToPlane` — map to a model point:
 
@@ -546,14 +569,34 @@ actually specified by — German practice writes it on the sheet as *Schnitthöh
 m über OKFF*.
 
 It follows that where both `storey.elevation` and `cutHeight` are present, the
-component of `plane.origin` along the plane normal `n` MUST equal
-`storey.elevation + cutHeight`. A validator MUST check this, and a writer that
-cannot satisfy it has misplaced one of the three.
+component of `plane.origin` along the plane normal, `plane.origin · n / |n|`, MUST
+equal `storey.elevation + cutHeight`, to within (2 + √3) × 0.0005 ≈ 0.0019 model
+length units, which bounds how far rounding the three can separate them (3.8). A
+validator MUST check this, and a writer that cannot satisfy it has misplaced one of
+the three.
 
 So a plan of a storey whose finished floor is at elevation 3.0 m, cut 1.2 m above
 that floor, has `storey.elevation` 3.0, `cutHeight` 1.2, and a `plane.origin` whose
 normal component is 4.2. `storey.elevation` is absolute; `cutHeight` is relative to
 it.
+
+**Storey elevation.** Absolute means in model coordinates: `storey.elevation` is the z
+of the storey's floor in the coordinates `plane.origin` is stated in, which is what
+lets the sum above be compared with the plane. It is not the storey's height above the
+building's own ±0,00, which is what a level mark prints and what IFC records in
+`IfcBuildingStorey.Elevation`; the two agree only where the model places that datum at
+z = 0. The Maleva 18 model stands its ground floor at z = 14.30 m, so a plan of that
+floor cut 1.2 m above it has `storey.elevation` 14300 and a plane at z = 15500 in
+millimetres, and the floor's level mark reads ±0,00.
+
+**Level elevation.** A `level` annotation's `elevation` is the other number: the
+height its mark states, in metres, from the datum the mark states it from, which is
+the building's ±0,00 on most drawings and sea level on a site plan. Where the mark
+stands in the model is already given by its position on the paper, through its
+viewport's transform, and is not stated a second time. On a section of the Maleva 18
+model the mark reading +3,35 has `elevation` 3.35 and stands at z = 17.65 m. The
+marks of one section that share a datum therefore differ exactly as their heights on
+the plane do.
 
 ### 3.7 Page rotation
 
@@ -653,6 +696,19 @@ the building. Where a reader needs model geometry to a finer tolerance, it MUST
 obtain it from the model. The plannotation says what is on the page; it is no more a
 substitute for the model than it is for the drawing.
 
+**Relations among rounded numbers.** Four requirements relate serialised numbers
+exactly: that the plane axes are unit vectors and orthogonal (3.6), that `scale`
+agrees with `paperToPlane` (3.5), and that `plane.origin` sits at
+`storey.elevation + cutHeight` (3.6). A writer meets each with the values it holds
+before rounding, and rounding may then leave the serialised numbers slightly off.
+Each of those clauses therefore states a tolerance, derived from the 0.0005 by which
+rounding can move one number, that admits everything rounding can explain; a
+validator MUST NOT report a violation within it and MUST report one beyond it. The
+requirements on a transform's determinant (3.5) and on bounding boxes (3.4) are not
+relaxed. A reader inverts the transform the file holds, so its determinant is a
+fact about the file; and rounding is monotonic, so it can neither reverse a box nor
+move one out of a box that held it.
+
 ### 3.9 A worked example
 
 An A3 landscape sheet, 420 mm × 297 mm, `page.rotation` 0, `CropBox` at the origin
@@ -666,7 +722,7 @@ of user space, `UserUnit` 1. It carries one viewport:
   "paperBBox": [20, 20, 320, 260],
   "paperToPlane": [0.05, 0, 0, 0.05, -3, -2.25],
   "plane": {
-    "origin": [0, 0, 3],
+    "origin": [0, 0, 4.2],
     "xAxis": [1, 0, 0],
     "yAxis": [0, 1, 0]
   },
@@ -679,10 +735,10 @@ of user space, `UserUnit` 1. It carries one viewport:
 ```
 
 and `model.lengthUnit` is `"m"`. The view is a plan of the storey whose floor is at
-3.000 m, cut 1.200 m above it, drawn at 1:50 — confirmed by
-`k = √(0.05 × 0.05) = 0.05` and `S = 0.05 × 1000 = 50`, which agrees with `scale`.
-The plan is seen from above, because `xAxis × yAxis = [0, 0, 1]` points at the
-observer.
+3.000 m, cut 1.200 m above it, so its plane lies at 4.200 m (3.6). It is drawn at
+1:50 — confirmed by `k = √(0.05 × 0.05) = 0.05` and `S = 0.05 × 1000 = 50`, which
+agrees with `scale`. The plan is seen from above, because `xAxis × yAxis = [0, 0, 1]`
+points at the observer.
 
 The members above are in ascending name order and the numbers carry no needless
 decimals, as 3.8 requires. The arrays are shown inline for legibility only: in the
@@ -726,10 +782,10 @@ and the inverse checks: `det = 0.0025`, `x = 0.05 × (5.420 + 3) / 0.0025 = 168.
 **4. Plane to model.** By 3.6:
 
 ```
-P = [0, 0, 3] + 5.420 × [1, 0, 0] + 4.310 × [0, 1, 0] = [5.420, 4.310, 3.000]
+P = [0, 0, 4.2] + 5.420 × [1, 0, 0] + 4.310 × [0, 1, 0] = [5.420, 4.310, 4.200]
 ```
 
-The wall corner is at model coordinates (5.420, 4.310, 3.000) metres. Because the
+The wall corner is at model coordinates (5.420, 4.310, 4.200) metres. Because the
 plan is a cut, the corner as drawn is the wall's footprint at the cut, and its
 model Z is the plane's, not the wall's.
 
@@ -2071,13 +2127,13 @@ the document (6.5.5).
 | The index of a plannotated document | SWAPP's DocumentSet | The sheets one PDF carries |
 | `viewport` | SWAPP's ViewPort, an `IfcAnnotation` aggregated with `IfcRelAggregates`; in Bonsai, a drawing placed on the sheet by an `IfcDocumentReference` | Its box on the paper is `viewport.paperBBox` |
 | `viewport.plane`, `paperToPlane`, `scale` | SWAPP's View; in Bonsai, the `IfcAnnotation` with `ObjectType` `DRAWING` and its `EPset_Drawing` | The annotation's placement is `viewport.plane`; the scale in `EPset_Drawing` is `viewport.scale` |
-| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name`, `elevation` and `ifcGuid` are the storey's `Name`, `Elevation` and `GlobalId` |
+| `viewport.cutHeight`, `storey` | The section height above an `IfcBuildingStorey` | `storey.name` and `ifcGuid` are the storey's `Name` and `GlobalId`; `storey.elevation` is the z of the storey's floor in model coordinates (3.6): the z of its placement where the placement carries the level, and otherwise the z of the building's ±0,00 plus `Elevation`. It equals `Elevation` only where that ±0,00 is at z = 0 |
 | `element` | An `IfcProduct`, usually an `IfcElement` | `GlobalId`, the entity class, `PredefinedType`, `Name` and `Tag` map one to one |
 | `element.properties` | The element's property sets and quantity sets | Keyed by set name (`Pset_WallCommon`), then property name |
 | `shows.property` | `Tag`, an attribute, or a dotted `Pset_Name.Property` | A mark shows `Tag`; a member's cross-section shows `Pset_ColumnCommon.Reference` |
 | `annotation` | SWAPP's Annotation: an `IfcAnnotation`, aggregated under its view by `IfcRelAggregates` | `shows.element` records its `IfcRelAssignsToProduct` |
 | `annotation.type = dimension` | `IfcAnnotation` of type `DIMENSION` | `measures` names what it runs between |
-| `level` | `IfcAnnotation` of type `SECTION_LEVEL` or `PLAN_LEVEL` | `elevation` is in metres; `ifcGuid` names the storey or the level annotation |
+| `level` | `IfcAnnotation` of type `SECTION_LEVEL` or `PLAN_LEVEL` | `elevation` is the height the mark states, in metres (3.6), so a storey's mark measured from the building's ±0,00 carries the storey's `Elevation` in metres; `ifcGuid` names the storey or the level annotation |
 | `text`, `leader` | `IfcAnnotation` of type `TEXT`, `TEXT_LEADER` | Assigned to a product by `IfcRelAssignsToProduct`, which is what `shows.element` records |
 | `sectionMark` | `IfcAnnotation` of type `SECTION` | `target` names the sheet and viewport of the section it opens |
 | `grid` | `IfcGridAxis` of an `IfcGrid` | `AxisTag` → `axis` |
@@ -2093,6 +2149,11 @@ entity with that GlobalId nor a supertype of it (PL-IFC-001, PL-IFC-002). A
 plannotation MAY name entities the reader's copy of the model lacks — the model
 may have moved on since the drawing was issued — and a reader MUST then treat the
 drawing, not the model, as the record of what was issued (1.2).
+
+A validator given the model SHOULD also report a `storey.elevation` that is not the
+z at which the model places the storey (3.6), as a warning (PL-IFC-004): a model may
+leave its storeys' placements at the building's datum and state their levels only
+in `Elevation`, so the comparison rests on a heuristic (4.4).
 
 ## 8. Versioning policy
 

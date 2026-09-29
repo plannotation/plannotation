@@ -299,8 +299,8 @@ _CATALOGUE: Final = (
     _rule(
         "PL-GEO-008",
         _ERROR,
-        "a similarity paperToPlane agrees with the viewport's scale to within 0.1 %",
-        "SPEC 3.5",
+        "a similarity paperToPlane agrees with the viewport's scale to within 0.1 % and rounding",
+        "SPEC 3.5, 3.8",
         "MUST. Where the linear part is not a similarity no scale can be recovered and "
         "3.5 forbids the comparison, so the rule is not applied there at all.",
     ),
@@ -317,26 +317,28 @@ _CATALOGUE: Final = (
         "PL-GEO-010",
         _ERROR,
         "a plane's axes are unit vectors",
-        "SPEC 3.6",
-        "MUST, to within 1e-6. Scale is carried by paperToPlane, so an axis of another "
+        "SPEC 3.6, 3.8",
+        "MUST, to within sqrt(3) x 0.0005, a bound on what three-decimal rounding does to "
+        "a unit vector's length. Scale is carried by paperToPlane, so an axis of another "
         "length states it a second time and the two statements can disagree.",
     ),
     _rule(
         "PL-GEO-011",
         _ERROR,
         "a plane's axes are mutually orthogonal",
-        "SPEC 3.6",
-        "MUST, to within 1e-6. A non-orthogonal pair describes a sheared view that "
-        "P = origin + X*xAxis + Y*yAxis does not mean.",
+        "SPEC 3.6, 3.8",
+        "MUST, to within a dot product of 2 sqrt(3) x 0.0005 + 3 x 0.0005^2, a bound on "
+        "what three-decimal rounding does to two orthogonal unit vectors. A non-orthogonal "
+        "pair describes a sheared view that P = origin + X*xAxis + Y*yAxis does not mean.",
     ),
     _rule(
         "PL-GEO-012",
         _ERROR,
         "a cut view's plane origin sits at storey.elevation + cutHeight along the normal",
-        "SPEC 3.6",
-        "MUST, and 3.6 says a validator MUST check it: for a cut view the drawing plane "
-        "is the cutting plane, so a writer that cannot satisfy it has misplaced one of "
-        "the three values.",
+        "SPEC 3.6, 3.8",
+        "MUST, to within (2 + sqrt(3)) x 0.0005 for rounding the three values, and 3.6 "
+        "says a validator MUST check it: for a cut view the drawing plane is the cutting "
+        "plane, so a writer that cannot satisfy it has misplaced one of the three.",
     ),
     _rule(
         "PL-GEO-013",
@@ -512,6 +514,15 @@ _CATALOGUE: Final = (
         "Warning. It rests on a tolerance -- 1 % or 5 mm, whichever is larger -- and on "
         "the heuristic that the distance between two elements is the distance between "
         "their bounding geometry projected on the viewport's plane.",
+    ),
+    _rule(
+        "PL-IFC-004",
+        _WARNING,
+        "a viewport's storey.elevation is the z the model places that storey at",
+        "SPEC 3.6, 7.3",
+        "Warning. It rests on the heuristic that a storey's placement carries its level; "
+        "IFC also states the level in Elevation, and a model whose placements leave it "
+        "there is not wrong.",
     ),
     # -- Rule 7: veraPDF --------------------------------------------------------
     _rule(

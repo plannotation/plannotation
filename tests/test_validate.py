@@ -21,7 +21,7 @@ import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 import pikepdf
@@ -537,6 +537,177 @@ class TestTheModelCrossCheck:
         assert "PL-IFC-002" in result.stdout
 
 
+class TestStoreyElevationIsInModelCoordinates:
+    """SPEC 3.6: ``storey.elevation`` is a z in the coordinates ``plane.origin`` is in.
+
+    The case that decided it is a building whose ±0,00 is not at the model's z = 0. The
+    Maleva 18 model stands its ground floor at z = 14.30 m, so the storey's IFC
+    ``Elevation`` is 0 while its placement, and every plane cut through it, is at 14.3 m.
+    """
+
+    #: The model z of the building's ±0,00, in millimetres.
+    DATUM_MM = 14300.0
+
+    @classmethod
+    def _plan(
+        cls,
+        elevation: float,
+        *,
+        guid: str | None = None,
+        unit: str = "mm",
+        cut_at: float | None = None,
+    ) -> Plannotation:
+        """Build a plan of the ground floor, cut 1.2 m above it.
+
+        Args:
+            elevation: The ``storey.elevation`` to state, in ``unit``.
+            guid: The storey's GlobalId, if the plannotation records one.
+            unit: ``model.lengthUnit``.
+            cut_at: The plane's z in ``unit``; by default 1.2 m above the ground floor
+                in model coordinates.
+
+        Returns:
+            The parsed plannotation.
+        """
+        per_mm = {"mm": 1.0, "m": 0.001}[unit]
+        storey: dict[str, Any] = {"elevation": elevation, "name": "1.korrus"}
+        if guid is not None:
+            storey["ifcGuid"] = guid
+        document = {
+            "plannotation": "0.1",
+            "provenance": "authored",
+            "page": {"index": 0, "widthMm": 841, "heightMm": 594},
+            "sheet": {"id": "M18-101"},
+            "model": {"lengthUnit": unit},
+            "viewports": [
+                {
+                    "cutHeight": 1200 * per_mm,
+                    "id": "vp-plan",
+                    "kind": "plan",
+                    "paperBBox": [44, 144, 796, 496],
+                    "plane": {
+                        "origin": [
+                            0,
+                            0,
+                            (cls.DATUM_MM + 1200) * per_mm if cut_at is None else cut_at,
+                        ],
+                        "xAxis": [0.873, -0.487, 0],
+                        "yAxis": [0.487, 0.873, 0],
+                    },
+                    "storey": storey,
+                }
+            ],
+        }
+        return load_plannotation(json.dumps(document))
+
+    def test_a_storey_above_the_models_origin_validates(self) -> None:
+        """14300 + 1200 = 15500: the storey and the cut, both in model coordinates."""
+        assert check_plannotation(self._plan(self.DATUM_MM)) == []
+
+    def test_the_ifc_elevation_attribute_is_not_the_storeys_elevation(self) -> None:
+        """Elevation 0 with the plane at 15500 is the misplacement PL-GEO-012 names."""
+        codes = [f.code for f in check_plannotation(self._plan(0.0))]
+        assert codes == ["PL-GEO-012"]
+
+    @staticmethod
+    def _model(tmp_path: Path) -> tuple[Path, str, str]:
+        """Write a millimetre model whose building's ±0,00 is at model z 14300.
+
+        The storeys are placed relative to the building, as authoring tools place them,
+        and carry the ``Elevation`` IFC measures from the building's ±0,00.
+
+        Args:
+            tmp_path: Directory to write into.
+
+        Returns:
+            The model's path, and the GlobalIds of the ground and first floors.
+        """
+        import ifcopenshell
+        import ifcopenshell.api.root
+        import ifcopenshell.api.unit
+
+        model = ifcopenshell.file(schema="IFC4")
+        ifcopenshell.api.root.create_entity(model, ifc_class="IfcProject", name="Fixture")
+        length = ifcopenshell.api.unit.add_si_unit(model, unit_type="LENGTHUNIT", prefix="MILLI")
+        ifcopenshell.api.unit.assign_unit(model, units=[length])
+
+        def placed(entity: Any, z: float, relative_to: Any) -> None:  # noqa: ANN401
+            point = model.createIfcCartesianPoint((0.0, 0.0, z))
+            entity.ObjectPlacement = model.createIfcLocalPlacement(
+                relative_to, model.createIfcAxis2Placement3D(point, None, None)
+            )
+
+        site = ifcopenshell.api.root.create_entity(model, ifc_class="IfcSite")
+        placed(site, 0.0, None)
+        building = ifcopenshell.api.root.create_entity(model, ifc_class="IfcBuilding")
+        placed(building, TestStoreyElevationIsInModelCoordinates.DATUM_MM, site.ObjectPlacement)
+        guids: list[str] = []
+        for name, elevation in (("1.korrus", 0.0), ("2.korrus", 3350.0)):
+            storey = ifcopenshell.api.root.create_entity(
+                model, ifc_class="IfcBuildingStorey", name=name
+            )
+            placed(storey, elevation, building.ObjectPlacement)
+            storey.Elevation = elevation
+            guids.append(storey.GlobalId)
+        path = tmp_path / "datum.ifc"
+        model.write(str(path))
+        return path, guids[0], guids[1]
+
+    def _against_model(self, tmp_path: Path, plannotation_of: Any) -> list[Finding]:  # noqa: ANN401
+        """Cross-check a plan of the ground floor against the model.
+
+        Args:
+            tmp_path: Directory for the model.
+            plannotation_of: Builds the plannotation from the ground floor's GlobalId.
+
+        Returns:
+            The cross-check's findings.
+        """
+        from plannotation.validate.ifc import check_against_model, open_model
+
+        path, ground, _ = self._model(tmp_path)
+        return check_against_model(plannotation_of(ground), open_model(path), source="page 0")
+
+    @needs_ifc
+    def test_the_storeys_placement_is_its_elevation(self, tmp_path: Path) -> None:
+        """The model places the ground floor at 14300, and the plannotation says so."""
+        findings = self._against_model(tmp_path, lambda guid: self._plan(self.DATUM_MM, guid=guid))
+        assert findings == []
+
+    @needs_ifc
+    def test_the_unit_is_the_plannotations_own(self, tmp_path: Path) -> None:
+        """14.3 in metres is the same z as 14300 in the model's millimetres."""
+        findings = self._against_model(
+            tmp_path, lambda guid: self._plan(self.DATUM_MM / 1000, guid=guid, unit="m")
+        )
+        assert findings == []
+
+    @needs_ifc
+    def test_writing_the_elevation_attribute_is_reported(self, tmp_path: Path) -> None:
+        """Storey and plane both measured from the building's ±0,00, not the model's z.
+
+        Consistent with itself, so PL-GEO-012 cannot see it; only the model can.
+        """
+        assert check_plannotation(self._plan(0.0, cut_at=1200)) == []
+        findings = self._against_model(
+            tmp_path, lambda guid: self._plan(0.0, guid=guid, cut_at=1200)
+        )
+        assert [f.code for f in findings] == ["PL-IFC-004"]
+        assert findings[0].severity is Severity.WARNING
+        assert findings[0].path == "/viewports/0/storey/elevation"
+        assert "z = 14300 mm" in findings[0].message
+        assert "Elevation attribute" in findings[0].message
+
+    @needs_ifc
+    def test_any_other_elevation_is_reported_without_blaming_the_attribute(
+        self, tmp_path: Path
+    ) -> None:
+        """3000 is neither the placement nor the attribute."""
+        findings = self._against_model(tmp_path, lambda guid: self._plan(3000.0, guid=guid))
+        assert [f.code for f in findings] == ["PL-IFC-004"]
+        assert "Elevation attribute" not in findings[0].message
+
+
 class TestTheModelCrossCheckWithoutIfcopenshell:
     """The extra is optional, so its absence must be explained rather than crash."""
 
@@ -933,17 +1104,40 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
     This is the check that makes a plannotation falsifiable. Everything else asks
     whether the plannotation is internally consistent; this asks whether it agrees with
     the building.
+
+    Every case runs against a model in millimetres and a model in metres, and each
+    plannotation states its model's unit truthfully. ifcopenshell builds geometry in
+    metres whatever unit the file is in, so a re-measurement that scaled that geometry
+    by the file's unit would pass one of the two and be a thousand times off on the
+    other.
     """
 
     GAP_MM = 4000.0
     """The clear distance between the two walls the fixture model places."""
 
-    @staticmethod
-    def _two_walls(tmp_path: Path) -> tuple[Path, str, str]:
+    #: The SI prefix of each length unit a fixture model is written in.
+    PREFIXES: ClassVar[dict[str, str | None]] = {"mm": "MILLI", "m": None}
+
+    @pytest.fixture(params=["mm", "m"])
+    def unit(self, request: pytest.FixtureRequest) -> str:
+        """The length unit the fixture model is written in.
+
+        Args:
+            request: The pytest request, carrying the parameter.
+
+        Returns:
+            ``mm`` or ``m``, as ``model.lengthUnit`` spells it.
+        """
+        value: str = request.param
+        return value
+
+    @classmethod
+    def _two_walls(cls, tmp_path: Path, unit: str) -> tuple[Path, str, str]:
         """Write a model holding two walls four metres apart.
 
         Args:
             tmp_path: Directory to write into.
+            unit: The model's length unit, ``mm`` or ``m``.
 
         Returns:
             The model's path and the two GlobalIds.
@@ -956,7 +1150,10 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
 
         model = ifcopenshell.file(schema="IFC4")
         ifcopenshell.api.root.create_entity(model, ifc_class="IfcProject", name="Fixture")
-        ifcopenshell.api.unit.assign_unit(model)
+        length = ifcopenshell.api.unit.add_si_unit(
+            model, unit_type="LENGTHUNIT", prefix=cls.PREFIXES[unit]
+        )
+        ifcopenshell.api.unit.assign_unit(model, units=[length])
         parent = ifcopenshell.api.context.add_context(model, context_type="Model")
         body = ifcopenshell.api.context.add_context(
             model,
@@ -985,13 +1182,14 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         return path, guids[0], guids[1]
 
     @staticmethod
-    def _plannotation(first: str, second: str, value: float) -> Plannotation:
+    def _plannotation(first: str, second: str, value: float, unit: str) -> Plannotation:
         """Build a plannotation whose dimension measures between two GlobalIds.
 
         Args:
             first: The first wall's GlobalId.
             second: The second wall's GlobalId.
             value: The distance the dimension claims, in millimetres.
+            unit: ``model.lengthUnit``, the unit the model is written in.
 
         Returns:
             The parsed plannotation.
@@ -1001,7 +1199,7 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
             "provenance": "authored",
             "page": {"index": 0, "widthMm": 420, "heightMm": 297},
             "sheet": {"id": "A-101"},
-            "model": {"lengthUnit": "m"},
+            "model": {"lengthUnit": unit},
             "elements": [
                 {
                     "id": "e1",
@@ -1029,53 +1227,70 @@ class TestDimensionsAreRemeasuredAgainstTheModel:
         }
         return load_plannotation(json.dumps(document))
 
-    def _check(self, tmp_path: Path, value: float) -> list[Finding]:
+    def _check(self, tmp_path: Path, value: float, unit: str) -> list[Finding]:
         """Cross-check a claimed distance against the model.
 
         Args:
             tmp_path: Directory for the model.
             value: The distance the dimension claims, in millimetres.
+            unit: The length unit the model is written in.
 
         Returns:
             The findings.
         """
         from plannotation.validate.ifc import check_against_model, open_model
 
-        path, first, second = self._two_walls(tmp_path)
+        path, first, second = self._two_walls(tmp_path, unit)
         return check_against_model(
-            self._plannotation(first, second, value), open_model(path), source="plannotation"
+            self._plannotation(first, second, value, unit),
+            open_model(path),
+            source="plannotation",
         )
 
-    def test_the_model_is_measured_at_all(self, tmp_path: Path) -> None:
+    def test_the_model_is_measured_at_all(self, tmp_path: Path, unit: str) -> None:
         """The fixture has to be a real measurement or the rest proves nothing."""
         from plannotation.validate.ifc import open_model
 
-        path, first, second = self._two_walls(tmp_path)
+        path, first, second = self._two_walls(tmp_path, unit)
         model = open_model(path)
         assert model.bounds(first) is not None
         assert model.bounds(second) is not None
 
-    def test_a_dimension_that_agrees_with_the_model_is_clean(self, tmp_path: Path) -> None:
+    def test_bounds_are_in_metres_whatever_the_models_unit(self, tmp_path: Path, unit: str) -> None:
+        """The second wall starts 5 m along x, in a model in millimetres as in metres."""
+        from plannotation.validate.ifc import open_model
+
+        path, _, second = self._two_walls(tmp_path, unit)
+        bounds = open_model(path).bounds(second)
+        assert bounds is not None
+        assert bounds[0][0] == pytest.approx(5.0)
+
+    def test_a_dimension_that_agrees_with_the_model_is_clean(
+        self, tmp_path: Path, unit: str
+    ) -> None:
         """Four metres between the walls, and the plannotation says four metres."""
-        codes = [f.code for f in self._check(tmp_path, self.GAP_MM)]
+        codes = [f.code for f in self._check(tmp_path, self.GAP_MM, unit)]
         assert "PL-IFC-003" not in codes
 
-    def test_a_dimension_inside_the_one_percent_tolerance_is_clean(self, tmp_path: Path) -> None:
+    def test_a_dimension_inside_the_one_percent_tolerance_is_clean(
+        self, tmp_path: Path, unit: str
+    ) -> None:
         """The tolerance is 1% or 5 mm, whichever is larger. 1% of 4 m is 40 mm."""
-        codes = [f.code for f in self._check(tmp_path, self.GAP_MM + 30.0)]
+        codes = [f.code for f in self._check(tmp_path, self.GAP_MM + 30.0, unit)]
         assert "PL-IFC-003" not in codes
 
-    def test_a_dimension_outside_the_tolerance_is_reported(self, tmp_path: Path) -> None:
+    def test_a_dimension_outside_the_tolerance_is_reported(self, tmp_path: Path, unit: str) -> None:
         """A metre of disagreement between the drawing and the building."""
-        findings = self._check(tmp_path, self.GAP_MM + 1000.0)
+        findings = self._check(tmp_path, self.GAP_MM + 1000.0, unit)
         assert [f.code for f in findings] == ["PL-IFC-003"]
 
-    def test_the_mismatch_is_a_warning_and_not_an_error(self, tmp_path: Path) -> None:
+    def test_the_mismatch_is_a_warning_and_not_an_error(self, tmp_path: Path, unit: str) -> None:
         """A section crops, a dimension may be to a face this heuristic cannot see."""
-        finding = next(f for f in self._check(tmp_path, self.GAP_MM + 1000.0))
+        finding = next(f for f in self._check(tmp_path, self.GAP_MM + 1000.0, unit))
         assert finding.severity is Severity.WARNING
 
-    def test_the_message_gives_both_numbers(self, tmp_path: Path) -> None:
+    def test_the_message_gives_both_numbers(self, tmp_path: Path, unit: str) -> None:
         """A mismatch nobody can check is a mismatch nobody will act on."""
-        message = next(iter(self._check(tmp_path, self.GAP_MM + 1000.0))).message
-        assert "5000" in message.replace(",", "") or "5.0" in message
+        message = next(iter(self._check(tmp_path, self.GAP_MM + 1000.0, unit))).message
+        assert "5000 mm" in message
+        assert "4000 mm apart" in message

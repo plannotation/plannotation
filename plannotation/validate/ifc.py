@@ -8,7 +8,7 @@ named by anything the validator may dereference (9.1 forbids resolving a filenam
 in a plannotation), and a validator that went looking for one would be doing something
 the specification tells readers not to do.
 
-Three checks, and the reason two are errors and one is not
+Four checks, and the reason two are errors and two are not
 ----------------------------------------------------------
 * **PL-IFC-001**, an ``ifcGuid`` that names no entity in the model, and
   **PL-IFC-002**, an entity whose class is not the ``ifcClass`` claimed, are plain
@@ -20,6 +20,21 @@ Three checks, and the reason two are errors and one is not
   bounding geometry projected onto the viewport's plane. That is right for the ordinary
   case and wrong for a dimension to a face, to a centre line or to a grid, and 4.4
   files a finding that rests on a tolerance or a heuristic as a warning.
+* **PL-IFC-004**, a ``storey.elevation`` that is not the z of the storey's placement,
+  is a warning. SPEC 3.6 puts ``storey.elevation`` in model coordinates, which the
+  placement gives; but IFC states a storey's level a second time, in ``Elevation``,
+  measured from the building's own ±0,00, and a model whose placements leave the level
+  to that attribute is not wrong. The finding names the attribute when it is what the
+  plannotation wrote, because that is the mistake this check exists to catch: the two
+  agree only where the building's ±0,00 is at z = 0.
+
+The model is measured in metres
+-------------------------------
+ifcopenshell builds geometry in metres whatever length unit the file is written in,
+unless it is told to convert back, and this module never tells it to. A distance
+between two bounds is therefore converted from metres, not from ``model.lengthUnit``:
+scaling it by the file's unit instead would be right for a model in metres and a
+thousand times short for one in millimetres, which is most of them.
 
 Class matching is directional
 -----------------------------
@@ -49,7 +64,8 @@ from typing import TYPE_CHECKING, Any, Final
 from plannotation.errors import InputNotValidatableError, MissingExtraError
 from plannotation.validate.codes import finding
 from plannotation.validate.geometric import (
-    MM_PER_MODEL_UNIT,
+    METRES_PER_MODEL_UNIT,
+    ROUNDING,
     declared_length,
     measured_length_mm,
     millimetres,
@@ -91,9 +107,12 @@ REMEASURE_TOLERANCE_MM: Final = 5.0
 #: reported as not done rather than allowed to run away.
 MAX_MEASURED_ENTITIES: Final = 2000
 
+#: Millimetres per metre, the unit ifcopenshell builds geometry in.
+_MM_PER_METRE: Final = 1000.0
+
 
 class IfcModel:
-    """An open IFC model, with the two questions this module asks it.
+    """An open IFC model, with the questions this module asks it.
 
     Thin on purpose. It exists so that ``ifcopenshell`` is named in one place and so
     that the rest of this module can be read, and reasoned about, without it installed.
@@ -113,6 +132,7 @@ class IfcModel:
         self._model = model
         self._boxes: dict[str, tuple[tuple[float, float, float], tuple[float, float, float]]] = {}
         self._measured = 0
+        self._metres_per_unit: float | None = None
 
     def entity(self, guid: str) -> Any | None:  # noqa: ANN401 - ifcopenshell is untyped here
         """Return the entity with a GlobalId, or None.
@@ -128,18 +148,52 @@ class IfcModel:
         except RuntimeError:
             return None
 
-    def bounds(
-        self, guid: str
-    ) -> tuple[tuple[float, float, float], tuple[float, float, float]] | None:
-        """Return an entity's axis-aligned bounds in model coordinates.
+    def placement_z(self, guid: str) -> float | None:
+        """Return the z of an entity's placement in model coordinates, in metres.
+
+        Every relative placement is resolved, so this is the z SPEC 3.6 means by model
+        coordinates, the one ``plane.origin`` is stated in.
 
         Args:
             guid: The entity's GlobalId.
 
         Returns:
-            The minimum and maximum corner, or None when the entity has no geometry,
-            when its geometry cannot be built, or when this run has already measured
-            :data:`MAX_MEASURED_ENTITIES` entities.
+            The z in metres, or None when the model holds no such entity or places it
+            other than by a chain of local placements.
+        """
+        entity = self.entity(guid)
+        placement = getattr(entity, "ObjectPlacement", None) if entity is not None else None
+        chain = placement
+        while chain is not None:
+            if not chain.is_a("IfcLocalPlacement"):
+                return None
+            chain = chain.PlacementRelTo
+        if placement is None:
+            return None
+        matrix = _module("ifcopenshell.util.placement").get_local_placement(placement)
+        return float(matrix[2][3]) * self.metres_per_unit
+
+    @property
+    def metres_per_unit(self) -> float:
+        """The size of the file's length unit, in metres."""
+        if self._metres_per_unit is None:
+            unit = _module("ifcopenshell.util.unit")
+            self._metres_per_unit = float(unit.calculate_unit_scale(self._model))
+        return self._metres_per_unit
+
+    def bounds(
+        self, guid: str
+    ) -> tuple[tuple[float, float, float], tuple[float, float, float]] | None:
+        """Return an entity's axis-aligned bounds in model coordinates, in metres.
+
+        Args:
+            guid: The entity's GlobalId.
+
+        Returns:
+            The minimum and maximum corner in metres, whatever unit the file is written
+            in, or None when the entity has no geometry, when its geometry cannot be
+            built, or when this run has already measured :data:`MAX_MEASURED_ENTITIES`
+            entities.
         """
         if guid in self._boxes:
             return self._boxes[guid]
@@ -164,10 +218,10 @@ class IfcModel:
             entity: The ifcopenshell entity.
 
         Returns:
-            Its bounds in model coordinates, or None when the shape cannot be built.
-            A model that refuses to tessellate one element is an ordinary occurrence
-            and must not end the run, so the failure is logged and treated as "no
-            geometry".
+            Its bounds in model coordinates and in metres, or None when the shape cannot
+            be built. A model that refuses to tessellate one element is an ordinary
+            occurrence and must not end the run, so the failure is logged and treated
+            as "no geometry".
         """
         geom = _module("ifcopenshell.geom")
         settings = geom.settings()
@@ -175,6 +229,8 @@ class IfcModel:
         # passed to a generic setter, not a mode flag, so the boolean-trap rule does
         # not apply and the keyword form it suggests is a TypeError.
         settings.set("use-world-coords", True)  # noqa: FBT003
+        # Metres, whatever the file's unit; the module docstring says why that matters.
+        settings.set("convert-back-units", False)  # noqa: FBT003
         try:
             shape = geom.create_shape(settings, entity)
         except (RuntimeError, OSError) as exc:  # pragma: no cover - model-dependent
@@ -223,7 +279,7 @@ def _module(name: str) -> Any:  # noqa: ANN401 - the whole point is that it is u
     data they are either way.
 
     Args:
-        name: ``"ifcopenshell"`` or ``"ifcopenshell.geom"``.
+        name: ``"ifcopenshell"`` or one of its modules, such as ``"ifcopenshell.geom"``.
 
     Returns:
         The imported module.
@@ -256,11 +312,13 @@ def check_against_model(
         source: Which document the plannotation is, for the findings.
 
     Returns:
-        Every violation: unresolved GlobalIds, class mismatches, and dimensions whose
-        printed value disagrees with the distance re-measured in the model.
+        Every violation: unresolved GlobalIds, class mismatches, dimensions whose
+        printed value disagrees with the distance re-measured in the model, and storeys
+        stated at another elevation than the model places them.
     """
     found = _check_guids(plannotation, model, source=source)
     found += _check_dimensions(plannotation, model, source=source)
+    found += _check_storeys(plannotation, model, source=source)
     return found
 
 
@@ -368,17 +426,16 @@ def _check_dimensions(plannotation: Plannotation, model: IfcModel, *, source: st
         by more than 1 per cent or 5 mm, whichever is larger. A dimension that names
         fewer than two elements, names one without a GlobalId, or names one whose
         geometry cannot be built is not reported at all: there is nothing to compare.
+        ``model.lengthUnit`` is not needed: the value carries its own unit and the
+        model is measured in metres.
     """
-    unit = plannotation.source_model.length_unit if plannotation.source_model else None
-    if unit is None:
-        return []
     elements = {element.local_id: element for element in plannotation.elements or []}
     found: list[Finding] = []
     for position, annotation in enumerate(plannotation.annotations or []):
         expected = measured_length_mm(annotation)
         if expected is None:
             continue
-        measured = _remeasure(annotation, elements, model, unit=unit)
+        measured = _remeasure(annotation, elements, model)
         if measured is None:
             continue
         tolerance = max(REMEASURE_TOLERANCE_MM, REMEASURE_TOLERANCE_RATIO * abs(expected))
@@ -404,8 +461,6 @@ def _remeasure(
     annotation: Annotation,
     elements: Mapping[str, Element],
     model: IfcModel,
-    *,
-    unit: str,
 ) -> float | None:
     """Measure the distance between the two elements a dimension names.
 
@@ -418,10 +473,9 @@ def _remeasure(
         annotation: The dimension.
         elements: Every element on the page, by local id.
         model: The opened model.
-        unit: ``model.lengthUnit``, which the model's coordinates are in.
 
     Returns:
-        The distance in model millimetres, or None when it cannot be measured.
+        The distance in millimetres, or None when it cannot be measured.
     """
     named = [elements[ref] for ref in (annotation.measures or []) if ref in elements]
     if len(named) != 2:  # noqa: PLR2004 - a dimension runs between exactly two things
@@ -437,7 +491,61 @@ def _remeasure(
         for axis in range(3)
     ]
     distance = math.sqrt(sum(gap * gap for gap in gaps))
-    return distance * MM_PER_MODEL_UNIT[unit]
+    return distance * _MM_PER_METRE
+
+
+def _check_storeys(plannotation: Plannotation, model: IfcModel, *, source: str) -> list[Finding]:
+    """Check every viewport's ``storey.elevation`` against the storey's placement.
+
+    Args:
+        plannotation: The loaded plannotation.
+        model: The opened model.
+        source: Which document it is, for the findings.
+
+    Returns:
+        One warning per storey stated at another z than the model places it, beyond
+        the rounding of SPEC 3.8. A storey without a GlobalId or an elevation, one the
+        model does not hold, and a plannotation that declares no ``model.lengthUnit``
+        are not compared: there is nothing to compare, or no unit to compare it in.
+    """
+    unit = plannotation.source_model.length_unit if plannotation.source_model else None
+    if unit is None:
+        return []
+    metres = METRES_PER_MODEL_UNIT[unit]
+    found: list[Finding] = []
+    for position, viewport in enumerate(plannotation.viewports or []):
+        storey = viewport.storey
+        if storey is None or storey.ifc_guid is None or storey.elevation is None:
+            continue
+        placed = model.placement_z(storey.ifc_guid)
+        if placed is None:
+            continue
+        stated = storey.elevation * metres
+        if math.isclose(placed, stated, rel_tol=1e-9, abs_tol=ROUNDING * metres):
+            continue
+        message = (
+            f"viewport {viewport.local_id!r}: storey.elevation is {storey.elevation:g} "
+            f"{unit}, but {model.path.name} places storey {storey.ifc_guid} at z = "
+            f"{round(placed / metres, 3):g} {unit}; SPEC 3.6 states it in model "
+            f"coordinates"
+        )
+        attribute = getattr(model.entity(storey.ifc_guid), "Elevation", None)
+        if attribute is not None and math.isclose(
+            float(attribute) * model.metres_per_unit, stated, abs_tol=ROUNDING * metres
+        ):
+            message += (
+                ", and this is the storey's Elevation attribute, which IFC measures "
+                "from the building's own ±0,00"
+            )
+        found.append(
+            finding(
+                "PL-IFC-004",
+                message=message,
+                path=json_pointer(["viewports", position, "storey", "elevation"]),
+                source=source,
+            )
+        )
+    return found
 
 
 def remeasurable(plannotation: Plannotation) -> int:
