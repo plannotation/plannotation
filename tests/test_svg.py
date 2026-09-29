@@ -245,6 +245,15 @@ class TestGeometry:
         sheet = parse_svg(svg(product(shape=shape)))
         assert sheet.products[0].paper_bbox == pytest.approx(box, abs=0.05)
 
+    def test_each_subpath_is_an_outline_of_its_own(self) -> None:
+        """A wall with an opening is two rings, with no line drawn through the opening."""
+        shape = '<path d="M70,150 L80,150 L80,155 L70,155 Z M90,150 L100,150 L100,155 Z"/>'
+        (wall,) = parse_svg(svg(product(shape=shape))).products
+        assert wall.outlines == (
+            ((70.0, 147.0), (80.0, 147.0), (80.0, 142.0), (70.0, 142.0), (70.0, 147.0)),
+            ((90.0, 147.0), (100.0, 147.0), (100.0, 142.0), (90.0, 147.0)),
+        )
+
     def test_an_unreadable_path_is_skipped(self) -> None:
         """One bad path does not lose the rest of the drawing."""
         body = product(shape='<path d="M 1 Q"/><rect x="0" y="0" width="1" height="1"/>')
