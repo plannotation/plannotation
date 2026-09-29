@@ -208,7 +208,7 @@ def test_scaffold_covers_the_architecture() -> None:
 def test_the_site_serves_every_schema_at_its_id_and_the_spec_at_its_uri(
     tmp_path: Path,
 ) -> None:
-    """Documents declare these URLs; ``make docs`` must stage a file at each one."""
+    """Documents declare these URLs; ``make site`` must stage a file at each one."""
     loader = importlib.util.spec_from_file_location(
         "stage_site", REPO_ROOT / "tools" / "stage_site.py"
     )
