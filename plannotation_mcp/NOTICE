@@ -46,7 +46,9 @@ Example drawings
 
 `make examples` draws sheets from third-party IFC models, which it downloads and
 which are not included in this repository or its distributions. The drawings are
-adaptations of those models and carry their credit:
+adaptations of those models and carry their credit, and so does the one picture of
+them in this repository, docs/img/inspector-m18-101.png, a crop of M18-101 in the
+inspector with the credit beside it in the README:
 
   * Maleva 18 seniors' apartment building, Tallinn. IFC model (c) Esplan OÜ
     (esplan.ee), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), via

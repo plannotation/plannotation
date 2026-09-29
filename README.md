@@ -21,6 +21,9 @@ drawn and plannotated from its openly licensed IFC model; [docs/examples.md](doc
 says how.
 
 ![M18-101 in the inspector: the plannotation's outlines over the ground floor plan, one door's class, name and GlobalId in its tooltip](docs/img/inspector-m18-101.png)
+<sub>Drawn and annotated by Plannotation from the Maleva 18 preliminary design model
+(changes made); model © Esplan OÜ, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Not drawn or endorsed by Esplan OÜ.</sub>
 
 <!-- `make bench` writes its measured table between these markers. -->
 <!-- BENCHMARK:START -->

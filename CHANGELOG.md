@@ -57,7 +57,7 @@ lives in [`spec/SPEC.md`](spec/SPEC.md).
   callouts, and writes plannotations computed from the models. Every sheet validates
   at L3 with no findings against its model, and rebuilds byte for byte. SVG to PDF
   falls back to the Inkscape command line with `--inkscape-fallback`.
-- **Validator.** `plannotation validate` checks 49 rules in seven families — schema,
+- **Validator.** `plannotation validate` checks 50 rules in seven families — schema,
   references, geometry, provenance, carrier, IFC cross-check and PDF/A via veraPDF —
   with JSON Pointer paths, Markdown or JSON reports, and exit codes 0, 1 and 2. A
   fixture per rule proves each one fires.
