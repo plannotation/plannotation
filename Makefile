@@ -136,12 +136,13 @@ bench-dry: samples ## Say how many benchmark questions would reach the API; ask 
 # landing page shows the example sheets in $(EXAMPLES_DIR)/, if they are built. The
 # renderer's two packages are not project dependencies, so uv supplies them for that
 # one command and uv.lock does not change.
-SITE_DIR      ?= site
+SITE_DIR      := site
 SITE_EXAMPLES  = $(if $(wildcard $(EXAMPLES_DIR)/index.json),--examples $(EXAMPLES_DIR))
 RENDER        := PYTHONPATH=$(CURDIR) $(UV) run --no-project \
                  --with markdown-it-py==4.2.0 --with mdit-py-plugins==0.6.1 python
 
 site: ## Build the public site into site/: stage it, then render its Markdown
+	@case "$(SITE_DIR)" in ""|.|..|/*|*..*) echo "refusing to replace SITE_DIR=$(SITE_DIR)"; exit 1;; esac
 	rm -rf $(SITE_DIR)
 	$(RUN) python tools/stage_site.py $(SITE_DIR) $(SITE_EXAMPLES)
 	$(RENDER) tools/render_site.py $(SITE_DIR) $(SITE_EXAMPLES)
