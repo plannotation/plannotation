@@ -38,6 +38,7 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 import urllib.request
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -128,9 +129,13 @@ _COMMUNITY = (
     "https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/"
     "IFC%202.3.0.1%20(IFC%202x3)/"
 )
+#: The commit of the Community Sample Test Files the models are downloaded from: the
+#: last to change the Maleva 18 model, so that a change upstream cannot break a build.
+_COMMIT = "7ddf57a201f88a0c213d5322b02ed15e94a60a40"
+
 _MEDIA = (
     "https://media.githubusercontent.com/media/buildingsmart-community/"
-    "Community-Sample-Test-Files/main/IFC%202.3.0.1%20(IFC%202x3)/"
+    f"Community-Sample-Test-Files/{_COMMIT}/IFC%202.3.0.1%20(IFC%202x3)/"
 )
 
 #: Esplan's preliminary-design architecture model of Maleva 18.
@@ -365,38 +370,78 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def fetch(source: Source, directory: Path) -> Path:
-    """Return the cached model, downloading it first if it is not there.
+#: How many times a download is tried before the build gives up, and how long to wait
+#: before the second try, in seconds; each later wait is twice the last.
+DOWNLOAD_TRIES, DOWNLOAD_WAIT_S = 3, 2.0
+
+
+def fetch(source: Source, directory: Path, *, wait: float = DOWNLOAD_WAIT_S) -> Path:
+    """Return the cached model, downloading it first if it is not there or not the pinned one.
+
+    A cached file of another size or hash is replaced, not trusted: a cache restored
+    from before the pin changed holds the old model under the same name. A download is
+    written beside the cache, checked, and only then moved into place, so a download
+    cut short never lands under the model's name.
 
     Args:
         source: The model.
         directory: The cache.
+        wait: The wait before the second try of a download that failed, in seconds.
 
     Returns:
         The model's path, its size and hash verified.
 
     Raises:
-        ExportError: If the file, cached or downloaded, is not the pinned one.
+        ExportError: If no try downloads the pinned file.
     """
     path = directory / source.filename
-    if not path.is_file():
-        directory.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        if _pinned(path, source):
+            return path
+        _LOGGER.warning("%s is not the pinned model; downloading it again", path)
+        path.unlink()
+    directory.mkdir(parents=True, exist_ok=True)
+    problem = ""
+    for attempt in range(DOWNLOAD_TRIES):
+        if attempt:
+            time.sleep(wait * 2 ** (attempt - 1))
         _LOGGER.info("downloading %s", source.url)
-        with (
-            tempfile.NamedTemporaryFile(dir=directory, delete=False, suffix=".part") as part,
-            urllib.request.urlopen(source.url, timeout=120) as response,  # noqa: S310 - pinned https
-        ):
-            shutil.copyfileobj(response, part)
-        Path(part.name).replace(path)
-    size, digest = path.stat().st_size, sha256_of(path)
-    if size != source.size or digest != source.sha256:
-        msg = (
-            f"{path} is {size} bytes with SHA-256 {digest}, but the pinned model is "
-            f"{source.size} bytes with SHA-256 {source.sha256}; delete it to download "
-            f"it again"
-        )
-        raise ExportError(msg)
-    return path
+        handle, name = tempfile.mkstemp(dir=directory, suffix=".part")
+        os.close(handle)
+        part = Path(name)
+        try:
+            with (
+                part.open("wb") as out,
+                urllib.request.urlopen(source.url, timeout=120) as response,  # noqa: S310 - pinned https
+            ):
+                shutil.copyfileobj(response, out)
+            if _pinned(part, source):
+                part.replace(path)
+                return path
+            problem = (
+                f"the download is {part.stat().st_size} bytes with SHA-256 "
+                f"{sha256_of(part)}, but the pinned model is {source.size} bytes with "
+                f"SHA-256 {source.sha256}"
+            )
+        except OSError as error:
+            problem = f"the download failed: {error}"
+        finally:
+            part.unlink(missing_ok=True)
+    msg = f"{source.url}: {problem} ({DOWNLOAD_TRIES} tries)"
+    raise ExportError(msg)
+
+
+def _pinned(path: Path, source: Source) -> bool:
+    """Say whether a file is the pinned model: its size, then its hash.
+
+    Args:
+        path: The file.
+        source: The model.
+
+    Returns:
+        True when both match.
+    """
+    return path.stat().st_size == source.size and sha256_of(path) == source.sha256
 
 
 # ---------------------------------------------------------------------------

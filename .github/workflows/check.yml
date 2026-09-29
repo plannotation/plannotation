@@ -177,7 +177,8 @@ jobs:
       - name: Restore the pinned models
         # The model is served from Git LFS, billed to buildingSMART, so it is fetched
         # once and then cached. The key follows the file that pins it; an older entry
-        # is fine to restore, because fetch() re-checks each file's size and SHA-256.
+        # is fine to restore, because fetch() downloads again any file whose size or
+        # SHA-256 is not the pinned one.
         uses: actions/cache@v6
         with:
           path: .cache/examples

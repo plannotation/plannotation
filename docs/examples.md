@@ -21,9 +21,10 @@ credit; the drawings are Plannotation's, not Esplan's.
 
 ## What the build does
 
-- **Fetches** the model by URL into `.cache/examples/` (or the directory
-  `PLANNOTATION_EXAMPLES_CACHE` or `--cache` names) and refuses it unless its size and
-  SHA-256 match the pinned ones. Nothing is committed.
+- **Fetches** the model from a fixed upstream commit into `.cache/examples/` (or the
+  directory `PLANNOTATION_EXAMPLES_CACHE` or `--cache` names), unless a copy with the
+  pinned size and SHA-256 is there already, and refuses a download that does not match
+  them. Nothing is committed.
 - **Draws** the plan through a horizontal plane 1.2 m above the ground floor, square to
   the model's grid, which the model places 60.8° off its world axes. The section is cut
   halfway between grids 4 and 5, looking towards grid 1.

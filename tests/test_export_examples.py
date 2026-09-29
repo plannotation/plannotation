@@ -99,11 +99,34 @@ class TestTheCache:
         (tmp_path / "model.ifc").write_bytes(content)
         assert fetch(_pinned(content), tmp_path) == tmp_path / "model.ifc"
 
-    def test_a_cached_file_with_another_hash_is_refused(self, tmp_path: Path) -> None:
-        """A model that is not the pinned one would draw a different building."""
-        (tmp_path / "model.ifc").write_bytes(b"something else")
-        with pytest.raises(ExportError, match="SHA-256"):
-            fetch(_pinned(b"ISO-10303-21;\n"), tmp_path)
+    def test_a_cached_file_with_another_hash_is_downloaded_again(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A cache restored from before the pin changed holds the old model: replace it."""
+        content = b"ISO-10303-21;\n"
+        (tmp_path / "model.ifc").write_bytes(b"the model before the pin changed")
+        monkeypatch.setattr(
+            examples.urllib.request, "urlopen", lambda *_, **__: io.BytesIO(content)
+        )
+        assert fetch(_pinned(content), tmp_path).read_bytes() == content
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["model.ifc"]
+
+    def test_a_download_that_fails_is_tried_again(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A reset connection on a cold cache does not fail the build."""
+        content = b"ISO-10303-21;\n"
+        answers: list[object] = [OSError("connection reset"), io.BytesIO(content)]
+
+        def urlopen(*_: object, **__: object) -> object:
+            answer = answers.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+        monkeypatch.setattr(examples.urllib.request, "urlopen", urlopen)
+        assert fetch(_pinned(content), tmp_path, wait=0.0).read_bytes() == content
+        assert answers == []
 
     def test_a_missing_file_is_downloaded_and_verified(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -123,15 +146,22 @@ class TestTheCache:
         assert asked == ["https://example.invalid/model.ifc"]
         assert sorted(p.name for p in (tmp_path / "cache").iterdir()) == ["model.ifc"]
 
+    @pytest.mark.parametrize("sent", [b"tampered", b"ISO-10303"], ids=["other", "cut short"])
     def test_a_download_with_another_hash_is_refused(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sent: bytes
     ) -> None:
-        """Whatever the server sends."""
-        monkeypatch.setattr(
-            examples.urllib.request, "urlopen", lambda *_, **__: io.BytesIO(b"tampered")
-        )
+        """Whatever the server sends, every try, and nothing is left under the model's name."""
+        tries: list[str] = []
+
+        def urlopen(url: str, **_: object) -> io.BytesIO:
+            tries.append(url)
+            return io.BytesIO(sent)
+
+        monkeypatch.setattr(examples.urllib.request, "urlopen", urlopen)
         with pytest.raises(ExportError, match="pinned"):
-            fetch(_pinned(b"ISO-10303-21;\n"), tmp_path)
+            fetch(_pinned(b"ISO-10303-21;\n"), tmp_path, wait=0.0)
+        assert len(tries) == examples.DOWNLOAD_TRIES
+        assert list(tmp_path.iterdir()) == []
 
 
 @needs_ifc
