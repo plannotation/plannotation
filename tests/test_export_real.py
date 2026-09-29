@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from plannotation.export.ifc_svg_pdf import ExportedSheet
     from plannotation.export.models import BuiltModel
-    from plannotation.model import Annotation, Element
+    from plannotation.model import Annotation, Element, Viewport
 
 MOD_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 
@@ -46,6 +46,8 @@ def build_raised(
     guid_tags: bool = False,
     roof: bool = False,
     behind: bool = False,
+    beside: bool = False,
+    millimetres: bool = False,
 ) -> BuiltModel:
     """Build a two-room house whose ground floor stands at z = 10 m, turned by ``rotation``.
 
@@ -64,6 +66,13 @@ def build_raised(
         roof: Add a storey at the top of the walls, for a section's second level.
         behind: Add a metre-high box outside the south wall, which a section looking
             south cannot see.
+        beside: Add a metre cube outside the east wall at its south end, which a
+            section looking south sees beside the house.
+        millimetres: State the model's lengths in millimetres, as models from practice
+            do. The house is the same: placements, extrusions and the grid are given
+            to ``ifcopenshell.api`` in metres, which converts them, and what the model
+            holds in its own unit -- the door's size and the roof storey's
+            ``Elevation`` -- is written in millimetres.
 
     Returns:
         The model, set up for a plan of its ground floor along the model axes.
@@ -81,6 +90,8 @@ def build_raised(
 
     model = ifcopenshell.file(schema="IFC4")
     body, storey = models._setup(model, "Raised House")
+    # How many of the model's length unit make a metre.
+    unit = _in_millimetres(model) if millimetres else 1.0
     building = model.by_type("IfcBuilding")[0]
     raised = np.eye(4)
     raised[2, 3] = RAISED_Z
@@ -90,7 +101,7 @@ def build_raised(
     storey.Name, storey.Elevation = "Ground", 0.0
     if roof:
         upper = models._storey(model, building, "Roof", RAISED_Z + 2.8)
-        upper.Elevation = 2.8
+        upper.Elevation = 2.8 * unit
 
     turn = math.radians(rotation)
 
@@ -127,8 +138,8 @@ def build_raised(
         "IfcDoor",
         "Front door",
         at=(*world(1.0, 0.0), RAISED_Z),
-        width=1.0,
-        height=2.1,
+        width=1.0 * unit,
+        height=2.1 * unit,
         rotation=rotation,
     )
     door.OperationType = "SINGLE_SWING_LEFT"
@@ -142,17 +153,21 @@ def build_raised(
         rotation=rotation,
     )
 
-    if behind:
-        models._box(
-            model,
-            body,
-            storey,
-            "IfcBuildingElementProxy",
-            "Behind",
-            at=(*world(4.0, -1.2), RAISED_Z),
-            size=(1.0, 0.2, 1.0),
-            rotation=rotation,
-        )
+    for name, wanted, (x, y), size in (
+        ("Behind", behind, (4.0, -1.2), (1.0, 0.2, 1.0)),
+        ("Beside", beside, (6.0, 0.25), (1.0, 1.0, 1.0)),
+    ):
+        if wanted:
+            models._box(
+                model,
+                body,
+                storey,
+                "IfcBuildingElementProxy",
+                name,
+                at=(*world(x, y), RAISED_Z),
+                size=size,
+                rotation=rotation,
+            )
 
     for number, long_name, area, (x0, x1) in (
         ("1", "Room", "9,5", (0.25, 2.9)),
@@ -199,6 +214,24 @@ def build_raised(
         storey_guid=str(storey.GlobalId),
         datum=RAISED_Z,
     )
+
+
+def _in_millimetres(model: Any) -> float:  # noqa: ANN401 - ifcopenshell is untyped here
+    """State a model's lengths in millimetres rather than the metres it was set up in.
+
+    Args:
+        model: The ``ifcopenshell.file``, before anything is placed in it.
+
+    Returns:
+        How many of its length unit make a metre.
+    """
+    import ifcopenshell.api.unit
+    import ifcopenshell.util.unit
+
+    length = ifcopenshell.util.unit.get_project_unit(model, "LENGTHUNIT")
+    ifcopenshell.api.unit.edit_named_unit(model, unit=length, attributes={"Prefix": "MILLI"})
+    assert ifcopenshell.util.unit.calculate_unit_scale(model) == pytest.approx(0.001)
+    return 1000.0
 
 
 def _pset(model: Any, product: Any, name: str, values: dict[str, object]) -> None:  # noqa: ANN401
@@ -433,6 +466,30 @@ class TestTitleFields:
             assert block[0] < x0 <= x1 < block[2], text
             assert block[1] < y0 <= y1 < block[3], text
 
+    def test_a_wrapped_value_pushes_the_next_field_down(self, tmp_path: Path) -> None:
+        """No printed line overlaps another, and each field ends above the next one's label.
+
+        The last two fields share the bottom row, side by side; every field above that row
+        is checked against the label below it.
+        """
+        from itertools import combinations
+
+        from plannotation.export.sheet import title_block_box
+
+        spec, exported = self._export(tmp_path)
+        page = exported.plannotation.page
+        block = title_block_box(page.width_mm, page.height_mm, spec.title_block_mm)
+        printed = self._printed(exported, block)
+        for (text, (ax0, ay0, ax1, ay1)), (other, (bx0, by0, bx1, by1)) in combinations(printed, 2):
+            assert not (ax0 < bx1 and bx0 < ax1 and ay0 < by1 and by0 < ay1), (text, other)
+        texts = [text for text, _ in printed]
+        labels = [field.label for field in spec.title_fields]
+        for label, following in pairwise(labels[:-1]):
+            below = texts.index(following)
+            assert texts.index(label) < below - 1, label
+            last_value, next_label = printed[below - 1][1], printed[below][1]
+            assert last_value[1] > next_label[3], label
+
     def test_the_plannotation_states_the_spec_s_title_and_project(self, tmp_path: Path) -> None:
         """The spec's project, not the model's ``Raised House``, and the spec's title."""
         from plannotation.export.sheet import title_block_box
@@ -503,6 +560,7 @@ def _drawn_plan(
     rotation: float = 0.0,
     guid_tags: bool = False,
     behind: bool = False,
+    millimetres: bool = False,
     **changes: object,
 ) -> tuple[BuiltModel, ExportedSheet]:
     """Draw the raised house's ground floor square to its grid, as the examples draw.
@@ -512,6 +570,7 @@ def _drawn_plan(
         rotation: How far the house is turned, in degrees.
         guid_tags: Fill every wall's ``Tag`` with a GUID.
         behind: Add the low box outside the south wall.
+        millimetres: State the model's lengths in millimetres.
         **changes: Sheet spec fields to change from the full treatment.
 
     Returns:
@@ -532,7 +591,11 @@ def _drawn_plan(
     )
 
     built = build_raised(
-        tmp_path / "raised.ifc", rotation=rotation, guid_tags=guid_tags, behind=behind
+        tmp_path / "raised.ifc",
+        rotation=rotation,
+        guid_tags=guid_tags,
+        behind=behind,
+        millimetres=millimetres,
     )
     model = open_model(built.path)
     storey = find_storey(model, "Ground")
@@ -883,8 +946,10 @@ def _roofed(out: Path) -> BuiltModel:
 
     An ``IfcRoof`` with no body of its own stands on the roof storey and aggregates three
     ``IfcBuildingElementPart`` layers over the whole house: "Slab", 200 mm of concrete
-    on the walls; "Insulation", 200 mm of mineral wool on that; and "Bare", 50 mm with
-    no material at all.
+    on the walls; "Insulation", 200 mm of mineral wool on that, a material it has only
+    through its ``IfcBuildingElementPartType``; and "Bare", 50 mm with no material at
+    all. The roof's ``Pset_RoofCommon`` states that it bears no load, which its class
+    overrules when it is drawn.
 
     Args:
         out: Where to write the IFC file.
@@ -898,6 +963,7 @@ def _roofed(out: Path) -> BuiltModel:
     import ifcopenshell.api.material
     import ifcopenshell.api.root
     import ifcopenshell.api.spatial
+    import ifcopenshell.api.type
 
     from plannotation.export import models
 
@@ -911,10 +977,11 @@ def _roofed(out: Path) -> BuiltModel:
     ]
     roof = ifcopenshell.api.root.create_entity(model, ifc_class="IfcRoof", name="Roof")
     ifcopenshell.api.spatial.assign_container(model, products=[roof], relating_structure=upper)
-    for name, bottom, thickness, material in (
-        ("Slab", 0.0, 0.2, "Concrete C30/37"),
-        ("Insulation", 0.2, 0.2, "Mineral wool"),
-        ("Bare", 0.4, 0.05, None),
+    _pset(model, roof, "Pset_RoofCommon", {"LoadBearing": False})
+    for name, bottom, thickness, material, typed in (
+        ("Slab", 0.0, 0.2, "Concrete C30/37", False),
+        ("Insulation", 0.2, 0.2, "Mineral wool", True),
+        ("Bare", 0.4, 0.05, None, False),
     ):
         part = models._box(
             model,
@@ -926,9 +993,16 @@ def _roofed(out: Path) -> BuiltModel:
             size=(6.0, 4.0, thickness),
         )
         ifcopenshell.api.aggregate.assign_object(model, products=[part], relating_object=roof)
-        if material is not None:
-            made_of = ifcopenshell.api.material.add_material(model, name=material)
-            ifcopenshell.api.material.assign_material(model, products=[part], material=made_of)
+        if material is None:
+            continue
+        made_of = ifcopenshell.api.material.add_material(model, name=material)
+        holder = part
+        if typed:
+            holder = ifcopenshell.api.root.create_entity(
+                model, ifc_class="IfcBuildingElementPartType", name=name
+            )
+            ifcopenshell.api.type.assign_type(model, related_objects=[part], relating_type=holder)
+        ifcopenshell.api.material.assign_material(model, products=[holder], material=made_of)
     models.reseed_guids(model, "raised")
     models.write_model(model, out)
     return built
@@ -1019,22 +1093,28 @@ class TestARoofIsDrawnAsItsLayersAreMade:
         assert fills == {"Slab": "none", "Insulation": "none", "Bare": "#000"}
 
     def test_the_facts_hold_each_part_s_materials_and_its_roof(self, tmp_path: Path) -> None:
-        """Read from the model, not from the drawing."""
+        """Read from the model, not from the drawing: a type's material, the roof's LoadBearing."""
+        import ifcopenshell.util.element
+
         from plannotation.export.ifc_svg_pdf import read_model_facts
         from plannotation.export.views import open_model
 
         built = _roofed(tmp_path / "roofed.ifc")
-        parts = {
-            part.Name: str(part.GlobalId)
-            for part in open_model(built.path).by_type("IfcBuildingElementPart")
-        }
-        facts = read_model_facts(built.path, include=tuple(parts.values()))
-        assert {name: facts.materials.get(guid) for name, guid in parts.items()} == {
+        model = open_model(built.path)
+        parts = {part.Name: part for part in model.by_type("IfcBuildingElementPart")}
+        # The insulation's material is its type's; the part has none of its own.
+        insulation = parts["Insulation"]
+        assert ifcopenshell.util.element.get_material(insulation, should_inherit=False) is None
+        assert ifcopenshell.util.element.get_type(insulation) is not None
+        guids = {name: str(part.GlobalId) for name, part in parts.items()}
+        facts = read_model_facts(built.path, include=tuple(guids.values()))
+        assert {name: facts.materials.get(guid) for name, guid in guids.items()} == {
             "Slab": ("Concrete C30/37",),
             "Insulation": ("Mineral wool",),
             "Bare": None,
         }
-        assert {facts.aggregates[guid] for guid in parts.values()} == {("IfcRoof", None)}
+        # As the model states it, though an IfcRoof is drawn as structure whatever it says.
+        assert {facts.aggregates[guid] for guid in guids.values()} == {("IfcRoof", False)}
 
     def test_materials_are_read_in_the_model_s_order(self) -> None:
         """A layer set's layers as they are stacked; a layer associated alone, its own."""
@@ -1141,6 +1221,34 @@ class TestAPartIsDrawnAsItIsMade:
                 materials=materials,
                 aggregate=aggregate,
                 material_styles=material_styles,
+            )
+            == style
+        )
+
+    @pytest.mark.parametrize(
+        ("material", "style"),
+        [
+            ("Raudbetoon - Konstruktsioon", "solid"),
+            ("Soojustus- SPU", "outline"),
+            ("Soojustus - vill kõva", "outline"),
+            ("Membraan - vihmakindel katus", "outline"),
+        ],
+    )
+    def test_maleva_18_s_roof_layers_by_their_estonian_names(
+        self, material: str, style: str
+    ) -> None:
+        """The reinforced concrete is structure; the insulation and the membrane are not."""
+        from plannotation.export.drafting import style_of
+        from plannotation.export.examples import M18_MATERIAL_STYLES
+
+        assert (
+            style_of(
+                "IfcBuildingElementPart",
+                load_bearing=None,
+                is_a=lambda cls, ancestor: cls == ancestor,
+                materials=(material,),
+                aggregate=("IfcRoof", None),
+                material_styles=M18_MATERIAL_STYLES,
             )
             == style
         )
@@ -1992,11 +2100,15 @@ def _distance_to(point: tuple[float, float], segments: Any) -> float:  # noqa: A
     return float(np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]).min())
 
 
-def _drawn_section(tmp_path: Path) -> tuple[BuiltModel, ExportedSheet]:
+def _drawn_section(
+    tmp_path: Path, *, beside: bool = False, millimetres: bool = False
+) -> tuple[BuiltModel, ExportedSheet]:
     """Draw section A-A through the raised house, looking south, with the box behind it.
 
     Args:
         tmp_path: Where to build the model.
+        beside: Add the cube outside the east wall.
+        millimetres: State the model's lengths in millimetres.
 
     Returns:
         The model as drawn, and the exported sheet.
@@ -2013,7 +2125,9 @@ def _drawn_section(tmp_path: Path) -> tuple[BuiltModel, ExportedSheet]:
         storey_levels,
     )
 
-    built = build_raised(tmp_path / "raised.ifc", roof=True, behind=True)
+    built = build_raised(
+        tmp_path / "raised.ifc", roof=True, behind=True, beside=beside, millimetres=millimetres
+    )
     model = open_model(built.path)
     lines = grid_lines(model)
     cut = section_between(lines, first="A", second="B", looking_to="A", datum=RAISED_Z)
@@ -2035,15 +2149,71 @@ def _drawn_section(tmp_path: Path) -> tuple[BuiltModel, ExportedSheet]:
     return built, export_sheet(built, spec, generator_version="0.0.0-test")
 
 
+#: The raised house in metres, and the same house in millimetres, the unit most models
+#: from practice are in. The plane's coordinates are in the model's unit and the edges
+#: they are matched with in metres, so a check that passes in one may fail in the other.
+_IN_EITHER_UNIT = pytest.mark.parametrize(
+    "millimetres", [False, True], ids=["metres", "millimetres"]
+)
+
+
+def _on_paper(viewport: Viewport, point: tuple[float, float, float]) -> tuple[float, float]:
+    """Return where a point in metres falls on the paper, from the view's plane and scale.
+
+    Only the paper point of the plane's origin is taken from ``paperToPlane``; the rest
+    is the point's distance along the plane's axes, at the viewport's scale.
+
+    Args:
+        viewport: The view, in a model whose unit is the metre.
+        point: The point in model coordinates.
+
+    Returns:
+        The paper point in millimetres.
+    """
+    from plannotation.export.paper import invert
+
+    assert viewport.plane is not None
+    assert viewport.paper_to_plane is not None
+    assert viewport.scale is not None
+    x0, y0 = invert(viewport.paper_to_plane, 0.0, 0.0)
+    relative = [p - o for p, o in zip(point, viewport.plane.origin, strict=True)]
+    u = sum(r * a for r, a in zip(relative, viewport.plane.x_axis, strict=True))
+    v = sum(r * a for r, a in zip(relative, viewport.plane.y_axis, strict=True))
+    mm_per_m = 1000.0 / viewport.scale
+    return (x0 + u * mm_per_m, y0 + v * mm_per_m)
+
+
+def _vertical_stretches(element: Element, x: float) -> list[tuple[float, float]]:
+    """Return the stretches of a vertical paper line an element's outlines run along.
+
+    Args:
+        element: The element.
+        x: The line's paper x.
+
+    Returns:
+        Each segment of its outlines that lies on the line, as its lower and upper paper
+        y, from the bottom up.
+    """
+    return sorted(
+        (min(a[1], b[1]), max(a[1], b[1]))
+        for outline in element.paper_outlines or []
+        for a, b in pairwise(outline)
+        if abs(a[0] - x) <= 0.01 and abs(b[0] - x) <= 0.01 and a[1] != b[1]
+    )
+
+
 @needs_ifc
 class TestWhatAViewSeesBeyondItsCut:
     """Beyond a section's cut, and below a plan's, each drawn line is some product's edge."""
 
-    def test_a_section_describes_the_wall_and_door_it_looks_at(self, tmp_path: Path) -> None:
+    @_IN_EITHER_UNIT
+    def test_a_section_describes_the_wall_and_door_it_looks_at(
+        self, tmp_path: Path, *, millimetres: bool
+    ) -> None:
         """The south wall and its door, as projection, on lines the sheet really draws."""
         from plannotation.export.sheet import PAPER_SIZES
 
-        _, exported = _drawn_section(tmp_path)
+        _, exported = _drawn_section(tmp_path, millimetres=millimetres)
         seen = {
             e.name: e
             for e in exported.plannotation.elements or []
@@ -2058,22 +2228,29 @@ class TestWhatAViewSeesBeyondItsCut:
                 for point in (outline[0], ((ax + bx) / 2, (ay + by) / 2), outline[-1]):
                     assert _distance_to(point, lines) <= 0.05
 
-    def test_the_cut_walls_stay_cut(self, tmp_path: Path) -> None:
+    @_IN_EITHER_UNIT
+    def test_the_cut_walls_stay_cut(self, tmp_path: Path, *, millimetres: bool) -> None:
         """East, west and the partition straddle the plane."""
-        _, exported = _drawn_section(tmp_path)
+        _, exported = _drawn_section(tmp_path, millimetres=millimetres)
         cut = sorted(
             e.name or "" for e in exported.plannotation.elements or [] if e.representation == "cut"
         )
         assert cut == ["East", "Partition", "West"]
 
-    def test_what_the_wall_hides_is_not_described(self, tmp_path: Path) -> None:
+    @_IN_EITHER_UNIT
+    def test_what_the_wall_hides_is_not_described(
+        self, tmp_path: Path, *, millimetres: bool
+    ) -> None:
         """The box outside the south wall draws no line, so no element stands for it."""
-        _, exported = _drawn_section(tmp_path)
+        _, exported = _drawn_section(tmp_path, millimetres=millimetres)
         assert "Behind" not in {e.name for e in exported.plannotation.elements or []}
 
-    def test_a_plan_still_describes_what_it_sees_below_its_cut(self, tmp_path: Path) -> None:
+    @_IN_EITHER_UNIT
+    def test_a_plan_still_describes_what_it_sees_below_its_cut(
+        self, tmp_path: Path, *, millimetres: bool
+    ) -> None:
         """The same box, a metre high, lies below a plan cut at 1.2 m: it is seen from above."""
-        _, exported = _drawn_plan(tmp_path, behind=True)
+        _, exported = _drawn_plan(tmp_path, behind=True, millimetres=millimetres)
         (box,) = [e for e in exported.plannotation.elements or [] if e.name == "Behind"]
         assert box.representation == "projection"
         x0, y0, x1, y1 = box.paper_bbox
@@ -2103,13 +2280,81 @@ class TestWhatAViewSeesBeyondItsCut:
         question = next(q for q in exported.ground_truth if "doors (IfcDoor)" in str(q["question"]))
         assert question["answer"] == 1
 
+    @pytest.mark.parametrize("view", ["section", "plan"])
+    def test_in_millimetres_every_element_is_where_it_is_in_metres(
+        self, tmp_path: Path, view: str
+    ) -> None:
+        """The same elements in the same paper boxes: the model's unit moves no line."""
+
+        def boxes(*, millimetres: bool) -> dict[tuple[str | None, str | None], Any]:
+            folder = tmp_path / ("millimetres" if millimetres else "metres")
+            folder.mkdir()
+            if view == "section":
+                _, exported = _drawn_section(folder, millimetres=millimetres)
+            else:
+                _, exported = _drawn_plan(folder, behind=True, millimetres=millimetres)
+            return {
+                (e.name, e.representation): e.paper_bbox
+                for e in exported.plannotation.elements or []
+            }
+
+        metres, millimetres = boxes(millimetres=False), boxes(millimetres=True)
+        assert any(representation == "projection" for _, representation in metres)
+        assert sorted(millimetres, key=str) == sorted(metres, key=str)
+        for key, box in metres.items():
+            assert millimetres[key] == pytest.approx(box, abs=0.001), key
+
+    def test_a_line_two_products_run_along_is_split_where_their_edges_meet(
+        self, tmp_path: Path
+    ) -> None:
+        """The cube outside the east wall owns the lowest metre of the house's end line.
+
+        Looking south, the section draws one line up the house's east end, where the cut
+        passes through the east wall, from the floor to the top of the walls. The south
+        wall's end edge runs all the way along it; the cube's corner runs along its lowest
+        metre, nearer the viewer, so that metre is the cube's and the 1.8 m above it the
+        wall's. Each piece is drawn where it lies on the line, not measured from the
+        line's other end.
+        """
+        _, exported = _drawn_section(tmp_path, beside=True)
+        (viewport,) = exported.plannotation.viewports or []
+        assert viewport.scale == 50
+        elements = {e.name: e for e in exported.plannotation.elements or []}
+        cube, wall = elements["Beside"], elements["South"]
+        assert (cube.representation, wall.representation) == ("projection", "projection")
+        # The cube's face towards the viewer: 1 m square, from x = 6 m, on the floor.
+        corners = [
+            _on_paper(viewport, (x, 1.25, z))
+            for x in (6.0, 7.0)
+            for z in (RAISED_Z, RAISED_Z + 1.0)
+        ]
+        own = (
+            min(x for x, _ in corners),
+            min(y for _, y in corners),
+            max(x for x, _ in corners),
+            max(y for _, y in corners),
+        )
+        assert (own[2] - own[0], own[3] - own[1]) == (
+            pytest.approx(20.0, abs=0.01),
+            pytest.approx(20.0, abs=0.01),
+        )
+        assert cube.paper_bbox == pytest.approx(own, abs=0.01)
+        (end_x, _) = _on_paper(viewport, (6.0, 1.25, RAISED_Z))
+        assert _vertical_stretches(cube, end_x) == [
+            (pytest.approx(own[1], abs=0.01), pytest.approx(own[3], abs=0.01))
+        ]
+        assert _vertical_stretches(wall, end_x) == [
+            (pytest.approx(own[3], abs=0.01), pytest.approx(wall.paper_bbox[3], abs=0.01))
+        ]
+
+    @_IN_EITHER_UNIT
     @needs_cairo
-    def test_the_section_validates(self, tmp_path: Path) -> None:
+    def test_the_section_validates(self, tmp_path: Path, *, millimetres: bool) -> None:
         """Written out, not even a warning."""
         from plannotation.export.ifc_svg_pdf import write_sample
         from plannotation.validate import validate
 
-        built, exported = _drawn_section(tmp_path)
+        built, exported = _drawn_section(tmp_path, millimetres=millimetres)
         pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
         assert [finding.code for finding in validate(pdf).findings] == []
 
@@ -2120,11 +2365,19 @@ class TestTheDrawnPlanValidates:
     """The full treatment still writes a plannotation the validator accepts."""
 
     def test_square_to_the_world_there_are_no_findings(self, tmp_path: Path) -> None:
-        """Not even a warning."""
+        """Not even a warning, with what is seen below the cut described as projection.
+
+        The box outside the house, and what of the door the plan cuts shows below the cut.
+        """
         from plannotation.export.ifc_svg_pdf import write_sample
         from plannotation.validate import validate
 
-        built, exported = _drawn_plan(tmp_path)
+        built, exported = _drawn_plan(tmp_path, behind=True)
+        assert sorted(
+            e.name or ""
+            for e in exported.plannotation.elements or []
+            if e.representation == "projection"
+        ) == ["Behind", "Front door"]
         pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
         assert [finding.code for finding in validate(pdf).findings] == []
 

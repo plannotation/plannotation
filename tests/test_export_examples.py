@@ -12,8 +12,10 @@ import hashlib
 import importlib.util
 import io
 import json
+import math
 from dataclasses import replace
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import TYPE_CHECKING
 
 import pytest
@@ -223,6 +225,59 @@ class TestTheContract:
         assert (0xA4, 0xC5, 0xDB) in colours
         assert (0x9A, 0x5B, 0x00) in colours
         assert (0x3F, 0x7D, 0x3F) in colours
+
+    def test_the_light_blue_marks_what_is_seen_beyond_the_cut(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """On the box below the plan's cut the light blue, on a cut wall the element blue.
+
+        Each is sampled where the thumbnail draws the element's outline: the middle of the
+        box's long side, and the middle of the north wall's outer face, taken from paper
+        millimetres to pixels as the thumbnail takes them.
+        """
+        from PIL import Image
+
+        from plannotation.pdf import embed
+
+        out = self._build(tmp_path, monkeypatch)
+        plannotation = embed.read(out / "X-101.pdf").pages[0]
+        elements = {e.name: e for e in plannotation.elements or []}
+        box, wall = elements["Behind"], elements["North"]
+        assert (box.representation, wall.representation) == ("projection", "cut")
+        seen, cut = (0xA4, 0xC5, 0xDB), (0x1D, 0x6F, 0xA5)
+        with Image.open(out / "X-101.png") as image:
+            pixels = image.convert("RGB")
+        scale = pixels.width / plannotation.page.width_mm
+
+        def around(x_mm: float, y_mm: float) -> set[tuple[int, int, int]]:
+            """Return the colours within a pixel of a paper point.
+
+            Args:
+                x_mm: Paper x.
+                y_mm: Paper y, up from the page's bottom edge.
+
+            Returns:
+                The colours of the nine pixels around it.
+            """
+            x, y = round(x_mm * scale), round((plannotation.page.height_mm - y_mm) * scale)
+            return {pixels.getpixel((x + dx, y + dy)) for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
+
+        (a, b), *_ = sorted(
+            pairwise(box.paper_outlines[0]), key=lambda side: -math.dist(side[0], side[1])
+        )
+        on_box = around((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+        assert seen in on_box
+        assert cut not in on_box
+        top = max(y for outline in wall.paper_outlines or [] for _, y in outline)
+        (a, b), *_ = [
+            (a, b)
+            for outline in wall.paper_outlines or []
+            for a, b in pairwise(outline)
+            if a[1] == b[1] == top
+        ]
+        on_wall = around((a[0] + b[0]) / 2.0, top)
+        assert cut in on_wall
+        assert seen not in on_wall
 
     def test_a_rebuild_is_byte_identical(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
