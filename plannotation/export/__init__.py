@@ -4,8 +4,12 @@
 :mod:`plannotation.export.models` builds the seeded sample models,
 :mod:`plannotation.export.svg_render` draws them with IfcOpenShell's SVG serializer,
 :mod:`plannotation.export.ifc_svg_pdf` composes the sheet and computes its plannotation
-from the model, and :mod:`plannotation.export.to_pdf` converts it. The exporter needs the
-``ifc`` and ``svg`` extras; importing this package does not.
+from the model, and :mod:`plannotation.export.to_pdf` converts it. For a real model,
+:mod:`plannotation.export.views` finds the storey, datum, grid and cutting planes,
+:mod:`plannotation.export.doors` the door swings, and :mod:`plannotation.export.drafting`
+draws what an architect expects of the sheet; :mod:`plannotation.export.examples` builds
+the example drawings from pinned, openly licensed models. The exporter needs the ``ifc``
+and ``svg`` extras; importing this package does not.
 """
 
 from __future__ import annotations

@@ -212,7 +212,8 @@ class Level:
 
     Attributes:
         name: The storey's name.
-        elevation: Its elevation in metres.
+        elevation: The z of its floor in model coordinates, in metres. A level mark
+            prints it relative to the building's ±0,00 (:attr:`BuiltModel.datum`).
         guid: Its GlobalId.
     """
 
@@ -223,12 +224,17 @@ class Level:
 
 @dataclass(frozen=True)
 class SectionCut:
-    """Where a vertical section is cut, and which way it looks.
+    """A cutting plane placed explicitly: a vertical section, or a plan.
+
+    A plan whose x-axis is not the model's -- one drawn square to a grid that the
+    model places at an angle -- is cut through a horizontal plane given here rather
+    than through the serializer's storey plans, which only draw along the model axes.
 
     Attributes:
-        location: A point on the cutting plane, in metres. Its z is the height the
-            plane's y coordinate is measured from, so zero makes plane y an elevation.
-        direction: The plane's normal.
+        location: A point on the cutting plane, in metres. For a section its z is the
+            height the plane's y coordinate is measured from, so zero makes plane y an
+            elevation; for a plan it is the height of the cut.
+        direction: The plane's normal, pointing at the viewer: up for a plan.
         x_axis: The direction that runs to the right on the paper.
     """
 
@@ -236,19 +242,58 @@ class SectionCut:
     direction: tuple[float, float, float]
     x_axis: tuple[float, float, float]
 
+    def axes(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """Return the plane's x- and y-axis as the serializer lays them on the paper.
+
+        The y-axis is the normal crossed with the x-axis, so that x, y and the normal are
+        a right-handed frame whose normal points at the viewer.
+
+        Returns:
+            ``(x_axis, y_axis)``, unit vectors.
+        """
+        x_axis = _unit(self.x_axis)
+        normal = _unit(self.direction)
+        y_axis = (
+            normal[1] * x_axis[2] - normal[2] * x_axis[1],
+            normal[2] * x_axis[0] - normal[0] * x_axis[2],
+            normal[0] * x_axis[1] - normal[1] * x_axis[0],
+        )
+        return x_axis, _unit(y_axis)
+
+
+def _unit(vector: tuple[float, float, float]) -> tuple[float, float, float]:
+    """Return a vector scaled to unit length.
+
+    Args:
+        vector: A 3-vector.
+
+    Returns:
+        It, of length 1.
+    """
+    length = sum(component * component for component in vector) ** 0.5
+    return (vector[0] / length, vector[1] / length, vector[2] / length)
+
 
 @dataclass(frozen=True)
 class BuiltModel:
-    """A model that has been built and written.
+    """A model that has been built and written, or found, and how to draw it.
 
     Attributes:
         path: Where it was written.
         seed: The seed its GlobalIds were derived from.
-        storey_elevation: The drawn storey's elevation, in metres.
+        storey_elevation: The z of the drawn storey's floor in model coordinates, in
+            metres: the storey's placement, which is its ``Elevation`` only where the
+            building's ±0,00 is at z = 0.
         cut_height: Where a plan of it is cut above that storey, in metres; None when
             it is drawn as a section instead.
-        section: The vertical cut, for a model drawn as a section.
+        section: The cutting plane, where it is placed explicitly: the vertical cut of
+            a section, or the horizontal cut of a plan drawn along axes of its own.
         levels: The storeys a section marks, lowest first.
+        storey_name: The drawn storey's name, recorded in the viewport's ``storey``.
+        storey_guid: Its GlobalId, recorded beside the name when known.
+        datum: The z of the building's ±0,00 in model coordinates, in metres. Level
+            marks print their height above it.
+        include: The GlobalIds of the products to draw, or None to draw every one.
     """
 
     path: Path
@@ -257,6 +302,25 @@ class BuiltModel:
     cut_height: float | None
     section: SectionCut | None = None
     levels: tuple[Level, ...] = ()
+    storey_name: str | None = None
+    storey_guid: str | None = None
+    datum: float = 0.0
+    include: tuple[str, ...] | None = None
+
+    @property
+    def is_plan(self) -> bool:
+        """Say whether the drawing is a plan: cut by a horizontal plane.
+
+        Returns:
+            True for a storey plan or an explicit plane whose normal is vertical.
+        """
+        if self.section is None:
+            return True
+        return abs(self.section.direction[2]) > _VERTICAL
+
+
+#: How close to 1 a unit normal's z must be for its plane to count as horizontal.
+_VERTICAL = 0.999999
 
 
 def _metric_units(model: Any) -> None:  # noqa: ANN401 - ifcopenshell is untyped here
@@ -602,7 +666,9 @@ def build_floorplan(out: Path, *, seed: str = "floorplan") -> BuiltModel:
     assign_tags(model)
     reseed_guids(model, seed)
     write_model(model, out)
-    return BuiltModel(path=out, seed=seed, storey_elevation=0.0, cut_height=1.2)
+    return BuiltModel(
+        path=out, seed=seed, storey_elevation=0.0, cut_height=1.2, storey_name=str(storey.Name)
+    )
 
 
 def _placed(numpy: Any, x: float, y: float, degrees: float) -> Any:  # noqa: ANN401
@@ -699,7 +765,9 @@ def build_positionsplan(out: Path, *, seed: str = "positionsplan") -> BuiltModel
     # Cut low, at 500 mm. The beams here are ground beams 750 mm deep, so a plan cut
     # at the usual 1.2 m would pass above them and number only the columns; the 250 mm
     # slab lies below the cut and is drawn beyond it.
-    return BuiltModel(path=out, seed=seed, storey_elevation=0.0, cut_height=0.5)
+    return BuiltModel(
+        path=out, seed=seed, storey_elevation=0.0, cut_height=0.5, storey_name=str(storey.Name)
+    )
 
 
 #: The section model's storeys: name and elevation in metres. The last is the roof.

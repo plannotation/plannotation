@@ -91,6 +91,12 @@ _site/
 samples/*/
 samples/groundtruth.jsonl
 
+# The real example sheets and the third-party models they are drawn from. `make
+# examples` downloads each pinned model into .cache/examples/ (ignored with the rest of
+# .cache/ above) and rebuilds the sheets byte-identically; the models are other
+# people's work and never belong in the repository.
+examples/
+
 # ------------------------------------------------------------------ misc ----
 *.log
 .ipynb_checkpoints/

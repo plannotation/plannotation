@@ -327,9 +327,7 @@ class _Walker:
         if guid is not None:
             product = self._product(guid, element, view) or product
         if product is not None:
-            outline = _outline(name, element, matrix, self.height_mm)
-            if outline:
-                product.outlines.append(outline)
+            product.outlines.extend(_outlines(name, element, matrix, self.height_mm))
         return [
             _Frame(child, matrix, view, product, frame.base, frame.image_depth) for child in element
         ]
@@ -794,8 +792,11 @@ def _matrix3(text: str) -> Matrix3 | None:
 # ---------------------------------------------------------------------------
 # Geometry
 # ---------------------------------------------------------------------------
-def _outline(name: str, element: ET.Element, matrix: Matrix, height_mm: float) -> Outline:
-    """Return what one shape draws, in paper millimetres, y up.
+def _outlines(name: str, element: ET.Element, matrix: Matrix, height_mm: float) -> list[Outline]:
+    """Return what one shape draws, in paper millimetres, y up: one outline per ring.
+
+    A path's subpaths are drawn each on its own, so each is an outline of its own; joined
+    up, a wall with an opening would gain a line through the opening.
 
     Args:
         name: The element's local name.
@@ -804,21 +805,53 @@ def _outline(name: str, element: ET.Element, matrix: Matrix, height_mm: float) -
         height_mm: The page height, for the flip of SPEC 3.3.
 
     Returns:
-        The shape's points, rounded, with repeats dropped; empty for anything that is
+        The shape's rings, each rounded with repeats dropped; none for anything that is
         not a shape.
     """
-    local = _shape_points(name, element)
-    outline: list[Point] = []
-    for x, y in local:
-        page_x, page_y = apply(matrix, x, y)
-        point = (round(page_x, COORD_DECIMALS), round(height_mm - page_y, COORD_DECIMALS))
-        if not outline or outline[-1] != point:
-            outline.append(point)
-    return tuple(outline)
+    outlines: list[Outline] = []
+    for ring in _shape_rings(name, element):
+        outline: list[Point] = []
+        for x, y in ring:
+            page_x, page_y = apply(matrix, x, y)
+            point = (round(page_x, COORD_DECIMALS), round(height_mm - page_y, COORD_DECIMALS))
+            if not outline or outline[-1] != point:
+                outline.append(point)
+        if outline:
+            outlines.append(tuple(outline))
+    return outlines
 
 
-def _shape_points(name: str, element: ET.Element) -> list[Point]:  # noqa: PLR0911 -- one per shape
-    """Return a shape's points in its own user units.
+def _shape_rings(name: str, element: ET.Element) -> list[list[Point]]:
+    """Return a shape's rings in its own user units: a path's subpaths, else its one ring.
+
+    Args:
+        name: The element's local name.
+        element: The element.
+
+    Returns:
+        The rings; none for an element that is not a shape or cannot be read.
+    """
+    if name != "path":
+        points = _shape_points(name, element)
+        return [points] if points else []
+    try:
+        segments = list(SvgPath(element.get("d", "")).segments())
+    except (ValueError, IndexError):
+        logger.debug("an unreadable path was skipped")
+        return []
+    rings: list[list[Point]] = []
+    for segment in segments:
+        points = segment_points(segment)
+        if type(segment).__name__ == "Move" or not rings:
+            # A move starts a ring at its end; its start is the last ring's end.
+            rings.append([])
+            points = points[-1:]
+        rings[-1] += points
+    return [ring for ring in rings if ring]
+
+
+def _shape_points(name: str, element: ET.Element) -> list[Point]:
+    """Return the points of a shape other than a path in its own user units.
 
     Args:
         name: The element's local name.
@@ -831,13 +864,6 @@ def _shape_points(name: str, element: ET.Element) -> list[Point]:  # noqa: PLR09
     def attribute(key: str) -> float:
         return _number(element.get(key)) or 0.0
 
-    if name == "path":
-        try:
-            segments = list(SvgPath(element.get("d", "")).segments())
-        except (ValueError, IndexError):
-            logger.debug("an unreadable path was skipped")
-            return []
-        return [point for segment in segments for point in segment_points(segment)]
     if name == "rect":
         x, y, w, h = attribute("x"), attribute("y"), attribute("width"), attribute("height")
         return [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)]

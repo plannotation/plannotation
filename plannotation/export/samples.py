@@ -19,7 +19,13 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from plannotation.export.ifc_svg_pdf import GridAxis, SheetSpec, export_sheet, write_sample
+from plannotation.export.ifc_svg_pdf import (
+    GridAxis,
+    SheetSpec,
+    Wording,
+    export_sheet,
+    write_sample,
+)
 from plannotation.export.models import (
     POSITIONSPLAN_X,
     POSITIONSPLAN_Y,
@@ -28,6 +34,7 @@ from plannotation.export.models import (
     build_positionsplan,
     build_section,
 )
+from plannotation.model import Project
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -35,6 +42,15 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from plannotation.model import Discipline, DrawingType
+
+#: The project the three samples belong to, as their title blocks print it.
+PROJECT = Project(name="Wohnanlage Lindenhof", number="2024-118")
+
+#: The revision every sample is issued at.
+REVISION = "A"
+
+#: The words a German title block prints around its values.
+GERMAN = Wording(project="Projekt", revision="Index", scale="M 1:{denominator}")
 
 
 @dataclass(frozen=True)
@@ -168,6 +184,9 @@ def build_samples(
                 callout_to=spec.callout_to,
                 drawing_type=spec.drawing_type,
                 discipline=spec.discipline,
+                project=PROJECT,
+                revision=REVISION,
+                wording=GERMAN,
             ),
             generator_version=version,
         )

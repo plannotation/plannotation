@@ -159,6 +159,17 @@ class TestPaperGeometry:
         points = path_points("M0,0 L10,0", page_height_mm=297.0, offset=(20.0, 37.0))
         assert points[0] == (20.0, 260.0)
 
+    def test_each_subpath_is_its_own_ring(self) -> None:
+        """A wall with an opening is two rings, with no line through the opening."""
+        from plannotation.export.geometry import path_rings
+
+        rings = path_rings("M0,0 L10,0 L10,5 Z M20,0 L30,0 L30,5 Z m5,0 l1,0", page_height_mm=100.0)
+        assert rings == [
+            [(0.0, 100.0), (10.0, 100.0), (10.0, 95.0), (0.0, 100.0)],
+            [(20.0, 100.0), (30.0, 100.0), (30.0, 95.0), (20.0, 100.0)],
+            [(25.0, 100.0), (26.0, 100.0)],
+        ]
+
     def test_a_bbox_is_ordered_lower_left_first(self) -> None:
         """SPEC 3.4, which PL-GEO-002 checks."""
         assert bounding_box([(290.0, 88.0), (130.0, 208.0)]) == (130.0, 88.0, 290.0, 208.0)
