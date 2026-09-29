@@ -1,0 +1,40 @@
+{
+  "examples": [
+    {
+      "name": "A-101",
+      "pdf": "A-101.pdf",
+      "png": "A-101.png",
+      "sheet": "A-101",
+      "title": "Ground floor & stair",
+      "paper": "A1",
+      "scale": "1:100",
+      "elements": 3,
+      "annotations": 1,
+      "source": {
+        "title": "Test model",
+        "url": "https://example.org/model",
+        "author": "Test Author",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    },
+    {
+      "name": "A-301",
+      "pdf": "A-301.pdf",
+      "png": "A-301.png",
+      "sheet": "A-301",
+      "title": "Section <A-A>",
+      "paper": "A2",
+      "scale": "1:50",
+      "elements": 1,
+      "annotations": 0,
+      "source": {
+        "title": "Test model",
+        "url": "https://example.org/model",
+        "author": "Test Author",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    }
+  ]
+}
