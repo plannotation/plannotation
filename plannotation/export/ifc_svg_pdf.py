@@ -1023,11 +1023,14 @@ def edges_beyond(local: NDArray[np.float64], faces: NDArray[np.int64]) -> NDArra
     first = np.ones(len(pairs), dtype=bool)
     first[1:] = (pairs[1:] != pairs[:-1]).any(axis=1)
     starts = np.flatnonzero(first)
-    bend = np.zeros(len(pairs))
-    bend[1:] = 1.0 - (sides[1:] * sides[:-1]).sum(axis=1)
-    bend[first] = 0.0
-    lone = np.diff(np.append(starts, len(pairs))) == 1
-    kept = pairs[starts[lone | (np.maximum.reduceat(bend, starts) > _FLAT)]]
+    count = np.diff(np.append(starts, len(pairs)))
+    towards = (sides * np.repeat(sides[starts], count, axis=0)).sum(axis=1)
+    # Faces bend where their normals part from the first face's. More than two faces whose
+    # normals are all parallel or opposite are one flat face drawn from both sides, as
+    # Archicad writes doors and windows, and the diagonals they share are no edges; two
+    # opposite faces alone are where a sheet of no thickness ends, which is an edge.
+    bend = np.where(np.repeat(count > 2, count), 1.0 - np.abs(towards), 1.0 - towards)  # noqa: PLR2004
+    kept = pairs[starts[(count == 1) | (np.maximum.reduceat(bend, starts) > _FLAT)]]
     ends = welded * _WELD_M
     near, far = ends[kept[:, 0]], ends[kept[:, 1]]
     beyond = (near[:, 2] <= 0) | (far[:, 2] <= 0)
@@ -1065,8 +1068,10 @@ def line_owners(
         edges: Each product's edges beyond the cut, by GlobalId (:func:`edges_beyond`).
 
     Returns:
-        For each segment, its pieces in order, each with the product it is an edge of;
-        a stretch that runs along no product's edge is left out.
+        For each segment, its pieces in order, each with the product it is an edge of.
+        A stretch that runs along no product's edge is left out, and so is one no
+        longer than the tolerance an edge is matched within, which cannot say whose it
+        is: a segment that short, or where one edge ends a hair before another.
     """
     guids = sorted(guid for guid, rows in edges.items() if len(rows))
     if not guids:
@@ -1084,6 +1089,10 @@ def line_owners(
         table, owner = every[found], owners_of[found]
         x0, y0, d0, x1, y1, d1 = table.T
         run = math.hypot(sx1 - sx0, sy1 - sy0)
+        if run <= tolerance:
+            # Shorter than the tolerance an edge is matched within: it cannot say whose.
+            owners.append([])
+            continue
         near = (
             (np.minimum(x0, x1) - tolerance <= max(sx0, sx1))
             & (min(sx0, sx1) <= np.maximum(x0, x1) + tolerance)
@@ -1102,15 +1111,26 @@ def line_owners(
         end = ((x1 - sx0) * ux + (y1 - sy0) * uy) / run
         low = np.maximum(0.0, np.minimum(start, end))
         high = np.minimum(1.0, np.maximum(start, end))
+        # An edge runs along the segment where it lies on the segment's line over the
+        # stretch they share. Its offset from that line is measured at that stretch's two
+        # ends, not at the edge's own: a long edge seen along a short segment would
+        # otherwise be judged by how the segment's rounding tilts it metres away.
+        offset0 = (x0 - sx0) * uy - (y0 - sy0) * ux
+        offset1 = (x1 - sx0) * uy - (y1 - sy0) * ux
+        span = np.where(end != start, end - start, 1.0)
         along = np.flatnonzero(
             near
-            & (np.abs((x0 - sx0) * uy - (y0 - sy0) * ux) <= tolerance)
-            & (np.abs((x1 - sx0) * uy - (y1 - sy0) * ux) <= tolerance)
+            & (np.abs(offset0 + (low - start) / span * (offset1 - offset0)) <= tolerance)
+            & (np.abs(offset0 + (high - start) / span * (offset1 - offset0)) <= tolerance)
             & ((high - low) * run > tolerance)
         )
         pieces: list[Piece] = []
         cuts = sorted({0.0, 1.0, *map(float, low[along]), *map(float, high[along])})
         for first, second in pairwise(cuts):
+            if (second - first) * run <= tolerance:
+                # Where one edge ends a hair before another along the same line: no
+                # stretch this short can say whose it is.
+                continue
             middle = (first + second) / 2.0
             cover = along[(low[along] <= middle) & (middle <= high[along])]
             if not len(cover):
@@ -1118,7 +1138,7 @@ def line_owners(
             share = (middle - start[cover]) / (end[cover] - start[cover])
             depth = np.round(d0[cover] + share * (d1[cover] - d0[cover]), 4)
             guid = guids[owner[cover[int(np.argmax(depth))]]]
-            if pieces and pieces[-1][2] == guid and pieces[-1][1] == first:
+            if pieces and pieces[-1][2] == guid and (first - pieces[-1][1]) * run <= tolerance:
                 pieces[-1] = (pieces[-1][0], second, guid)
             else:
                 pieces.append((first, second, guid))
@@ -1258,7 +1278,10 @@ def _dot_owner(
     share = np.clip(
         ((point[0] - x0) * dx + (point[1] - y0) * dy) / np.where(span > 0, span, 1.0), 0.0, 1.0
     )
-    through = np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]) <= _EDGE_TOLERANCE_M
+    # An edge seen end on draws nothing on the paper, so it owns no line either.
+    through = (span > 0) & (
+        np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]) <= _EDGE_TOLERANCE_M
+    )
     if not through.any():
         return []
     depth = np.where(through, np.round(d0 + share * (d1 - d0), 4), -np.inf)

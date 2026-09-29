@@ -1676,6 +1676,24 @@ class TestEdgesBeyond:
             _edge((*a, -1.0), (*b, -1.0)) for a, b in pairwise([*ring, ring[0]])
         }
 
+    def test_a_face_drawn_from_both_sides_has_no_diagonal(self) -> None:
+        """Archicad writes doors and windows with each face twice, once each way round."""
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import edges_beyond
+
+        square = [(0.0, 0.0, -1.0), (1.0, 0.0, -1.0), (1.0, 1.0, -1.0), (0.0, 1.0, -1.0)]
+        # The front two triangles, then the same two turned over, all four sharing the
+        # diagonal from the first corner to the third.
+        faces = [(0, 1, 2), (0, 2, 3), (0, 2, 1), (0, 3, 2)]
+        rows = edges_beyond(np.array(square), np.array(faces))
+        assert _edge_set(rows) == {
+            _edge(square[0], square[1]),
+            _edge(square[1], square[2]),
+            _edge(square[2], square[3]),
+            _edge(square[3], square[0]),
+        }
+
     def test_nothing_in_front_of_the_plane(self) -> None:
         """A shape wholly on the viewer's side has no edge beyond the cut."""
         from plannotation.export.ifc_svg_pdf import edges_beyond
@@ -1736,13 +1754,76 @@ class TestLineOwners:
         assert pieces == [(0.0, round(1 / 3, 6), "along")]
 
     def test_a_segment_too_short_for_a_direction_goes_to_the_edge_through_it(self) -> None:
-        """Four millimetres: the edge through its midpoint, not a nearer one beside it."""
+        """Eight millimetres: the edge through its midpoint, not a nearer one beside it.
+
+        The nearer edge passes 7 mm from the midpoint, inside the box the segment is
+        searched in but outside the tolerance, so only the rule decides.
+        """
         pieces = self._owners(
-            (0.0, 0.0, 0.004, 0.0),
-            through=[(0.002, -1.0, -1.0, 0.002, 1.0, -1.0)],
-            beside=[(0.02, -1.0, -0.5, 0.02, 1.0, -0.5)],
+            (0.0, 0.0, 0.008, 0.0),
+            through=[(0.004, -1.0, -1.0, 0.004, 1.0, -1.0)],
+            beside=[(0.011, -1.0, -0.5, 0.011, 1.0, -0.5)],
         )
         assert pieces == [(0.0, 1.0, "through")]
+
+    def test_an_edge_seen_end_on_owns_no_short_segment(self) -> None:
+        """It draws nothing on the paper, whichever of its ends comes first."""
+        for corner in ((0.004, 0.0, -2.0, 0.004, 0.0, 0.0), (0.004, 0.0, 0.0, 0.004, 0.0, -2.0)):
+            pieces = self._owners(
+                (0.0, 0.0, 0.008, 0.0),
+                drawn=[(-1.0, 0.0, -1.0, 1.0, 0.0, -1.0)],
+                corner=[corner],
+            )
+            assert pieces == [(0.0, 1.0, "drawn")]
+
+    def test_a_segment_no_longer_than_the_tolerance_is_nobody_s(self) -> None:
+        """Four millimetres cannot say whose edge they are."""
+        pieces = self._owners(
+            (0.0, 0.0, 0.004, 0.0), through=[(0.002, -1.0, -1.0, 0.002, 1.0, -1.0)]
+        )
+        assert pieces == []
+
+    def test_a_hidden_edge_gets_no_sliver_where_the_nearer_one_stops_short(self) -> None:
+        """A wall's edge ending 0.04 mm before the drawn line does: the wall behind gets nothing.
+
+        Paper points are rounded to 0.001 mm and model points welded to 0.1 mm, so a
+        line and the edge it draws seldom end at exactly the same place.
+        """
+        pieces = self._owners(
+            (0.0, 0.0, 7.5, 0.0),
+            near=[(0.0, 0.0, -1.0, 7.49996, 0.0, -1.0)],
+            far=[(0.0, 0.0, -2.0, 7.6, 0.0, -2.0)],
+        )
+        assert [owner for _, _, owner in pieces] == ["near"]
+        assert pieces[0][1] == pytest.approx(1.0, abs=1e-5)
+
+    def test_an_edge_that_leaves_the_line_owns_none_of_it(self) -> None:
+        """Nearer, and starting on the line, but only one of its ends is on it."""
+        pieces = self._owners(
+            (0.0, 0.0, 3.0, 0.0),
+            along=[(0.0, 0.0, -1.0, 3.0, 0.0, -1.0)],
+            slant=[(1.0, 0.0, -0.5, 2.0, 1.0, -0.5)],
+        )
+        assert pieces == [(0.0, 1.0, "along")]
+
+    def test_a_short_piece_of_a_long_slope_is_the_slope_s(self) -> None:
+        """A 20 mm piece of a 10 m roof slope, its ends rounded as a sheet rounds them.
+
+        The piece's direction is off the slope's by rounding, which tilts its line
+        millimetres away from the slope's far ends; along the piece itself they agree.
+        A short collinear edge two metres further back does not take it.
+        """
+        slope = math.radians(30.0)
+
+        def on(x: float) -> tuple[float, float]:
+            return (x, x * math.tan(slope))
+
+        pieces = self._owners(
+            (3.5065, 2.0245, 3.5239, 2.0345),
+            roof=[(0.0, 0.0, -1.0, 8.660, 5.0, -1.0)],
+            behind=[(*on(3.4), -3.0, *on(3.7), -3.0)],
+        )
+        assert pieces == [(0.0, 1.0, "roof")]
 
     def test_no_edges_no_owners(self) -> None:
         """Every line is returned, with no pieces."""
