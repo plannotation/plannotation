@@ -89,6 +89,10 @@ THUMBNAIL_WIDTH_PX = 1200
 #: (``--element``, ``--annotation`` and ``--viewport`` in inspector/index.html).
 INSPECTOR_COLOURS = {"element": "#1d6fa5", "annotation": "#9a5b00", "viewport": "#3f7d3f"}
 
+#: The element blue at 40 % on white, for what a view sees beyond its cut: the sheet
+#: draws it finer than what is cut, and the thumbnail draws it lighter.
+SEEN_COLOUR = "#a4c5db"
+
 #: The licence every example's source model is published under.
 CC_BY_4 = ("CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/")
 
@@ -498,8 +502,9 @@ def _paper_name(width_mm: float, height_mm: float) -> str:
 def thumbnail(pdf: Path, plannotation: Plannotation, out: Path) -> Path:
     """Render page 1 with the plannotation's outlines over it, as the inspector shows it.
 
-    Viewports dashed in green, elements' boxes and outlines in blue, annotations' boxes
-    and geometry in amber, one pixel wide -- the inspector's light theme.
+    Viewports dashed in green, elements' boxes and outlines in blue -- a lighter blue
+    for what is seen beyond the cut -- and annotations' boxes and geometry in amber, one
+    pixel wide: the inspector's light theme.
 
     Args:
         pdf: The plannotated PDF.
@@ -529,7 +534,8 @@ def thumbnail(pdf: Path, plannotation: Plannotation, out: Path) -> Path:
     for viewport in plannotation.viewports or []:
         _dashed_box(draw, [pixel(viewport.paper_bbox[:2]), pixel(viewport.paper_bbox[2:])])
     for element in plannotation.elements or []:
-        colour = INSPECTOR_COLOURS["element"]
+        seen = element.representation == "projection"
+        colour = SEEN_COLOUR if seen else INSPECTOR_COLOURS["element"]
         _box(draw, element.paper_bbox, pixel, colour)
         for outline in element.paper_outlines or []:
             draw.line([pixel(p) for p in outline], fill=colour, width=1)

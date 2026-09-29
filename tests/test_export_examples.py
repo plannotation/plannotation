@@ -141,8 +141,9 @@ class TestTheContract:
     def _build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         """Build one stand-in example into ``tmp_path / "out"``.
 
-        The raised house of ``test_export_real`` goes into a cache under a pin of its
-        own, and the example list is swapped for one sheet drawn from it.
+        The raised house of ``test_export_real``, with the low box outside it that its
+        plan sees below the cut, goes into a cache under a pin of its own, and the example
+        list is swapped for one sheet drawn from it.
 
         Args:
             tmp_path: Scratch space.
@@ -155,7 +156,7 @@ class TestTheContract:
 
         cache = tmp_path / "cache"
         cache.mkdir(parents=True)
-        built, _ = _drawn_plan(tmp_path)
+        built, _ = _drawn_plan(tmp_path, behind=True)
         content = built.path.read_bytes()
         (cache / "raised.ifc").write_bytes(content)
         source = _pinned(content, "raised.ifc")
@@ -210,7 +211,7 @@ class TestTheContract:
     def test_the_thumbnail_is_1200_px_wide_with_the_inspector_s_outlines(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Element blue, annotation amber, viewport green: the inspector's light theme."""
+        """Element blue, lighter beyond the cut, annotation amber, viewport green."""
         from PIL import Image
 
         out = self._build(tmp_path, monkeypatch)
@@ -219,6 +220,7 @@ class TestTheContract:
             assert image.height == pytest.approx(1200 * 420 / 594, abs=1)
             colours = {colour for _, colour in image.convert("RGB").getcolors(1 << 20) or []}
         assert (0x1D, 0x6F, 0xA5) in colours
+        assert (0xA4, 0xC5, 0xDB) in colours
         assert (0x9A, 0x5B, 0x00) in colours
         assert (0x3F, 0x7D, 0x3F) in colours
 
