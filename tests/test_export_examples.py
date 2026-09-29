@@ -262,8 +262,9 @@ class TestTheContract:
             x, y = round(x_mm * scale), round((plannotation.page.height_mm - y_mm) * scale)
             return {pixels.getpixel((x + dx, y + dy)) for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
 
-        (a, b), *_ = sorted(
-            pairwise(box.paper_outlines[0]), key=lambda side: -math.dist(side[0], side[1])
+        a, b = max(
+            (side for outline in box.paper_outlines or [] for side in pairwise(outline)),
+            key=lambda side: math.dist(*side),
         )
         on_box = around((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
         assert seen in on_box

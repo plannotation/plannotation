@@ -1188,6 +1188,8 @@ class TestAPartIsDrawnAsItIsMade:
         [
             # The first expression that any material matches, not the first material.
             ("IfcBuildingElementPart", ("Wool", "Concrete"), None, _CONCRETE_FIRST, "solid"),
+            # An expression is searched for anywhere in the name, not only at its start.
+            ("IfcBuildingElementPart", ("Reinforced concrete",), None, _CONCRETE_FIRST, "solid"),
             ("IfcBuildingElementPart", ("Wool", "Concrete"), None, _WOOL_FIRST, "partition"),
             # Materials that match nothing: the class's style, whatever the whole is.
             ("IfcBuildingElementPart", ("Glass",), ("IfcRoof", None), _CONCRETE_FIRST, "outline"),
@@ -2346,6 +2348,16 @@ class TestWhatAViewSeesBeyondItsCut:
         )
         assert cube.paper_bbox == pytest.approx(own, abs=0.01)
         (end_x, _) = _on_paper(viewport, (6.0, 1.25, RAISED_Z))
+        # The premise: the sheet draws the house's end as one line, floor to wall top,
+        # which the two products share unevenly.
+        lines = _projection_lines(exported.svg, exported.plannotation.page.height_mm)
+        assert any(
+            abs(x0 - end_x) <= 0.01
+            and abs(x1 - end_x) <= 0.01
+            and min(y0, y1) <= own[1] + 0.01
+            and max(y0, y1) >= wall.paper_bbox[3] - 0.01
+            for x0, y0, x1, y1 in lines
+        )
         assert _vertical_stretches(cube, end_x) == [
             (pytest.approx(own[1], abs=0.01), pytest.approx(own[3], abs=0.01))
         ]
@@ -2362,7 +2374,8 @@ class TestWhatAViewSeesBeyondItsCut:
 
         built, exported = _drawn_section(tmp_path, millimetres=millimetres)
         pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
-        assert [finding.code for finding in validate(pdf).findings] == []
+        report = validate(pdf, ifc_model=built.path)
+        assert [finding.code for finding in report.findings] == []
 
 
 @needs_ifc
@@ -2385,7 +2398,8 @@ class TestTheDrawnPlanValidates:
             if e.representation == "projection"
         ) == ["Behind", "Front door"]
         pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
-        assert [finding.code for finding in validate(pdf).findings] == []
+        report = validate(pdf, ifc_model=built.path)
+        assert [finding.code for finding in report.findings] == []
 
     def test_turned_only_the_rounded_axes_are_reported(self, tmp_path: Path) -> None:
         """PL-GEO-010 until the validator allows for three-decimal rounding."""
