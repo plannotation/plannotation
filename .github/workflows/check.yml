@@ -190,6 +190,12 @@ jobs:
       - name: Build the example sheets and validate each against its model
         run: make examples-check
 
+      - name: Pin what the real sheets describe
+        # These tests skip unless the pinned model is cached, which it now is.
+        env:
+          PLANNOTATION_EXAMPLES_CACHE: .cache/examples
+        run: uv run --no-sync pytest -q tests/test_examples_real.py
+
       - name: Upload the sheets
         # Also when the check fails: the sheets are what to look at then.
         if: always()
