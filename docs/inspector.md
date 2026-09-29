@@ -64,10 +64,8 @@ right, so that part is checked by hand against the samples:
 10. With a drawing open, choose a file that is not a PDF. A note should say why it
     could not be opened, and no empty box or tooltip should be left from the drawing.
 
-And on the site, staged with an examples directory
-(`uv run python tools/stage_site.py site --examples DIR`, where DIR holds the
-`index.json` and files that `tools/stage_site.py` describes; then
-`python -m http.server -d site`):
+And on the site, built as GitHub Pages builds it (`make examples site site-serve`,
+then http://localhost:8000/):
 
 11. `/inspector/` opens the first example, fitted to the width and sharp.
 12. Choosing the other example from the picker opens it and puts its `?pdf=` in the

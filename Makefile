@@ -33,7 +33,8 @@ endif
 
 
 .PHONY: help install lock sync fmt fmt-check lint typecheck test fixtures check \
-        cov licenses samples samples-check examples bench bench-dry docs inspector hooks precommit \
+        cov licenses samples samples-check examples bench bench-dry site site-serve inspector \
+        hooks precommit \
         build clean distclean version
 
 help: ## Show this help
@@ -124,11 +125,24 @@ bench-dry: samples ## Say how many benchmark questions would reach the API; ask 
 	$(RUN) plannotation-bench run --condition plain       --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 	$(RUN) plannotation-bench run --condition plannotated --model $(BENCH_MODEL) --n $(BENCH_N) --dry-run
 
-# Every schema is staged at the path of its own $id and the spec at SPEC_URI, both
-# read from the code, so the published layout cannot drift from what documents
-# declare. The landing page shows the example sheets in examples/, if there are any.
-docs: ## Stage the landing page, inspector, examples, schemas and spec into site/
-	$(RUN) python tools/stage_site.py site $(if $(wildcard examples/index.json),--examples examples)
+# The public site, built by the same two commands the Pages workflow runs. Every
+# schema is staged at the path of its own $id and the spec at SPEC_URI, both read from
+# the code, so the published layout cannot drift from what documents declare; the
+# landing page shows the example sheets in $(EXAMPLES_DIR)/, if they are built. The
+# renderer's two packages are not project dependencies, so uv supplies them for that
+# one command and uv.lock does not change.
+SITE_DIR      ?= site
+SITE_EXAMPLES  = $(if $(wildcard $(EXAMPLES_DIR)/index.json),--examples $(EXAMPLES_DIR))
+RENDER        := PYTHONPATH=$(CURDIR) $(UV) run --no-project \
+                 --with markdown-it-py==4.2.0 --with mdit-py-plugins==0.6.1 python
+
+site: ## Build the public site into site/: stage it, then render its Markdown
+	rm -rf $(SITE_DIR)
+	$(RUN) python tools/stage_site.py $(SITE_DIR) $(SITE_EXAMPLES)
+	$(RENDER) tools/render_site.py $(SITE_DIR) $(SITE_EXAMPLES)
+
+site-serve: ## Serve site/ at http://localhost:8000
+	python3 -m http.server -d $(SITE_DIR) 8000
 
 # The inspector is one static file with no build step; this only makes sure there is
 # a plannotated drawing to open in it. `open` is macOS, `xdg-open` elsewhere.
