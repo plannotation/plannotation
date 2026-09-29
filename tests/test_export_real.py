@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import math
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -44,6 +45,7 @@ def build_raised(
     rotation: float = 0.0,
     guid_tags: bool = False,
     roof: bool = False,
+    behind: bool = False,
 ) -> BuiltModel:
     """Build a two-room house whose ground floor stands at z = 10 m, turned by ``rotation``.
 
@@ -60,6 +62,8 @@ def build_raised(
         rotation: How far the house and its grid are turned about the origin, degrees.
         guid_tags: Fill every wall's ``Tag`` with a GUID, as Archicad does.
         roof: Add a storey at the top of the walls, for a section's second level.
+        behind: Add a metre-high box outside the south wall, which a section looking
+            south cannot see.
 
     Returns:
         The model, set up for a plan of its ground floor along the model axes.
@@ -137,6 +141,18 @@ def build_raised(
         size=(1.0, 0.27, 2.1),
         rotation=rotation,
     )
+
+    if behind:
+        models._box(
+            model,
+            body,
+            storey,
+            "IfcBuildingElementProxy",
+            "Behind",
+            at=(*world(4.0, -1.2), RAISED_Z),
+            size=(1.0, 0.2, 1.0),
+            rotation=rotation,
+        )
 
     for number, long_name, area, (x0, x1) in (
         ("1", "Room", "9,5", (0.25, 2.9)),
@@ -352,7 +368,12 @@ class TestTheRaisedHouseValidates:
 
 
 def _drawn_plan(
-    tmp_path: Path, *, rotation: float = 0.0, guid_tags: bool = False, **changes: object
+    tmp_path: Path,
+    *,
+    rotation: float = 0.0,
+    guid_tags: bool = False,
+    behind: bool = False,
+    **changes: object,
 ) -> tuple[BuiltModel, ExportedSheet]:
     """Draw the raised house's ground floor square to its grid, as the examples draw.
 
@@ -360,6 +381,7 @@ def _drawn_plan(
         tmp_path: Where to build the model.
         rotation: How far the house is turned, in degrees.
         guid_tags: Fill every wall's ``Tag`` with a GUID.
+        behind: Add the low box outside the south wall.
         **changes: Sheet spec fields to change from the full treatment.
 
     Returns:
@@ -379,7 +401,9 @@ def _drawn_plan(
         storey_products,
     )
 
-    built = build_raised(tmp_path / "raised.ifc", rotation=rotation, guid_tags=guid_tags)
+    built = build_raised(
+        tmp_path / "raised.ifc", rotation=rotation, guid_tags=guid_tags, behind=behind
+    )
     model = open_model(built.path)
     storey = find_storey(model, "Ground")
     lines = grid_lines(model)
@@ -866,37 +890,350 @@ class TestTheGroundTruthCountsSubtypes:
         assert question["answer"] == 5
 
 
-class TestSilhouettes:
-    """What a plan sees of an element below its cut is its outline, not its hull."""
+def _mesh(
+    quads: list[list[tuple[float, float, float]]],
+) -> tuple[Any, Any]:
+    """Return quadrilaterals as a mesh: welded-apart vertices and two triangles each.
 
-    def test_an_l_shaped_slab_keeps_its_notch(self) -> None:
-        """Six corners, where the convex hull would have five."""
-        import numpy as np
+    Args:
+        quads: Each quadrilateral's corners in order, in plane x, y and depth; the
+            triangles keep that order's winding.
 
-        from plannotation.export.ifc_svg_pdf import silhouette
+    Returns:
+        The vertices and the triangles, as ``edges_beyond`` takes them.
+    """
+    import numpy as np
 
-        # An L of two unit squares and one more, as two triangles each, facing up.
-        squares = [(0, 0), (1, 0), (0, 1)]
-        points: list[tuple[float, float, float]] = []
-        faces: list[tuple[int, int, int]] = []
-        for x, y in squares:
-            base = len(points)
-            points += [(x, y, 0.0), (x + 1, y, 0.0), (x + 1, y + 1, 0.0), (x, y + 1, 0.0)]
-            faces += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
-        (loop,) = silhouette(np.array(points), np.array(faces))
-        assert loop[0] == loop[-1]
-        assert sorted(set(loop)) == sorted(
-            {(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (1.0, 1.0), (1.0, 2.0), (0.0, 2.0)}
+    points: list[tuple[float, float, float]] = []
+    faces: list[tuple[int, int, int]] = []
+    for quad in quads:
+        base = len(points)
+        points += quad
+        faces += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
+    return np.array(points, dtype=np.float64), np.array(faces, dtype=np.int64)
+
+
+def _edge_set(rows: Any) -> set[frozenset[tuple[float, ...]]]:  # noqa: ANN401
+    """Return edges as unordered pairs of rounded ends, to compare regardless of direction.
+
+    Args:
+        rows: ``x0, y0, d0, x1, y1, d1`` per edge.
+
+    Returns:
+        The edges.
+    """
+    # Adding 0.0 turns a -0.0 into 0.0, which would otherwise not equal it as a key.
+    return {
+        frozenset(
+            {
+                tuple(round(float(v), 6) + 0.0 for v in row[:3]),
+                tuple(round(float(v), 6) + 0.0 for v in row[3:]),
+            }
         )
+        for row in rows
+    }
 
-    def test_faces_turned_away_are_not_seen(self) -> None:
-        """A face whose normal points down shows nothing from above."""
+
+def _edge(*ends: tuple[float, float, float]) -> frozenset[tuple[float, ...]]:
+    """Return one edge as :func:`_edge_set` writes it.
+
+    Args:
+        *ends: Its two ends.
+
+    Returns:
+        The edge.
+    """
+    return frozenset(tuple(float(v) for v in end) for end in ends)
+
+
+class TestEdgesBeyond:
+    """A shape's edges beyond the cut are where its faces meet at an angle or end."""
+
+    def test_a_square_gives_its_sides_not_its_diagonal(self) -> None:
+        """Two triangles in one plane share a diagonal that no drawing shows."""
+        from plannotation.export.ifc_svg_pdf import edges_beyond
+
+        square = [(0.0, 0.0, -1.0), (1.0, 0.0, -1.0), (1.0, 1.0, -1.0), (0.0, 1.0, -1.0)]
+        rows = edges_beyond(*_mesh([square]))
+        assert _edge_set(rows) == {
+            _edge(square[0], square[1]),
+            _edge(square[1], square[2]),
+            _edge(square[2], square[3]),
+            _edge(square[3], square[0]),
+        }
+
+    def test_a_cube_through_the_plane_keeps_only_what_lies_beyond(self) -> None:
+        """Its far face's four edges, and its side edges clipped where the plane cuts them."""
+        from plannotation.export.ifc_svg_pdf import edges_beyond
+
+        near, far = 0.5, -0.5
+        faces = [
+            [(0.0, 0.0, far), (0.0, 1.0, far), (1.0, 1.0, far), (1.0, 0.0, far)],
+            [(0.0, 0.0, near), (1.0, 0.0, near), (1.0, 1.0, near), (0.0, 1.0, near)],
+            [(0.0, 0.0, far), (1.0, 0.0, far), (1.0, 0.0, near), (0.0, 0.0, near)],
+            [(1.0, 0.0, far), (1.0, 1.0, far), (1.0, 1.0, near), (1.0, 0.0, near)],
+            [(1.0, 1.0, far), (0.0, 1.0, far), (0.0, 1.0, near), (1.0, 1.0, near)],
+            [(0.0, 1.0, far), (0.0, 0.0, far), (0.0, 0.0, near), (0.0, 1.0, near)],
+        ]
+        rows = edges_beyond(*_mesh(faces))
+        assert len(rows) == 8
+        assert rows[:, [2, 5]].max() <= 0.0
+        corners = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+        far_face = {_edge((*a, far), (*b, far)) for a, b in pairwise([*corners, corners[0]])}
+        sides = {_edge((*a, far), (*a, 0.0)) for a in corners}
+        assert _edge_set(rows) == far_face | sides
+
+    def test_two_faces_at_a_right_angle_keep_the_edge_they_share(self) -> None:
+        """A fold is an edge: seven of the two squares' eight sides, the shared one once."""
+        from plannotation.export.ifc_svg_pdf import edges_beyond
+
+        floor = [(0.0, 0.0, -1.0), (1.0, 0.0, -1.0), (1.0, 1.0, -1.0), (0.0, 1.0, -1.0)]
+        wall = [(1.0, 0.0, -1.0), (0.0, 0.0, -1.0), (0.0, 0.0, -2.0), (1.0, 0.0, -2.0)]
+        rows = edges_beyond(*_mesh([floor, wall]))
+        assert len(rows) == 7
+        assert _edge((0.0, 0.0, -1.0), (1.0, 0.0, -1.0)) in _edge_set(rows)
+
+    def test_an_open_mesh_keeps_its_border(self) -> None:
+        """An L of three flat squares: its eight border edges, the notch among them."""
+        from plannotation.export.ifc_svg_pdf import edges_beyond
+
+        squares = [
+            [(x, y, -1.0), (x + 1, y, -1.0), (x + 1, y + 1, -1.0), (x, y + 1, -1.0)]
+            for x, y in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+        ]
+        rows = edges_beyond(*_mesh(squares))
+        ring = [(0, 0), (1, 0), (2, 0), (2, 1), (1, 1), (1, 2), (0, 2), (0, 1)]
+        assert _edge_set(rows) == {
+            _edge((*a, -1.0), (*b, -1.0)) for a, b in pairwise([*ring, ring[0]])
+        }
+
+    def test_nothing_in_front_of_the_plane(self) -> None:
+        """A shape wholly on the viewer's side has no edge beyond the cut."""
+        from plannotation.export.ifc_svg_pdf import edges_beyond
+
+        square = [(0.0, 0.0, 1.0), (1.0, 0.0, 1.0), (1.0, 1.0, 1.0), (0.0, 1.0, 1.0)]
+        assert edges_beyond(*_mesh([square])).shape == (0, 6)
+
+
+class TestLineOwners:
+    """Each line drawn beyond the cut belongs to the edge nearest the viewer along it."""
+
+    @staticmethod
+    def _owners(line: tuple[float, float, float, float], **edges: list[tuple[float, ...]]) -> Any:  # noqa: ANN401
+        """Return the pieces of one line, rounded, given each product's edges.
+
+        Args:
+            line: ``x0, y0, x1, y1``.
+            **edges: Rows ``x0, y0, d0, x1, y1, d1`` by product name.
+
+        Returns:
+            The line's pieces, fractions rounded to six places.
+        """
         import numpy as np
 
-        from plannotation.export.ifc_svg_pdf import silhouette
+        from plannotation.export.ifc_svg_pdf import line_owners
 
-        points = np.array([(0, 0, 0), (1, 0, 0), (1, 1, 0)], dtype=float)
-        assert silhouette(points, np.array([(0, 2, 1)])) == []
+        (pieces,) = line_owners(
+            np.array([line], dtype=np.float64),
+            {name: np.array(rows, dtype=np.float64).reshape(-1, 6) for name, rows in edges.items()},
+        )
+        return [(round(first, 6), round(second, 6), owner) for first, second, owner in pieces]
+
+    def test_a_line_along_a_jamb_and_then_a_wall_splits_between_them(self) -> None:
+        """The door's jamb stands in front of the wall up to the head; above it, the wall."""
+        pieces = self._owners(
+            (0.0, 0.0, 0.0, 3.0),
+            door=[(0.0, 0.0, -1.0, 0.0, 2.0, -1.0)],
+            wall=[(0.0, 0.0, -1.2, 0.0, 3.0, -1.2)],
+        )
+        assert pieces == [(0.0, round(2 / 3, 6), "door"), (round(2 / 3, 6), 1.0, "wall")]
+
+    def test_where_edges_coincide_the_nearest_owns_the_line(self) -> None:
+        """Whichever product's name sorts first, the one nearer the viewer wins."""
+        pieces = self._owners(
+            (0.0, 0.0, 1.0, 0.0),
+            a_far=[(0.0, 0.0, -2.0, 1.0, 0.0, -2.0)],
+            z_near=[(1.0, 0.0, -1.0, 0.0, 0.0, -1.0)],
+        )
+        assert pieces == [(0.0, 1.0, "z_near")]
+
+    def test_a_stretch_along_no_edge_is_left_out(self) -> None:
+        """Only the first metre runs along an edge; an edge that merely crosses owns nothing."""
+        pieces = self._owners(
+            (0.0, 0.0, 3.0, 0.0),
+            along=[(0.0, 0.0, -1.0, 1.0, 0.0, -1.0)],
+            across=[(2.0, -1.0, -0.5, 2.0, 1.0, -0.5)],
+        )
+        assert pieces == [(0.0, round(1 / 3, 6), "along")]
+
+    def test_a_segment_too_short_for_a_direction_goes_to_the_edge_through_it(self) -> None:
+        """Four millimetres: the edge through its midpoint, not a nearer one beside it."""
+        pieces = self._owners(
+            (0.0, 0.0, 0.004, 0.0),
+            through=[(0.002, -1.0, -1.0, 0.002, 1.0, -1.0)],
+            beside=[(0.02, -1.0, -0.5, 0.02, 1.0, -0.5)],
+        )
+        assert pieces == [(0.0, 1.0, "through")]
+
+    def test_no_edges_no_owners(self) -> None:
+        """Every line is returned, with no pieces."""
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import line_owners
+
+        lines = np.array([(0.0, 0.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0)], dtype=np.float64)
+        assert line_owners(lines, {}) == [[], []]
+
+
+def _projection_lines(svg: str, page_height_mm: float) -> Any:  # noqa: ANN401
+    """Return the lines a sheet draws beyond its view's cut, as paper segments.
+
+    Read from the sheet itself -- the view group's translation and its projection
+    group -- not from the exporter's own bookkeeping.
+
+    Args:
+        svg: The composed sheet.
+        page_height_mm: The page height, for the y-flip.
+
+    Returns:
+        One row ``x0, y0, x1, y1`` per segment, in paper millimetres.
+    """
+    import re
+
+    from plannotation.export.drafting import segments_of
+    from plannotation.export.geometry import path_points
+
+    view = svg.index('class="section"')
+    wrapper = svg.rindex('<g transform="translate(', 0, view)
+    found = re.match(r'<g transform="translate\(([-\d.]+),([-\d.]+)\)"', svg[wrapper:])
+    assert found is not None
+    offset = (float(found.group(1)), float(found.group(2)))
+    start = svg.index('<g class="projection"', view)
+    body = svg[start : svg.index("</g>", start)]
+    return segments_of(
+        [
+            path_points(d, page_height_mm=page_height_mm, offset=offset)
+            for d in re.findall(r'\bd="([^"]+)"', body)
+        ]
+    )
+
+
+def _distance_to(point: tuple[float, float], segments: Any) -> float:  # noqa: ANN401
+    """Return how far a point lies from the nearest of some segments.
+
+    Args:
+        point: The point.
+        segments: ``x0, y0, x1, y1`` rows.
+
+    Returns:
+        The distance.
+    """
+    import numpy as np
+
+    x0, y0, x1, y1 = segments.T
+    dx, dy = x1 - x0, y1 - y0
+    span = np.where(dx * dx + dy * dy > 0, dx * dx + dy * dy, 1.0)
+    share = np.clip(((point[0] - x0) * dx + (point[1] - y0) * dy) / span, 0.0, 1.0)
+    return float(np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]).min())
+
+
+def _drawn_section(tmp_path: Path) -> tuple[BuiltModel, ExportedSheet]:
+    """Draw section A-A through the raised house, looking south, with the box behind it.
+
+    Args:
+        tmp_path: Where to build the model.
+
+    Returns:
+        The model as drawn, and the exported sheet.
+    """
+    from dataclasses import replace
+
+    from plannotation.export.ifc_svg_pdf import export_sheet
+    from plannotation.export.views import (
+        building_products,
+        grid_axes_on,
+        grid_lines,
+        open_model,
+        section_between,
+        storey_levels,
+    )
+
+    built = build_raised(tmp_path / "raised.ifc", roof=True, behind=True)
+    model = open_model(built.path)
+    lines = grid_lines(model)
+    cut = section_between(lines, first="A", second="B", looking_to="A", datum=RAISED_Z)
+    built = replace(
+        built,
+        section=cut,
+        cut_height=None,
+        levels=storey_levels(model),
+        include=building_products(model),
+    )
+    spec = _spec(
+        sheet_id="X-301",
+        title="Section A-A",
+        drawing_type="section",
+        grids=grid_axes_on(lines, cut),
+        presentation=True,
+        page_size="A2",
+    )
+    return built, export_sheet(built, spec, generator_version="0.0.0-test")
+
+
+@needs_ifc
+class TestWhatAViewSeesBeyondItsCut:
+    """Beyond a section's cut, and below a plan's, each drawn line is some product's edge."""
+
+    def test_a_section_describes_the_wall_and_door_it_looks_at(self, tmp_path: Path) -> None:
+        """The south wall and its door, as projection, on lines the sheet really draws."""
+        from plannotation.export.sheet import PAPER_SIZES
+
+        _, exported = _drawn_section(tmp_path)
+        seen = {
+            e.name: e
+            for e in exported.plannotation.elements or []
+            if e.representation == "projection"
+        }
+        assert sorted(seen) == ["Front door", "South"]
+        lines = _projection_lines(exported.svg, PAPER_SIZES["A2"][1])
+        for element in seen.values():
+            assert element.paper_outlines
+            for outline in element.paper_outlines:
+                (ax, ay), (bx, by) = outline[0], outline[-1]
+                for point in (outline[0], ((ax + bx) / 2, (ay + by) / 2), outline[-1]):
+                    assert _distance_to(point, lines) <= 0.05
+
+    def test_the_cut_walls_stay_cut(self, tmp_path: Path) -> None:
+        """East, west and the partition straddle the plane."""
+        _, exported = _drawn_section(tmp_path)
+        cut = sorted(
+            e.name or "" for e in exported.plannotation.elements or [] if e.representation == "cut"
+        )
+        assert cut == ["East", "Partition", "West"]
+
+    def test_what_the_wall_hides_is_not_described(self, tmp_path: Path) -> None:
+        """The box outside the south wall draws no line, so no element stands for it."""
+        _, exported = _drawn_section(tmp_path)
+        assert "Behind" not in {e.name for e in exported.plannotation.elements or []}
+
+    def test_a_plan_still_describes_what_it_sees_below_its_cut(self, tmp_path: Path) -> None:
+        """The same box, a metre high, lies below a plan cut at 1.2 m: it is seen from above."""
+        _, exported = _drawn_plan(tmp_path, behind=True)
+        (box,) = [e for e in exported.plannotation.elements or [] if e.name == "Behind"]
+        assert box.representation == "projection"
+        x0, y0, x1, y1 = box.paper_bbox
+        # 1.0 by 0.2 metres at 1:50.
+        assert (x1 - x0, y1 - y0) == (pytest.approx(20.0, abs=0.05), pytest.approx(4.0, abs=0.05))
+
+    @needs_cairo
+    def test_the_section_validates(self, tmp_path: Path) -> None:
+        """Written out, not even a warning."""
+        from plannotation.export.ifc_svg_pdf import write_sample
+        from plannotation.validate import validate
+
+        built, exported = _drawn_section(tmp_path)
+        pdf = write_sample(exported, built, tmp_path / "out", mod_date=MOD_DATE)
+        assert [finding.code for finding in validate(pdf).findings] == []
 
 
 @needs_ifc

@@ -63,7 +63,13 @@ from plannotation.export.drafting import (
     style_of,
 )
 from plannotation.export.geometry import bounding_box, path_points, union_box
-from plannotation.export.paper import Affine, invert, paper_to_plane, plane_from_ifc_plane
+from plannotation.export.paper import (
+    Affine,
+    apply,
+    invert,
+    paper_to_plane,
+    plane_from_ifc_plane,
+)
 from plannotation.export.sheet import PAPER_SIZES, Sheet, frame_box, text_width, title_block_box
 from plannotation.export.svg_render import RenderedView, render_view
 from plannotation.export.to_pdf import svg_to_pdf
@@ -310,8 +316,9 @@ class ModelFacts:
         depths: Where a cutting plane was given, how far each product reaches along its
             normal, least and most, in metres from the plane: a product is cut when the
             two straddle zero.
-        outlines: Where a plan's cutting plane was given, each product's outlines as
-            seen from above, in plane coordinates in metres.
+        edges: Where a cutting plane was given, each product's edges beyond it, as
+            :func:`edges_beyond` returns them: the lines a drawing of what lies beyond
+            the cut could show of it.
         north: True north in model x and y.
         names: Each space's ``Name`` and ``LongName``, by GlobalId.
     """
@@ -325,7 +332,7 @@ class ModelFacts:
     properties: dict[str, dict[str, dict[str, object]]] = field(default_factory=dict)
     extents: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = field(default_factory=dict)
     depths: dict[str, tuple[float, float]] = field(default_factory=dict)
-    outlines: dict[str, list[list[tuple[float, float]]]] = field(default_factory=dict)
+    edges: dict[str, NDArray[np.float64]] = field(default_factory=dict)
     north: tuple[float, float] = (0.0, 1.0)
     names: dict[str, tuple[str | None, str | None]] = field(default_factory=dict)
 
@@ -472,12 +479,14 @@ def export_sheet(
     )
 
     plane = (origin, x_axis, y_axis)
-    elements, group = _draw_view(view, spec, built, facts, frame, plane, (*offset, height_mm))
+    seen_lines = _seen_lines(view.svg, height_mm, offset)
+    elements, group = _draw_view(
+        view, spec, built, facts, frame, plane, (*offset, height_mm), seen_lines
+    )
     sheet.group(group, transform=f"translate({offset[0]},{offset[1]})")
     if not elements:
         msg = f"sheet {spec.sheet_id} drew no elements; the view would be empty"
         raise ExportError(msg)
-    seen_lines = _seen_lines(view.svg, height_mm, offset)
     annotations = _annotate(
         sheet, spec, built, facts, frame, box, elements, plane=plane, seen_lines=seen_lines
     )
@@ -527,6 +536,7 @@ def _draw_view(
     frame: _Frame,
     plane: tuple[list[float], list[float], list[float]],
     placement: tuple[float, float, float],
+    seen_lines: list[list[Point]],
 ) -> tuple[list[Element], str]:
     """Describe what the serializer drew, add what it leaves out, and style it.
 
@@ -538,6 +548,7 @@ def _draw_view(
         frame: The view's placement.
         plane: The plane's origin and axes, in model units.
         placement: The view group's offset on the sheet, x and y, and the sheet's height.
+        seen_lines: The lines the serializer draws beyond the cut, on the paper.
 
     Returns:
         The elements, and the view group to place on the sheet.
@@ -549,8 +560,8 @@ def _draw_view(
         seen, markup = _projections(facts, built, frame, plane, elements, placement)
         elements += seen
         group = group[: -len("</g>")] + markup + "</g>"
-    elif built.is_plan:
-        elements += _seen_below(facts, built, frame, elements)
+    else:
+        elements += _seen_beyond(facts, built, frame, elements, seen_lines)
     if spec.door_swings and built.is_plan:
         group = _draw_swings(group, elements, built, frame, placement)
     if spec.presentation:
@@ -767,8 +778,8 @@ def read_model_facts(
     Args:
         model_path: The IFC file.
         include: The products whose geometry is measured; None for all of them.
-        plane: A cutting plane to measure each product against, for its depth and its
-            outline along the plane's normal.
+        plane: A cutting plane to measure each product against: how far it reaches
+            along the plane's normal, and its edges beyond the plane.
         psets: Property sets to read besides the common ones, such as a model's own
             room data.
 
@@ -800,8 +811,7 @@ def read_model_facts(
         if chosen:
             properties[guid] = chosen
     projects = model.by_type("IfcProject")
-    horizontal = plane is not None and abs(plane.direction[2]) > 1.0 - 1e-6
-    extents, depths, outlines = _extents(model, include, plane, outlines=horizontal)
+    extents, depths, edges = _extents(model, include, plane)
     return ModelFacts(
         unit_scale=float(unit.calculate_unit_scale(model)),
         sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
@@ -812,7 +822,7 @@ def read_model_facts(
         properties=properties,
         extents=extents,
         depths=depths,
-        outlines=outlines,
+        edges=edges,
         north=_true_north(model),
         names={
             str(space.GlobalId): (space.Name or None, space.LongName or None)
@@ -843,26 +853,22 @@ def _extents(
     model: Any,  # noqa: ANN401
     include: Sequence[str] | None = None,
     plane: SectionCut | None = None,
-    *,
-    outlines: bool = False,
 ) -> tuple[
     dict[str, tuple[tuple[float, ...], tuple[float, ...]]],
     dict[str, tuple[float, float]],
-    dict[str, list[list[tuple[float, float]]]],
+    dict[str, NDArray[np.float64]],
 ]:
-    """Measure every product: its world box, and against a plane, its depth and outline.
+    """Measure every product: its world box, and against a plane, what the view sees of it.
 
     Args:
         model: The open ``ifcopenshell.file``.
         include: The products to measure, or None for all of them.
         plane: The cutting plane, or None.
-        outlines: Whether to find each product's outline as seen along the plane's
-            normal, which a plan needs for what it sees below the cut.
 
     Returns:
         World boxes in metres by GlobalId, then -- where a plane was given -- each
-        product's least and most distance along the plane's normal, and where asked
-        its outline in plane coordinates.
+        product's least and most distance along the plane's normal, and its edges beyond
+        the plane (:func:`edges_beyond`).
     """
     geom = importlib.import_module("ifcopenshell.geom")
     settings = geom.settings()
@@ -873,7 +879,7 @@ def _extents(
         iterator = geom.iterator(settings, model, include=[model.by_guid(guid) for guid in include])
     extents: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = {}
     depths: dict[str, tuple[float, float]] = {}
-    seen: dict[str, list[list[tuple[float, float]]]] = {}
+    edges: dict[str, NDArray[np.float64]] = {}
     frame = None
     if plane is not None:
         x_axis, y_axis = plane.axes()
@@ -890,39 +896,28 @@ def _extents(
                 if frame is not None:
                     local = (points - frame[0]) @ frame[1]
                     depths[guid] = (float(local[:, 2].min()), float(local[:, 2].max()))
-                    if outlines:
-                        faces = np.array(shape.geometry.faces, dtype=np.int64).reshape(-1, 3)
-                        seen[guid] = silhouette(local, faces) or [closed(convex_hull(local[:, :2]))]
+                    faces = np.array(shape.geometry.faces, dtype=np.int64).reshape(-1, 3)
+                    edges[guid] = edges_beyond(local, faces)
             if not iterator.next():
                 break
-    return extents, depths, seen
+    return extents, depths, edges
 
 
-#: How finely silhouette vertices are matched, in metres: a tenth of a millimetre.
+#: How finely an edge's ends are matched, in metres: a tenth of a millimetre.
 _WELD_M = 1e-4
 
 
-def closed(loop: list[tuple[float, float]]) -> list[tuple[float, float]]:
-    """Return a polygon's vertices with the first repeated at the end.
-
-    Args:
-        loop: The vertices.
-
-    Returns:
-        The closed polyline.
-    """
-    return [*loop, loop[0]] if loop and loop[0] != loop[-1] else loop
+#: How far apart two faces' unit normals may be and still count as one flat face.
+_FLAT = 1e-6
 
 
-def silhouette(
-    local: NDArray[np.float64], faces: NDArray[np.int64]
-) -> list[list[tuple[float, float]]]:
-    """Return what a shape looks like from the viewer's side of a plane: its outlines.
+def edges_beyond(local: NDArray[np.float64], faces: NDArray[np.int64]) -> NDArray[np.float64]:
+    """Return the edges of a shape that a view could draw beyond its cutting plane.
 
-    The faces turned towards the viewer are projected onto the plane, and every edge two
-    of them share there is dropped; what is left is the outline of each region they
-    cover -- a slab's footprint with its notches, a flight of stairs as one shape, each
-    tread's nosing vanishing into the next tread's back edge.
+    An edge is where two faces meet at an angle, or where a face ends; a diagonal that
+    splits a flat face into triangles is not one. Each edge is clipped to the far side of
+    the plane, so that the part of a cut wall in front of the cut, which the view removes,
+    draws nothing.
 
     Args:
         local: The shape's vertices in plane coordinates, the third being the distance
@@ -930,90 +925,158 @@ def silhouette(
         faces: Its triangles, as vertex indices.
 
     Returns:
-        Closed polylines in plane x and y; none for a shape with no face turned to the
-        viewer.
+        One row per edge, ``x0, y0, d0, x1, y1, d1``: its two ends in plane x and y,
+        each with its distance towards the viewer, which is at most zero.
     """
+    empty = np.zeros((0, 6), dtype=np.float64)
     if not len(faces):
-        return []
+        return empty
+    keys = np.round(local / _WELD_M).astype(np.int64)
+    welded, index = np.unique(keys, axis=0, return_inverse=True)
+    triangles = index.reshape(-1)[faces]
     corners = local[faces]
     normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
     lengths = np.linalg.norm(normals, axis=1)
-    facing = (lengths > 0) & (normals[:, 2] > 0.1 * np.where(lengths > 0, lengths, 1.0))
-    counts: dict[tuple[tuple[int, int], tuple[int, int]], int] = {}
-    keys = np.round(local[:, :2] / _WELD_M).astype(np.int64)
-    for triangle in faces[facing]:
-        ring = [(int(keys[i][0]), int(keys[i][1])) for i in triangle]
-        for a, b in ((ring[0], ring[1]), (ring[1], ring[2]), (ring[2], ring[0])):
-            if a != b:
-                edge = (a, b) if a < b else (b, a)
-                counts[edge] = counts.get(edge, 0) + 1
-    neighbours: dict[tuple[int, int], list[tuple[int, int]]] = {}
-    for a, b in sorted(edge for edge, count in counts.items() if count == 1):
-        neighbours.setdefault(a, []).append(b)
-        neighbours.setdefault(b, []).append(a)
-    loops: list[list[tuple[float, float]]] = []
-    for start in sorted(neighbours):
-        while neighbours[start]:
-            loop = [start]
-            current = start
-            while neighbours[current]:
-                following = neighbours[current].pop(0)
-                neighbours[following].remove(current)
-                loop.append(following)
-                current = following
-                if current == start:
-                    break
-            points = _simplified([(x * _WELD_M, y * _WELD_M) for x, y in loop])
-            if len(points) > 2:  # noqa: PLR2004 - a line is not an outline
-                loops.append(points)
-    return loops
+    solid = lengths > 0
+    triangles, normals = triangles[solid], normals[solid] / lengths[solid, None]
+    pairs = np.concatenate([triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [2, 0]]])
+    sides = np.concatenate([normals, normals, normals])
+    real = pairs[:, 0] != pairs[:, 1]
+    pairs, sides = np.sort(pairs[real], axis=1), sides[real]
+    if not len(pairs):
+        return empty
+    order = np.lexsort((pairs[:, 1], pairs[:, 0]))
+    pairs, sides = pairs[order], sides[order]
+    first = np.ones(len(pairs), dtype=bool)
+    first[1:] = (pairs[1:] != pairs[:-1]).any(axis=1)
+    starts = np.flatnonzero(first)
+    bend = np.zeros(len(pairs))
+    bend[1:] = 1.0 - (sides[1:] * sides[:-1]).sum(axis=1)
+    bend[first] = 0.0
+    lone = np.diff(np.append(starts, len(pairs))) == 1
+    kept = pairs[starts[lone | (np.maximum.reduceat(bend, starts) > _FLAT)]]
+    ends = welded * _WELD_M
+    near, far = ends[kept[:, 0]], ends[kept[:, 1]]
+    beyond = (near[:, 2] <= 0) | (far[:, 2] <= 0)
+    near, far = near[beyond], far[beyond]
+    for this, other in ((near, far), (far, near)):
+        clip = this[:, 2] > 0
+        share = this[clip, 2] / (this[clip, 2] - other[clip, 2])
+        this[clip] += (other[clip] - this[clip]) * share[:, None]
+        this[clip, 2] = 0.0
+    return np.hstack([near, far])
 
 
-def _simplified(line: list[tuple[float, float]]) -> list[tuple[float, float]]:
-    """Drop the vertices of a polyline that lie on the straight line through their neighbours.
+#: How far a line drawn beyond the cut may lie from a product's edge and still be that
+#: edge, in metres.
+_EDGE_TOLERANCE_M = 0.005
 
-    Args:
-        line: The polyline.
-
-    Returns:
-        It, with only the vertices where it turns, and its ends.
-    """
-    kept = [line[0]]
-    for index in range(1, len(line) - 1):
-        (ax, ay), (bx, by), (cx, cy) = kept[-1], line[index], line[index + 1]
-        if abs((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) > _WELD_M * _WELD_M:
-            kept.append(line[index])
-    kept.append(line[-1])
-    return kept
+#: A piece of a drawn line and whose edge it is: where it starts and ends as fractions
+#: of the line, and the product's GlobalId.
+Piece = tuple[float, float, str]
 
 
-def convex_hull(points: NDArray[np.float64]) -> list[tuple[float, float]]:
-    """Return the convex hull of some points, anticlockwise, by Andrew's monotone chain.
+def line_owners(
+    lines: NDArray[np.float64], edges: dict[str, NDArray[np.float64]]
+) -> list[list[Piece]]:
+    """Say whose edge each line drawn beyond the cut is, piece by piece.
+
+    The serializer draws what the view sees beyond its cut with hidden lines removed, as
+    anonymous segments, and one segment may run along the edges of several products in
+    turn -- a door's jamb, then the wall above it. So each segment is split wherever an
+    edge along it starts or ends, and each piece is the edge nearest the viewer that runs
+    along it, since that edge hides the others.
 
     Args:
-        points: An ``(n, 2)`` array.
+        lines: The segments, one row ``x0, y0, x1, y1`` each, in plane metres.
+        edges: Each product's edges beyond the cut, by GlobalId (:func:`edges_beyond`).
 
     Returns:
-        The hull's vertices, not repeating the first.
+        For each segment, its pieces in order, each with the product it is an edge of;
+        a stretch that runs along no product's edge is left out.
     """
-    unique = sorted({(round(float(x), 4), round(float(y), 4)) for x, y in points})
-    if len(unique) < 3:  # noqa: PLR2004 - a hull of fewer points is those points
-        return unique
+    guids = sorted(guid for guid, rows in edges.items() if len(rows))
+    if not guids:
+        return [[] for _ in lines]
+    table = np.vstack([edges[guid] for guid in guids])
+    owner = np.concatenate([np.full(len(edges[guid]), n) for n, guid in enumerate(guids)])
+    x0, y0, d0, x1, y1, d1 = table.T
+    tolerance = _EDGE_TOLERANCE_M
+    owners: list[list[Piece]] = []
+    for sx0, sy0, sx1, sy1 in lines:
+        run = math.hypot(sx1 - sx0, sy1 - sy0)
+        near = (
+            (np.minimum(x0, x1) - tolerance <= max(sx0, sx1))
+            & (min(sx0, sx1) <= np.maximum(x0, x1) + tolerance)
+            & (np.minimum(y0, y1) - tolerance <= max(sy0, sy1))
+            & (min(sy0, sy1) <= np.maximum(y0, y1) + tolerance)
+        )
+        if run < 2.0 * tolerance:
+            owners.append(
+                _dot_owner(((sx0 + sx1) / 2.0, (sy0 + sy1) / 2.0), table, near, guids, owner)
+            )
+            continue
+        ux, uy = (sx1 - sx0) / run, (sy1 - sy0) / run
+        # Both ends of an edge along the segment lie on its line; where along it they fall,
+        # as fractions of the segment, says which stretch of it the edge covers.
+        start = ((x0 - sx0) * ux + (y0 - sy0) * uy) / run
+        end = ((x1 - sx0) * ux + (y1 - sy0) * uy) / run
+        low = np.maximum(0.0, np.minimum(start, end))
+        high = np.minimum(1.0, np.maximum(start, end))
+        along = np.flatnonzero(
+            near
+            & (np.abs((x0 - sx0) * uy - (y0 - sy0) * ux) <= tolerance)
+            & (np.abs((x1 - sx0) * uy - (y1 - sy0) * ux) <= tolerance)
+            & ((high - low) * run > tolerance)
+        )
+        pieces: list[Piece] = []
+        cuts = sorted({0.0, 1.0, *map(float, low[along]), *map(float, high[along])})
+        for first, second in pairwise(cuts):
+            middle = (first + second) / 2.0
+            cover = along[(low[along] <= middle) & (middle <= high[along])]
+            if not len(cover):
+                continue
+            share = (middle - start[cover]) / (end[cover] - start[cover])
+            depth = np.round(d0[cover] + share * (d1[cover] - d0[cover]), 4)
+            guid = guids[owner[cover[int(np.argmax(depth))]]]
+            if pieces and pieces[-1][2] == guid and pieces[-1][1] == first:
+                pieces[-1] = (pieces[-1][0], second, guid)
+            else:
+                pieces.append((first, second, guid))
+        owners.append(pieces)
+    return owners
 
-    def cross(o: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
-    lower: list[tuple[float, float]] = []
-    upper: list[tuple[float, float]] = []
-    for point in unique:
-        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0:  # noqa: PLR2004
-            lower.pop()
-        lower.append(point)
-    for point in reversed(unique):
-        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0:  # noqa: PLR2004
-            upper.pop()
-        upper.append(point)
-    return lower[:-1] + upper[:-1]
+def _dot_owner(
+    point: tuple[float, float],
+    table: NDArray[np.float64],
+    near: NDArray[np.bool_],
+    guids: list[str],
+    owner: NDArray[np.int64],
+) -> list[Piece]:
+    """Say whose edge a segment too short to have a direction is: the nearest through it.
+
+    Args:
+        point: The segment's midpoint, in plane metres.
+        table: Every edge, as :func:`edges_beyond` gives them.
+        near: Which edges come near the segment at all.
+        guids: The products, in the order ``owner`` numbers them.
+        owner: The product each edge belongs to.
+
+    Returns:
+        One piece covering the whole segment, or none where no edge passes through it.
+    """
+    x0, y0, d0, x1, y1, d1 = table[near].T
+    dx, dy = x1 - x0, y1 - y0
+    span = dx * dx + dy * dy
+    share = np.clip(
+        ((point[0] - x0) * dx + (point[1] - y0) * dy) / np.where(span > 0, span, 1.0), 0.0, 1.0
+    )
+    through = np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]) <= _EDGE_TOLERANCE_M
+    if not through.any():
+        return []
+    depth = np.where(through, np.round(d0 + share * (d1 - d0), 4), -np.inf)
+    return [(0.0, 1.0, guids[owner[np.flatnonzero(near)[int(np.argmax(depth))]]])]
 
 
 def _representation(guid: str, facts: ModelFacts, built: BuiltModel) -> Representation | None:
@@ -1202,35 +1265,62 @@ def _projections(
     return added, "".join(markup)
 
 
-def _seen_below(
-    facts: ModelFacts, built: BuiltModel, frame: _Frame, drawn: list[Element]
+def _seen_beyond(
+    facts: ModelFacts,
+    built: BuiltModel,
+    frame: _Frame,
+    drawn: list[Element],
+    lines: list[list[Point]],
 ) -> list[Element]:
-    """Describe what a plan through an explicit plane sees below its cut.
+    """Describe what a view through an explicit plane sees beyond its cut.
 
-    The serializer draws those lines itself -- a stair, a low railing, the floor slab
-    -- but as anonymous paths in one group, so they are described here from the model:
-    every product of the drawing that lies wholly below the cut, with its outline as
-    seen from above. Nothing is drawn, because the serializer already drew it.
+    The serializer draws those lines itself -- below a plan's cut a stair, a low railing,
+    the floor slab; beyond a section's the walls, doors and windows of the rooms it looks
+    into -- but as anonymous paths in one group, with hidden lines removed. Each line is
+    given to the product whose edge it is (:func:`line_owners`), and every product of the
+    drawing that lies wholly beyond the cut is described by the lines it draws: they are
+    its outlines, and its box is theirs. A product hidden behind another draws no line
+    and is not described, and one partly hidden claims only what shows. Nothing is drawn
+    here, because the serializer already drew it.
 
     Args:
-        facts: What the model says, measured against the plan's plane.
+        facts: What the model says, measured against the view's plane.
         built: The model and what is drawn of it.
         frame: The view's placement.
         drawn: The elements the cut passes through.
+        lines: The lines the serializer draws beyond the cut, on the paper.
 
     Returns:
-        One ``projection`` element per product seen below the cut.
+        One ``projection`` element per product seen beyond the cut.
     """
+    segments = segments_of(lines)
+    plane = np.array(
+        [
+            [*apply(frame.transform, x0, y0), *apply(frame.transform, x1, y1)]
+            for x0, y0, x1, y1 in segments
+        ],
+        dtype=np.float64,
+    ).reshape(-1, 4)
+    own: dict[str, list[list[Point]]] = {}
+    for (x0, y0, x1, y1), pieces in zip(
+        segments, line_owners(plane * frame.unit_scale, facts.edges), strict=True
+    ):
+        for first, second, owner in pieces:
+            own.setdefault(owner, []).append(
+                [
+                    (round(float(x0 + (x1 - x0) * at), 3), round(float(y0 + (y1 - y0) * at), 3))
+                    for at in (first, second)
+                ]
+            )
     seen = {element.ifc_guid for element in drawn}
     added: list[Element] = []
     for guid in sorted(built.include or facts.depths):
-        depth, outline = facts.depths.get(guid), facts.outlines.get(guid)
-        if guid in seen or guid not in facts.classes or depth is None or not outline:
+        depth, paper = facts.depths.get(guid), own.get(guid)
+        if guid in seen or guid not in facts.classes or depth is None or not paper:
             continue
         if depth[1] >= -_CUT_TOLERANCE_M:
             continue
         ifc_class, name = facts.classes[guid]
-        paper = [[frame.paper(u, v) for u, v in loop] for loop in outline]
         added.append(
             Element(
                 id=f"e-{len(drawn) + len(added):02d}",
