@@ -30,7 +30,7 @@ import importlib
 import json
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from html import escape
 from itertools import pairwise
 from typing import TYPE_CHECKING, Any, cast, get_args
@@ -998,12 +998,18 @@ def line_owners(
     guids = sorted(guid for guid, rows in edges.items() if len(rows))
     if not guids:
         return [[] for _ in lines]
-    table = np.vstack([edges[guid] for guid in guids])
-    owner = np.concatenate([np.full(len(edges[guid]), n) for n, guid in enumerate(guids)])
-    x0, y0, d0, x1, y1, d1 = table.T
+    every = np.vstack([edges[guid] for guid in guids])
+    owners_of = np.concatenate([np.full(len(edges[guid]), n) for n, guid in enumerate(guids)])
     tolerance = _EDGE_TOLERANCE_M
+    ends = every[:, [0, 1]], every[:, [3, 4]]
+    index = _edge_index(np.hstack([np.minimum(*ends) - tolerance, np.maximum(*ends) + tolerance]))
     owners: list[list[Piece]] = []
     for sx0, sy0, sx1, sy1 in lines:
+        # Only the edges the index finds near the segment are tested; they keep their
+        # order, so the nearest edge wins a tie exactly as it would among all of them.
+        found = index.near((min(sx0, sx1), min(sy0, sy1), max(sx0, sx1), max(sy0, sy1)))
+        table, owner = every[found], owners_of[found]
+        x0, y0, d0, x1, y1, d1 = table.T
         run = math.hypot(sx1 - sx0, sy1 - sy0)
         near = (
             (np.minimum(x0, x1) - tolerance <= max(sx0, sx1))
@@ -1045,6 +1051,113 @@ def line_owners(
                 pieces.append((first, second, guid))
         owners.append(pieces)
     return owners
+
+
+#: At most how many cells the edge index has along each side.
+_INDEX_CELLS = 1024
+
+
+@dataclass(frozen=True)
+class _EdgeIndex:
+    """A uniform grid over edges' boxes: each cell lists the edges whose box touches it.
+
+    Attributes:
+        low: The grid's lower-left corner, in plane metres.
+        cell: A cell's side, in metres.
+        size: How many cells there are along each side.
+        keys: The cells that hold an edge, sorted, each as its column times ``size`` plus
+            its row.
+        starts: Where each of those cells' edges start in ``members``, then where the
+            last cell's end.
+        members: Edge indices, cell by cell, ascending within each cell.
+    """
+
+    low: tuple[float, float]
+    cell: float
+    size: int
+    keys: NDArray[np.int64]
+    starts: NDArray[np.int64]
+    members: NDArray[np.int64]
+
+    def cells(self, values: NDArray[np.float64], axis: int) -> NDArray[np.int64]:
+        """Return the column (``axis`` 0) or row (1) of each coordinate.
+
+        A coordinate off the grid takes the nearest border cell's, so a box reaching
+        beyond the edges still finds those near its part on the grid.
+
+        Args:
+            values: Plane coordinates, in metres.
+            axis: 0 for x, 1 for y.
+
+        Returns:
+            The cells' columns or rows.
+        """
+        scaled = np.floor((values - self.low[axis]) / self.cell)
+        return np.clip(scaled, 0, self.size - 1).astype(np.int64)
+
+    def near(self, box: tuple[float, float, float, float]) -> NDArray[np.int64]:
+        """Return every edge whose box may touch a box, in ascending order.
+
+        Every edge whose box overlaps ``box`` is among them, since both lie in a cell they
+        share; an edge that shares only a cell with it may be too.
+
+        Args:
+            box: ``x_low, y_low, x_high, y_high`` in plane metres.
+
+        Returns:
+            The edges' indices.
+        """
+        (c0, c1), (r0, r1) = (
+            self.cells(np.array([box[axis], box[axis + 2]]), axis) for axis in (0, 1)
+        )
+        wanted = (np.arange(c0, c1 + 1)[:, None] * self.size + np.arange(r0, r1 + 1)).ravel()
+        at = np.searchsorted(self.keys, wanted)
+        held = at < len(self.keys)
+        held[held] = self.keys[at[held]] == wanted[held]
+        chunks = [self.members[self.starts[i] : self.starts[i + 1]] for i in at[held]]
+        if not chunks:
+            return np.zeros(0, dtype=np.int64)
+        return np.unique(np.concatenate(chunks))
+
+
+def _edge_index(boxes: NDArray[np.float64]) -> _EdgeIndex:
+    """Index edges by their boxes on a uniform grid, so a line meets only those near it.
+
+    The grid has about as many cells as there are edges, and no cell is smaller than
+    twice the tolerance an edge is matched within.
+
+    Args:
+        boxes: One row ``x_low, y_low, x_high, y_high`` per edge, in plane metres.
+
+    Returns:
+        The index.
+    """
+    low = boxes[:, :2].min(axis=0)
+    span = float((boxes[:, 2:].max(axis=0) - low).max())
+    size = min(_INDEX_CELLS, max(1, math.ceil(math.sqrt(len(boxes)))))
+    grid = _EdgeIndex(
+        low=(float(low[0]), float(low[1])),
+        cell=max(span / size, 2.0 * _EDGE_TOLERANCE_M),
+        size=size,
+        keys=np.zeros(0, dtype=np.int64),
+        starts=np.zeros(1, dtype=np.int64),
+        members=np.zeros(0, dtype=np.int64),
+    )
+    c0, r0 = grid.cells(boxes[:, 0], 0), grid.cells(boxes[:, 1], 1)
+    c1, r1 = grid.cells(boxes[:, 2], 0), grid.cells(boxes[:, 3], 1)
+    columns = c1 - c0 + 1
+    count = columns * (r1 - r0 + 1)
+    edge = np.repeat(np.arange(len(boxes)), count)
+    # Each edge's cells, numbered from 0 within its own rectangle of them.
+    local = np.arange(int(count.sum())) - np.repeat(np.cumsum(count) - count, count)
+    width = np.repeat(columns, count)
+    key = (np.repeat(c0, count) + local % width) * size + np.repeat(r0, count) + local // width
+    order = np.lexsort((edge, key))
+    key, edge = key[order], edge[order]
+    keys, starts = np.unique(key, return_index=True)
+    return replace(
+        grid, keys=keys, starts=np.append(starts, len(key)).astype(np.int64), members=edge
+    )
 
 
 def _dot_owner(

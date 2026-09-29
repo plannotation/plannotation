@@ -1085,6 +1085,49 @@ class TestLineOwners:
         assert line_owners(lines, {}) == [[], []]
 
 
+class TestTheEdgeIndex:
+    """Looking up only the edges near a line finds every edge the full search would."""
+
+    def test_it_misses_no_edge_whose_box_meets_the_query(self) -> None:
+        """On seeded random boxes, long and short, some off the grid: a superset, in order."""
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import _edge_index
+
+        rng = np.random.default_rng(18)
+        corner = rng.uniform(-5.0, 60.0, size=(3000, 2))
+        size = rng.exponential(0.5, size=(3000, 2)) * rng.choice(
+            [1.0, 40.0], size=(3000, 1), p=[0.95, 0.05]
+        )
+        boxes = np.hstack([corner, corner + size])
+        index = _edge_index(boxes)
+        for query in rng.uniform(-20.0, 80.0, size=(300, 4)):
+            box = (
+                min(query[0], query[2]),
+                min(query[1], query[3]),
+                max(query[0], query[2]),
+                max(query[1], query[3]),
+            )
+            meets = np.flatnonzero(
+                (boxes[:, 0] <= box[2])
+                & (box[0] <= boxes[:, 2])
+                & (boxes[:, 1] <= box[3])
+                & (box[1] <= boxes[:, 3])
+            )
+            found = index.near(box)
+            assert set(meets) <= set(found)
+            assert list(found) == sorted(set(found))
+
+    def test_one_edge_is_its_own_grid(self) -> None:
+        """A single point-sized edge still makes an index that finds it."""
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import _edge_index
+
+        index = _edge_index(np.array([(1.0, 1.0, 1.0, 1.0)]))
+        assert list(index.near((0.0, 0.0, 2.0, 2.0))) == [0]
+
+
 def _projection_lines(svg: str, page_height_mm: float) -> Any:  # noqa: ANN401
     """Return the lines a sheet draws beyond its view's cut, as paper segments.
 
