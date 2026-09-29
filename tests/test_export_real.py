@@ -327,6 +327,136 @@ class TestTheSheetSaysWhatTheSpecAndTheModelSay:
             assert box[1] <= y0 <= y1 <= box[3]
 
 
+@needs_ifc
+class TestTitleFields:
+    """A title block of labelled fields prints each one inside its border, and nothing else."""
+
+    #: The source credit: long enough to wrap, as Maleva 18's attribution does.
+    CREDIT = (
+        "Raised House, a two-room model built through ifcopenshell.api for Plannotation's "
+        "own tests, its ground floor standing 10 m above the model's origin. Drawn and "
+        "annotated from the model by the exporter under test; not an issued drawing, and "
+        "nothing is to be built from it."
+    )
+
+    @classmethod
+    def _export(cls, tmp_path: Path) -> tuple[Any, ExportedSheet]:
+        """Draw the raised house with fields laid out as the examples lay out Maleva 18's.
+
+        Args:
+            tmp_path: Where to build the model.
+
+        Returns:
+            The sheet spec, and the exported sheet.
+        """
+        from plannotation.export.ifc_svg_pdf import TitleField, export_sheet
+        from plannotation.model import Project
+
+        spec = _spec(
+            title="Ground floor plan",
+            project=Project(name="Raised House, lot 7", number="RH-07"),
+            title_block_mm=(180.0, 64.0),
+            title_fields=(
+                TitleField("PROJECT", "Raised House, lot 7"),
+                TitleField("ADDRESS", "No street: a model built through ifcopenshell.api"),
+                TitleField("STAGE", "Test sheet, not for construction"),
+                TitleField("DRAWING", "Ground floor plan"),
+                TitleField("SOURCE", cls.CREDIT),
+                TitleField("SHEET", "X-101"),
+                TitleField("SCALE", "1:50"),
+            ),
+        )
+        built = build_raised(tmp_path / "raised.ifc")
+        return spec, export_sheet(built, spec, generator_version="0.0.0-test")
+
+    @staticmethod
+    def _printed(
+        exported: ExportedSheet, block: tuple[float, float, float, float]
+    ) -> list[tuple[str, tuple[float, float, float, float]]]:
+        """Return each line of text the sheet anchors inside a box, with the box it prints in.
+
+        Read from the SVG's own ``<text>`` elements. A line's box runs from its descender
+        to its cap height, as ``drafting.label_boxes`` measures a label, and is as wide as
+        ``sheet.text_width`` says.
+
+        Args:
+            exported: The exported sheet.
+            block: The paper box, ``x0, y0, x1, y1``.
+
+        Returns:
+            The lines in the order the sheet writes them, each with its paper box.
+        """
+        import html
+        import re
+
+        from plannotation.export.sheet import text_width
+
+        height = exported.plannotation.page.height_mm
+        printed = []
+        for x, y, size, bold, anchor, value in re.findall(
+            r'<text x="([-\d.]+)" y="([-\d.]+)" font-family="Helvetica" '
+            r'font-size="([\d.]+)"( font-weight="bold")? text-anchor="(\w+)" fill="#000">'
+            r"([^<]*)</text>",
+            exported.svg,
+        ):
+            text, points = html.unescape(value), float(size)
+            width = text_width(text, points, bold=bool(bold))
+            left = float(x) - {"start": 0.0, "middle": width / 2.0, "end": width}[anchor]
+            baseline = height - float(y)
+            if block[0] <= float(x) <= block[2] and block[1] <= baseline <= block[3]:
+                box = (left, baseline - 0.22 * points, left + width, baseline + 0.76 * points)
+                printed.append((text, box))
+        return printed
+
+    def test_every_field_prints_inside_the_title_block(self, tmp_path: Path) -> None:
+        """Label then value, field by field, the credit wrapped, nothing across the border."""
+        from plannotation.export.sheet import title_block_box
+
+        spec, exported = self._export(tmp_path)
+        page = exported.plannotation.page
+        block = title_block_box(page.width_mm, page.height_mm, spec.title_block_mm)
+        printed = self._printed(exported, block)
+        texts = [text for text, _ in printed]
+        labels = [field.label for field in spec.title_fields]
+        starts = [texts.index(label) for label in labels]
+        assert starts[0] == 0
+        assert starts == sorted(starts)
+        lines = {
+            label: texts[start + 1 : end]
+            for label, (start, end) in zip(labels, pairwise([*starts, len(texts)]), strict=True)
+        }
+        assert {label: " ".join(value) for label, value in lines.items()} == {
+            field.label: field.value for field in spec.title_fields
+        }
+        assert len(lines["SOURCE"]) > 1
+        for text, (x0, y0, x1, y1) in printed:
+            assert block[0] < x0 <= x1 < block[2], text
+            assert block[1] < y0 <= y1 < block[3], text
+
+    def test_the_plannotation_states_the_spec_s_title_and_project(self, tmp_path: Path) -> None:
+        """The spec's project, not the model's ``Raised House``, and the spec's title."""
+        from plannotation.export.sheet import title_block_box
+        from plannotation.model import Project
+
+        _, exported = self._export(tmp_path)
+        sheet = exported.plannotation.sheet
+        assert (sheet.sheet_id, sheet.title) == ("X-101", "Ground floor plan")
+        assert sheet.project == Project(name="Raised House, lot 7", number="RH-07")
+        page = exported.plannotation.page
+        block = title_block_box(page.width_mm, page.height_mm, (180.0, 64.0))
+        assert sheet.title_block_bbox == block
+
+    def test_no_sample_s_wording_leaks_onto_the_sheet(self, tmp_path: Path) -> None:
+        """Neither printed nor recorded: the samples' project, number, storey or revision."""
+        from plannotation.model import canonical_json
+
+        _, exported = self._export(tmp_path)
+        written = canonical_json(exported.plannotation)
+        for wording in ("Wohnanlage Lindenhof", "2024-118", "Erdgeschoss", "Index A"):
+            assert wording not in exported.svg
+            assert wording not in written
+
+
 class TestTheDefaultLayout:
     """The layout rule reproduces the A3 layout the samples were drawn on."""
 
@@ -530,6 +660,124 @@ class TestTheModelIsReadInItsOwnTerms:
         axes = {axis.axis: axis for axis in grid_axes_on(lines, cut)}
         assert sorted(axes) == ["1", "2"]
         assert axes["2"].position - axes["1"].position == pytest.approx(-5.75)
+
+
+@needs_ifc
+class TestWhatASectionDraws:
+    """A section through the building draws every storey's products and their parts."""
+
+    @staticmethod
+    def _build(out: Path) -> tuple[Any, dict[str, str]]:
+        """Build the raised house with a roof of two layers and a note on its floor.
+
+        On the roof storey an ``IfcRoof`` aggregates two ``IfcBuildingElementPart``
+        layers, as Maleva 18's roof does; on the ground storey an ``IfcAnnotation`` stands
+        beside the walls, the door, its opening, the rooms and the grid.
+
+        Args:
+            out: Where to write the IFC file.
+
+        Returns:
+            The model, and the GlobalIds of the roof, its layers and the note by name.
+        """
+        pytest.importorskip("ifcopenshell")
+        import ifcopenshell.api.aggregate
+        import ifcopenshell.api.root
+        import ifcopenshell.api.spatial
+
+        from plannotation.export import models
+        from plannotation.export.views import open_model
+
+        built = build_raised(out, roof=True)
+        model = open_model(built.path)
+        storeys = {storey.Name: storey for storey in model.by_type("IfcBuildingStorey")}
+        (body,) = [
+            context
+            for context in model.by_type("IfcGeometricRepresentationSubContext")
+            if context.ContextIdentifier == "Body"
+        ]
+        roof = ifcopenshell.api.root.create_entity(model, ifc_class="IfcRoof", name="Roof")
+        ifcopenshell.api.spatial.assign_container(
+            model, products=[roof], relating_structure=storeys["Roof"]
+        )
+        for name, bottom in (("Deck", 0.0), ("Insulation", 0.2)):
+            part = models._box(
+                model,
+                body,
+                None,
+                "IfcBuildingElementPart",
+                name,
+                at=(0.0, 0.0, RAISED_Z + 2.8 + bottom),
+                size=(6.0, 4.0, 0.2),
+            )
+            ifcopenshell.api.aggregate.assign_object(model, products=[part], relating_object=roof)
+        note = ifcopenshell.api.root.create_entity(model, ifc_class="IfcAnnotation", name="Note")
+        ifcopenshell.api.spatial.assign_container(
+            model, products=[note], relating_structure=storeys["Ground"]
+        )
+        models.reseed_guids(model, "raised")
+        models.write_model(model, out)
+        written = open_model(out)
+        return written, {
+            str(product.Name): str(product.GlobalId)
+            for product in written.by_type("IfcProduct")
+            if product.Name in {"Roof", "Deck", "Insulation", "Note"}
+            and not product.is_a("IfcBuildingStorey")
+        }
+
+    def test_every_storey_s_products_and_their_parts(self, tmp_path: Path) -> None:
+        """The ground floor's walls and door, the roof on the storey above, and its layers."""
+        from plannotation.export.views import building_products
+
+        model, named = self._build(tmp_path / "raised.ifc")
+        drawn = building_products(model)
+        classes = sorted(model.by_guid(guid).is_a() for guid in drawn)
+        assert classes == [
+            "IfcBuildingElementPart",
+            "IfcBuildingElementPart",
+            "IfcDoor",
+            "IfcRoof",
+            "IfcWall",
+            "IfcWall",
+            "IfcWall",
+            "IfcWall",
+            "IfcWallStandardCase",
+        ]
+        assert {named["Roof"], named["Deck"], named["Insulation"]} <= set(drawn)
+
+    def test_spaces_only_when_asked(self, tmp_path: Path) -> None:
+        """A section usually leaves the rooms out; asked, it has both."""
+        from plannotation.export.views import building_products
+
+        model, _ = self._build(tmp_path / "raised.ifc")
+        without, with_spaces = building_products(model), building_products(model, spaces=True)
+        assert not any(model.by_guid(guid).is_a("IfcSpace") for guid in without)
+        added = sorted(set(with_spaces) - set(without))
+        assert [model.by_guid(guid).is_a() for guid in added] == ["IfcSpace", "IfcSpace"]
+
+    def test_never_an_opening_a_grid_or_an_annotation(self, tmp_path: Path) -> None:
+        """The model holds each of them; the drawing draws none of them, spaces or not."""
+        from plannotation.export.views import building_products
+
+        model, named = self._build(tmp_path / "raised.ifc")
+        left_out = {
+            str(product.GlobalId)
+            for kind in ("IfcOpeningElement", "IfcGrid", "IfcAnnotation")
+            for product in model.by_type(kind)
+        }
+        assert len(left_out) == 3  # the door's opening, the grid, the note
+        assert named["Note"] in left_out
+        for spaces in (False, True):
+            assert not left_out & set(building_products(model, spaces=spaces))
+
+    def test_sorted_and_each_once(self, tmp_path: Path) -> None:
+        """A part is held by its roof and reached again through it, but listed once."""
+        from plannotation.export.views import building_products
+
+        model, _ = self._build(tmp_path / "raised.ifc")
+        for spaces in (False, True):
+            drawn = building_products(model, spaces=spaces)
+            assert list(drawn) == sorted(set(drawn))
 
 
 @needs_ifc
@@ -958,6 +1206,185 @@ class TestDoorSwings:
         assert hinge[0] == pytest.approx(min(x for x, _ in points), abs=0.01)
         assert door.paper_bbox[3] >= max(y for _, y in points) - 0.001
         assert 'stroke-width="0.1"' in exported.svg
+
+
+@needs_ifc
+class TestIfc2x3DoorStyles:
+    """In IFC2X3 a door has no operation type of its own: its ``IfcDoorStyle`` carries it."""
+
+    @staticmethod
+    def _build(out: Path) -> BuiltModel:
+        """Build an IFC2X3 wall with two doors in it, each typed by a door style.
+
+        An 8 m wall 250 mm thick runs along x. At x = 1 m stands a 2 m double door whose
+        style lists a right panel of 0.4 and a left panel of 0.6 of its width; at x = 5 m
+        a 1.2 m door whose style says it slides. IFC2X3 makes every rooted entity record
+        who owns it, so the model has an owner.
+
+        Args:
+            out: Where to write the IFC file.
+
+        Returns:
+            The model, set up for a plan cut 1.2 m above its floor, along the model axes.
+        """
+        pytest.importorskip("ifcopenshell")
+        import ifcopenshell
+        import ifcopenshell.api.owner
+        import ifcopenshell.api.root
+        import ifcopenshell.api.type
+
+        from plannotation.export import models
+        from plannotation.export.views import find_storey, open_model, storey_products
+
+        model = ifcopenshell.file(schema="IFC2X3")
+        person = ifcopenshell.api.owner.add_person(
+            model, identification="tests", family_name="Tests", given_name="Plannotation"
+        )
+        organisation = ifcopenshell.api.owner.add_organisation(
+            model, identification="PLN", name="Plannotation"
+        )
+        ifcopenshell.api.owner.add_person_and_organisation(
+            model, person=person, organisation=organisation
+        )
+        ifcopenshell.api.owner.add_application(model)
+        body, storey = models._setup(model, "Door Styles")
+        storey.Name = "Ground"
+        wall = models._box(
+            model,
+            body,
+            storey,
+            "IfcWallStandardCase",
+            "Wall",
+            at=(0.0, 0.0, 0.0),
+            size=(8.0, 0.25, 2.8),
+        )
+        for name, x, width, operation, panels in (
+            ("Double", 1.0, 2.0, "DOUBLE_DOOR_SINGLE_SWING", (("RIGHT", 0.4), ("LEFT", 0.6))),
+            ("Sliding", 5.0, 1.2, "SLIDING_TO_LEFT", ()),
+        ):
+            door = models._filling(
+                model,
+                body,
+                storey,
+                "IfcDoor",
+                name,
+                at=(x, 0.0, 0.0),
+                width=width,
+                height=2.1,
+                rotation=0.0,
+            )
+            models._opening(
+                model, body, wall, door, at=(x, -0.01, 0.0), size=(width, 0.27, 2.1), rotation=0.0
+            )
+            style = ifcopenshell.api.root.create_entity(model, ifc_class="IfcDoorStyle", name=name)
+            style.OperationType = operation
+            held = []
+            for position, share in panels:
+                panel = ifcopenshell.api.root.create_entity(
+                    model, ifc_class="IfcDoorPanelProperties", name=f"{position} panel"
+                )
+                panel.PanelOperation, panel.PanelPosition, panel.PanelWidth = (
+                    "SWINGING",
+                    position,
+                    share,
+                )
+                held.append(panel)
+            style.HasPropertySets = tuple(held) or None
+            ifcopenshell.api.type.assign_type(model, related_objects=[door], relating_type=style)
+        models.reseed_guids(model, "door-styles")
+        models.write_model(model, out)
+        written = open_model(out)
+        ground = find_storey(written, "Ground")
+        return models.BuiltModel(
+            path=out,
+            seed="door-styles",
+            storey_elevation=ground.z,
+            cut_height=1.2,
+            section=models.SectionCut(
+                location=(0.0, 0.0, 1.2), direction=(0.0, 0.0, 1.0), x_axis=(1.0, 0.0, 0.0)
+            ),
+            storey_name=ground.name,
+            storey_guid=ground.guid,
+            include=storey_products(written, ground),
+        )
+
+    @staticmethod
+    def _doors(built: BuiltModel) -> tuple[Any, dict[str, Any]]:
+        """Open the model and find its doors.
+
+        Args:
+            built: The model.
+
+        Returns:
+            The ``ifcopenshell.file``, and its doors by name.
+        """
+        from plannotation.export.views import open_model
+
+        model = open_model(built.path)
+        return model, {door.Name: door for door in model.by_type("IfcDoor")}
+
+    def test_the_operation_type_is_read_from_the_style(self, tmp_path: Path) -> None:
+        """The door has no ``OperationType`` to read; its style has."""
+        from plannotation.export.doors import operation_type
+
+        model, doors = self._doors(self._build(tmp_path / "doors.ifc"))
+        assert model.schema == "IFC2X3"
+        assert all("OperationType" not in door.get_info() for door in doors.values())
+        assert {name: operation_type(door) for name, door in doors.items()} == {
+            "Double": "DOUBLE_DOOR_SINGLE_SWING",
+            "Sliding": "SLIDING_TO_LEFT",
+        }
+
+    def test_a_double_door_opens_two_leaves_split_as_its_left_panel_says(
+        self, tmp_path: Path
+    ) -> None:
+        """PanelWidth 0.6 on the left panel: leaves of 1.2 and 0.8 m, meeting at x = 2.2 m."""
+        from plannotation.export.doors import door_swings
+
+        model, doors = self._doors(self._build(tmp_path / "doors.ifc"))
+        guid = doors["Double"].GlobalId
+        swings, reasons = door_swings(model, [guid])
+        assert reasons == {}
+        leaves, arcs = swings[guid].leaves, swings[guid].arcs
+        # Hinged at both jambs, on the wall's face at y = 0.25 m, and open square to it.
+        assert [c for leaf in leaves for c in leaf[0]] == pytest.approx([1.0, 0.25, 3.0, 0.25])
+        assert [end[1] - start[1] for start, end in leaves] == pytest.approx([1.2, 0.8])
+        assert [c for arc in arcs for c in arc[-1]] == pytest.approx([2.2, 0.25, 2.2, 0.25])
+
+    def test_a_sliding_door_gets_no_swing(self, tmp_path: Path) -> None:
+        """Its style says it slides; an arc would say it swings."""
+        from plannotation.export.doors import door_swings
+
+        model, doors = self._doors(self._build(tmp_path / "doors.ifc"))
+        guid = doors["Sliding"].GlobalId
+        swings, reasons = door_swings(model, [guid])
+        assert swings == {}
+        assert reasons == {guid: "operation type SLIDING_TO_LEFT does not swing"}
+
+    def test_the_plan_draws_the_double_door_open_and_the_sliding_door_shut(
+        self, tmp_path: Path
+    ) -> None:
+        """At 1:50 the double door gains leaves of 24 and 16 mm; the sliding door gains none."""
+        from plannotation.export.ifc_svg_pdf import export_sheet
+
+        built = self._build(tmp_path / "doors.ifc")
+        shut, drawn = (
+            {
+                door.name: door.paper_outlines or []
+                for door in _by_class(
+                    export_sheet(built, _spec(door_swings=swings), generator_version="0.0.0-test"),
+                    "IfcDoor",
+                )
+            }
+            for swings in (False, True)
+        )
+        assert drawn["Sliding"] == shut["Sliding"]
+        assert drawn["Double"][: len(shut["Double"])] == shut["Double"]
+        added = drawn["Double"][len(shut["Double"]) :]
+        assert len(added) == 4
+        assert [math.dist(line[0], line[-1]) for line in added[:2]] == pytest.approx(
+            [24.0, 16.0], abs=0.01
+        )
 
 
 @needs_ifc
