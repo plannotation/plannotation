@@ -63,7 +63,7 @@ from plannotation.export.drafting import (
     segments_of,
     style_of,
 )
-from plannotation.export.geometry import bounding_box, path_points, union_box
+from plannotation.export.geometry import bounding_box, path_rings, union_box
 from plannotation.export.paper import (
     Affine,
     apply,
@@ -1411,7 +1411,9 @@ def _elements(
     elements: list[Element] = []
     for product in view.products:
         outlines = [
-            path_points(path, page_height_mm=height_mm, offset=offset) for path in product.paths
+            ring
+            for path in product.paths
+            for ring in path_rings(path, page_height_mm=height_mm, offset=offset)
         ]
         points = [point for outline in outlines for point in outline]
         if not points:
@@ -1747,15 +1749,16 @@ def _seen_lines(svg: str, height_mm: float, offset: tuple[float, float]) -> list
         offset: Where the view group sits on the sheet.
 
     Returns:
-        One polyline per path of the projection group.
+        One polyline per subpath of the projection group's paths.
     """
     start = svg.find('<g class="projection">')
     if start == -1:
         return []
     body = svg[start : svg.find("</g>", start)]
     return [
-        path_points(d, page_height_mm=height_mm, offset=offset)
+        ring
         for d in re.findall(r'\bd="([^"]+)"', body)
+        for ring in path_rings(d, page_height_mm=height_mm, offset=offset)
     ]
 
 

@@ -64,6 +64,45 @@ def path_points(
     return points
 
 
+def path_rings(
+    d_attribute: str,
+    *,
+    page_height_mm: float,
+    offset: tuple[float, float] = (0.0, 0.0),
+    scale: float = 1.0,
+) -> list[list[tuple[float, float]]]:
+    """Flatten one SVG path into paper-millimetre polylines, one per subpath.
+
+    A path draws each subpath on its own: a wall with an opening is two rings, not one
+    line through the opening from the end of the first to the start of the second.
+
+    Args:
+        d_attribute: The path's ``d``.
+        page_height_mm: The sheet's height, for the y-flip.
+        offset: The translation of the wrapper that placed this view on the sheet.
+        scale: That wrapper's uniform scale.
+
+    Returns:
+        Each subpath's points in paper millimetres, in order, rounded as
+        :func:`path_points` rounds them; a subpath of one point is left out.
+    """
+    rings: list[list[tuple[float, float]]] = []
+    for segment in Path(d_attribute).segments():
+        raws = segment_points(segment)
+        if type(segment).__name__ == "Move" or not rings:
+            # A move starts a subpath at its end; its start is the last one's end.
+            rings.append([])
+            raws = raws[-1:]
+        for raw in raws:
+            x = raw[0] * scale + offset[0]
+            y = raw[1] * scale + offset[1]
+            paper = svg_to_paper(x, y, page_height_mm)
+            rounded = (round(paper[0], COORD_DECIMALS), round(paper[1], COORD_DECIMALS))
+            if not rings[-1] or rings[-1][-1] != rounded:
+                rings[-1].append(rounded)
+    return [ring for ring in rings if len(ring) > 1]
+
+
 def segment_points(segment: object) -> list[tuple[float, float]]:
     """Return the points of one path segment, flattening a curve if it is one.
 

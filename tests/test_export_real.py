@@ -1955,7 +1955,7 @@ def _projection_lines(svg: str, page_height_mm: float) -> Any:  # noqa: ANN401
     import re
 
     from plannotation.export.drafting import segments_of
-    from plannotation.export.geometry import path_points
+    from plannotation.export.geometry import path_rings
 
     view = svg.index('class="section"')
     wrapper = svg.rindex('<g transform="translate(', 0, view)
@@ -1966,8 +1966,9 @@ def _projection_lines(svg: str, page_height_mm: float) -> Any:  # noqa: ANN401
     body = svg[start : svg.index("</g>", start)]
     return segments_of(
         [
-            path_points(d, page_height_mm=page_height_mm, offset=offset)
+            ring
             for d in re.findall(r'\bd="([^"]+)"', body)
+            for ring in path_rings(d, page_height_mm=page_height_mm, offset=offset)
         ]
     )
 
