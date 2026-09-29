@@ -613,6 +613,248 @@ class TestThePresentation:
         assert "stroke-dasharray" not in exported.svg
 
 
+def _roofed(out: Path) -> BuiltModel:
+    """Build the raised house under a roof that, as Maleva 18's does, is only its parts.
+
+    An ``IfcRoof`` with no body of its own stands on the roof storey and aggregates three
+    ``IfcBuildingElementPart`` layers over the whole house: "Slab", 200 mm of concrete
+    on the walls; "Insulation", 200 mm of mineral wool on that; and "Bare", 50 mm with
+    no material at all.
+
+    Args:
+        out: Where to write the IFC file.
+
+    Returns:
+        The model, set up as :func:`build_raised` sets it up.
+    """
+    pytest.importorskip("ifcopenshell")
+    import ifcopenshell
+    import ifcopenshell.api.aggregate
+    import ifcopenshell.api.material
+    import ifcopenshell.api.root
+    import ifcopenshell.api.spatial
+
+    from plannotation.export import models
+
+    built = build_raised(out, roof=True)
+    model = ifcopenshell.open(str(out))
+    (upper,) = [s for s in model.by_type("IfcBuildingStorey") if s.Name == "Roof"]
+    (body,) = [
+        context
+        for context in model.by_type("IfcGeometricRepresentationSubContext")
+        if context.ContextIdentifier == "Body"
+    ]
+    roof = ifcopenshell.api.root.create_entity(model, ifc_class="IfcRoof", name="Roof")
+    ifcopenshell.api.spatial.assign_container(model, products=[roof], relating_structure=upper)
+    for name, bottom, thickness, material in (
+        ("Slab", 0.0, 0.2, "Concrete C30/37"),
+        ("Insulation", 0.2, 0.2, "Mineral wool"),
+        ("Bare", 0.4, 0.05, None),
+    ):
+        part = models._box(
+            model,
+            body,
+            None,
+            "IfcBuildingElementPart",
+            name,
+            at=(0.0, 0.0, RAISED_Z + 2.8 + bottom),
+            size=(6.0, 4.0, thickness),
+        )
+        ifcopenshell.api.aggregate.assign_object(model, products=[part], relating_object=roof)
+        if material is not None:
+            made_of = ifcopenshell.api.material.add_material(model, name=material)
+            ifcopenshell.api.material.assign_material(model, products=[part], material=made_of)
+    models.reseed_guids(model, "raised")
+    models.write_model(model, out)
+    return built
+
+
+def _drawn_roof(tmp_path: Path, **changes: object) -> ExportedSheet:
+    """Draw section A-A through the roofed house, its parts styled as Maleva 18's are.
+
+    Args:
+        tmp_path: Where to build the model.
+        **changes: Sheet spec fields to change.
+
+    Returns:
+        The exported sheet.
+    """
+    from dataclasses import replace
+
+    from plannotation.export.examples import M18_MATERIAL_STYLES
+    from plannotation.export.ifc_svg_pdf import export_sheet
+    from plannotation.export.views import (
+        building_products,
+        grid_axes_on,
+        grid_lines,
+        open_model,
+        section_between,
+        storey_levels,
+    )
+
+    built = _roofed(tmp_path / "roofed.ifc")
+    model = open_model(built.path)
+    lines = grid_lines(model)
+    cut = section_between(lines, first="A", second="B", looking_to="A", datum=RAISED_Z)
+    built = replace(
+        built,
+        section=cut,
+        cut_height=None,
+        levels=storey_levels(model),
+        include=building_products(model),
+    )
+    spec = _spec(
+        sheet_id="X-301",
+        title="Section A-A",
+        drawing_type="section",
+        grids=grid_axes_on(lines, cut),
+        presentation=True,
+        material_styles=M18_MATERIAL_STYLES,
+        page_size="A2",
+    )
+    return export_sheet(built, replace(spec, **changes), generator_version="0.0.0-test")
+
+
+@needs_ifc
+class TestARoofIsDrawnAsItsLayersAreMade:
+    """A roof's parts are drawn by their material, and a bare one as the roof itself."""
+
+    @staticmethod
+    def _fills(exported: ExportedSheet) -> dict[str | None, str]:
+        """Return each part's fill on the sheet, by name.
+
+        Args:
+            exported: The exported sheet.
+
+        Returns:
+            The fill each part's group is given.
+        """
+        import re
+
+        fills = {}
+        for part in _by_class(exported, "IfcBuildingElementPart"):
+            assert part.representation == "cut"
+            fill = re.search(
+                r'\bfill="([^"]+)"', TestThePresentation._group(exported.svg, part.ifc_guid)
+            )
+            assert fill is not None
+            fills[part.name] = fill.group(1)
+        return fills
+
+    def test_the_concrete_is_solid_the_insulation_outlined(self, tmp_path: Path) -> None:
+        """As the slabs below it are filled, and what bears nothing is not."""
+        fills = self._fills(_drawn_roof(tmp_path))
+        assert fills == {"Slab": "#000", "Insulation": "none", "Bare": "#000"}
+
+    def test_without_material_styles_a_layer_with_a_material_is_outlined(
+        self, tmp_path: Path
+    ) -> None:
+        """No material is claimed as structure unless the sheet says so."""
+        fills = self._fills(_drawn_roof(tmp_path, material_styles=()))
+        assert fills == {"Slab": "none", "Insulation": "none", "Bare": "#000"}
+
+    def test_the_facts_hold_each_part_s_materials_and_its_roof(self, tmp_path: Path) -> None:
+        """Read from the model, not from the drawing."""
+        from plannotation.export.ifc_svg_pdf import read_model_facts
+        from plannotation.export.views import open_model
+
+        built = _roofed(tmp_path / "roofed.ifc")
+        parts = {
+            part.Name: str(part.GlobalId)
+            for part in open_model(built.path).by_type("IfcBuildingElementPart")
+        }
+        facts = read_model_facts(built.path, include=tuple(parts.values()))
+        assert {name: facts.materials.get(guid) for name, guid in parts.items()} == {
+            "Slab": ("Concrete C30/37",),
+            "Insulation": ("Mineral wool",),
+            "Bare": None,
+        }
+        assert {facts.aggregates[guid] for guid in parts.values()} == {("IfcRoof", None)}
+
+    def test_materials_are_read_in_the_model_s_order(self) -> None:
+        """A layer set's layers as they are stacked; a layer associated alone, its own."""
+        import ifcopenshell
+        import ifcopenshell.api.material
+        import ifcopenshell.api.root
+        import ifcopenshell.guid
+
+        from plannotation.export.ifc_svg_pdf import _material_names
+
+        model = ifcopenshell.file(schema="IFC4")
+        wall = ifcopenshell.api.root.create_entity(model, ifc_class="IfcWall")
+        layers = ifcopenshell.api.material.add_material_set(
+            model, name="Wall", set_type="IfcMaterialLayerSet"
+        )
+        made = {
+            name: ifcopenshell.api.material.add_material(model, name=name)
+            for name in ("Plaster", "Concrete", "Mineral wool")
+        }
+        for material in made.values():
+            ifcopenshell.api.material.add_layer(model, layer_set=layers, material=material)
+        ifcopenshell.api.material.assign_material(
+            model, products=[wall], type="IfcMaterialLayerSetUsage", material=layers
+        )
+        assert _material_names(wall) == ("Plaster", "Concrete", "Mineral wool")
+
+        part = ifcopenshell.api.root.create_entity(model, ifc_class="IfcBuildingElementPart")
+        layer = model.createIfcMaterialLayer(made["Mineral wool"], 0.1)
+        model.createIfcRelAssociatesMaterial(
+            ifcopenshell.guid.new(), None, None, None, [part], layer
+        )
+        assert _material_names(part) == ("Mineral wool",)
+
+
+#: Concrete first, then wool; and the other way round.
+_CONCRETE_FIRST = ((r"(?i)concrete", "solid"), (r"(?i)wool", "partition"))
+_WOOL_FIRST = tuple(reversed(_CONCRETE_FIRST))
+
+
+class TestAPartIsDrawnAsItIsMade:
+    """The rule: a matching material first, then the whole it is part of, then its class."""
+
+    @pytest.mark.parametrize(
+        ("ifc_class", "materials", "aggregate", "material_styles", "style"),
+        [
+            # The first expression that any material matches, not the first material.
+            ("IfcBuildingElementPart", ("Wool", "Concrete"), None, _CONCRETE_FIRST, "solid"),
+            ("IfcBuildingElementPart", ("Wool", "Concrete"), None, _WOOL_FIRST, "partition"),
+            # Materials that match nothing: the class's style, whatever the whole is.
+            ("IfcBuildingElementPart", ("Glass",), ("IfcRoof", None), _CONCRETE_FIRST, "outline"),
+            # No material: the whole's style, from its class and its LoadBearing.
+            ("IfcBuildingElementPart", (), ("IfcRoof", None), _CONCRETE_FIRST, "solid"),
+            ("IfcBuildingElementPart", (), ("IfcWall", False), _CONCRETE_FIRST, "partition"),
+            ("IfcBuildingElementPart", (), ("IfcWall", True), (), "solid"),
+            # Neither: the class's style.
+            ("IfcBuildingElementPart", (), None, _CONCRETE_FIRST, "outline"),
+            # Not a part: its class decides, as it always has.
+            ("IfcWall", ("Concrete",), ("IfcRoof", None), _CONCRETE_FIRST, "partition"),
+            ("IfcDoor", ("Concrete",), None, _CONCRETE_FIRST, "outline"),
+        ],
+    )
+    def test_style_of(
+        self,
+        ifc_class: str,
+        materials: tuple[str, ...],
+        aggregate: tuple[str, bool | None] | None,
+        material_styles: tuple[tuple[str, str], ...],
+        style: str,
+    ) -> None:
+        """Each case of the rule."""
+        from plannotation.export.drafting import style_of
+
+        assert (
+            style_of(
+                ifc_class,
+                load_bearing=None,
+                is_a=lambda cls, ancestor: cls == ancestor,
+                materials=materials,
+                aggregate=aggregate,
+                material_styles=material_styles,
+            )
+            == style
+        )
+
+
 @needs_ifc
 class TestMarksShapedLikeGuidsAreNotMarks:
     """Archicad writes its own GUID into Tag; no drawing prints that."""

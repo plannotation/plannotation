@@ -8,9 +8,10 @@ blob is not a plan. This module restores what a reader expects of a drawing at 1
 as presentation attributes on each product's group, where they survive composition:
 
 * cut load-bearing walls and columns -- and slabs, beams and roofs -- solid black;
-  cut walls that bear nothing grey; everything else cut, windows and doors among
-  them, in outline; spaces not drawn at all, only labelled; what is seen beyond the cut
-  in fine lines. Line weights are graded from cut to seen to annotation.
+  cut walls that bear nothing grey; a roof's or a wall's layers by what they are made
+  of; everything else cut, windows and doors among them, in outline; spaces not drawn
+  at all, only labelled; what is seen beyond the cut in fine lines. Line weights are
+  graded from cut to seen to annotation.
 * chain lines for grids, section marks with the sheet they point at, a view title with
   its scale, a north arrow turned to the model's true north, and a scale bar.
 * room labels -- number, name and area -- placed inside each room, clear of every line
@@ -51,6 +52,10 @@ STRUCTURAL = ("IfcColumn", "IfcBeam", "IfcSlab", "IfcRoof", "IfcFooting", "IfcPi
 
 #: Classes drawn grey when cut and not stated to bear load.
 PARTITIONS = ("IfcWall",)
+
+#: Classes drawn as what they are made of: a part is one layer of a roof or a wall,
+#: concrete or insulation, and its class does not say which.
+PARTS = ("IfcBuildingElementPart",)
 
 #: The fills and strokes of cut elements by kind, and of what is seen beyond the cut.
 #: The grey is light enough for a black line on it to read and dark enough to tell a
@@ -122,19 +127,45 @@ class ViewTitle:
     target_sheet: str | None = None
 
 
-def style_of(ifc_class: str, *, load_bearing: bool | None, is_a: Callable[[str, str], bool]) -> str:
+def style_of(
+    ifc_class: str,
+    *,
+    load_bearing: bool | None,
+    is_a: Callable[[str, str], bool],
+    materials: Sequence[str] = (),
+    aggregate: tuple[str, bool | None] | None = None,
+    material_styles: Sequence[tuple[str, str]] = (),
+) -> str:
     """Return how a cut element is drawn.
+
+    An element is drawn as its class says, except a part (:data:`PARTS`). A part is
+    drawn as the first of ``material_styles`` that any of its materials matches. One
+    whose materials match none keeps its class's style: a material nobody recognised is
+    never claimed as structure. One with no material at all is drawn as the element it
+    is part of, so a bare layer of a roof is structure.
 
     Args:
         ifc_class: Its IFC class.
         load_bearing: Its common property set's ``LoadBearing``, or None.
         is_a: Says whether a class is a given class or a subtype of it.
+        materials: Its materials' names, in the model's order.
+        aggregate: The class of the element it is part of, and that element's
+            ``LoadBearing`` or None; None when it is part of nothing.
+        material_styles: Regular expressions searched for in a material's name, each
+            with the key of :data:`STYLES` a part matching it is drawn in. The first
+            that matches decides.
 
     Returns:
         A key of :data:`STYLES`.
     """
     if is_a(ifc_class, "IfcSpace"):
         return "hidden"
+    if any(is_a(ifc_class, name) for name in PARTS):
+        for pattern, key in material_styles:
+            if any(re.search(pattern, material) for material in materials):
+                return key
+        if not materials and aggregate is not None:
+            return style_of(aggregate[0], load_bearing=aggregate[1], is_a=is_a)
     if load_bearing is True or any(is_a(ifc_class, name) for name in STRUCTURAL):
         return "solid"
     if any(is_a(ifc_class, name) for name in PARTITIONS):

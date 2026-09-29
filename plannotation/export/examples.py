@@ -185,6 +185,10 @@ M18_FIELDS = (
 #: The title block's size on both sheets.
 M18_TITLE_BLOCK_MM = (180.0, 64.0)
 
+#: How the layers of Maleva 18's roofs are drawn when cut: the reinforced concrete
+#: ("Raudbetoon") solid, as the slabs below it are; insulation and membrane stay outlined.
+M18_MATERIAL_STYLES = ((r"(?i)raudbetoon|betoon|beton|concrete", "solid"),)
+
 
 def _m18_fields(drawing: str, sheet: str, scale: str) -> tuple[TitleField, ...]:
     """Return a Maleva 18 sheet's title block fields.
@@ -216,6 +220,7 @@ M18_SHEET = SheetSpec(
     project=Project(name=M18_PROJECT),
     title_block_mm=M18_TITLE_BLOCK_MM,
     presentation=True,
+    material_styles=M18_MATERIAL_STYLES,
     grid_overshoot_mm=36.0,
     scale_bar=True,
 )

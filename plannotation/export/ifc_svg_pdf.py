@@ -99,7 +99,7 @@ from plannotation.svg.carrier import uuid_from_guid
 from plannotation.units import length_unit_for
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
     from datetime import datetime
     from pathlib import Path
 
@@ -244,6 +244,12 @@ class SheetSpec:
             everything else cut in outline, spaces unfilled, what lies beyond the cut
             in fine lines, grids as chain lines. Without it the serializer's paths keep
             SVG's default, filled black, which is what the samples were drawn with.
+        material_styles: How a cut part -- one layer of a roof or a wall -- is drawn,
+            by what it is made of: pairs of a regular expression, searched for in a
+            material's name, and a key of :data:`plannotation.export.drafting.STYLES`.
+            A part takes the style of the first expression any of its materials
+            matches; one whose materials match none is drawn as its class says, and
+            one with no material as the element it is part of.
         grid_overshoot_mm: How far grid lines run beyond the drawing, with the bubble
             beyond that; None to run them across the whole viewport.
         dimension_offsets_mm: How far from the drawing the two dimension chains run.
@@ -272,6 +278,7 @@ class SheetSpec:
     title_fields: tuple[TitleField, ...] = ()
     title_block_mm: tuple[float, float] | None = None
     presentation: bool = False
+    material_styles: tuple[tuple[str, str], ...] = ()
     grid_overshoot_mm: float | None = None
     dimension_offsets_mm: tuple[float, float] = (10.0, 22.0)
     rooms: RoomLabels | None = None
@@ -321,6 +328,12 @@ class ModelFacts:
             the cut could show of it.
         north: True north in model x and y.
         names: Each space's ``Name`` and ``LongName``, by GlobalId.
+        materials: Each product's materials' names, by GlobalId, in the order the model
+            gives them: its material, or the materials of its layer set, list, profile
+            set or constituent set, taken from its type where it has none of its own.
+        aggregates: For each product that is part of another, by GlobalId, the other's
+            IFC class and the ``LoadBearing`` its common property set states, or None
+            where it states none.
     """
 
     unit_scale: float
@@ -335,6 +348,8 @@ class ModelFacts:
     edges: dict[str, NDArray[np.float64]] = field(default_factory=dict)
     north: tuple[float, float] = (0.0, 1.0)
     names: dict[str, tuple[str | None, str | None]] = field(default_factory=dict)
+    materials: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    aggregates: dict[str, tuple[str, bool | None]] = field(default_factory=dict)
 
     def is_a(self, ifc_class: str, ancestor: str) -> bool:
         """Say whether a class is another, or a subtype of it, in this model's schema.
@@ -565,7 +580,7 @@ def _draw_view(
     if spec.door_swings and built.is_plan:
         group = _draw_swings(group, elements, built, frame, placement)
     if spec.presentation:
-        group = present(group, _styles(elements, facts))
+        group = present(group, _styles(elements, facts, spec.material_styles))
     return elements, group
 
 
@@ -773,7 +788,7 @@ def read_model_facts(
     plane: SectionCut | None = None,
     psets: Sequence[str] = (),
 ) -> ModelFacts:
-    """Read the unit, hash, marks, property sets and extents out of a model.
+    """Read the unit, hash, marks, property sets, materials and extents out of a model.
 
     Args:
         model_path: The IFC file.
@@ -792,6 +807,8 @@ def read_model_facts(
     model = ifcopenshell.open(str(model_path))
     tags: dict[str, str] = {}
     properties: dict[str, dict[str, dict[str, object]]] = {}
+    materials: dict[str, tuple[str, ...]] = {}
+    wholes: dict[str, Any] = {}
     classes = {
         str(element.GlobalId): (str(element.is_a()), element.Name or None)
         for element in model.by_type("IfcElement")
@@ -810,6 +827,12 @@ def read_model_facts(
         }
         if chosen:
             properties[guid] = chosen
+        names = _material_names(product)
+        if names:
+            materials[guid] = names
+        whole = util_element.get_aggregate(product)
+        if whole is not None:
+            wholes[guid] = whole
     projects = model.by_type("IfcProject")
     extents, depths, edges = _extents(model, include, plane)
     return ModelFacts(
@@ -828,7 +851,57 @@ def read_model_facts(
             str(space.GlobalId): (space.Name or None, space.LongName or None)
             for space in model.by_type("IfcSpace")
         },
+        materials=materials,
+        aggregates={
+            guid: (str(whole.is_a()), _load_bearing(properties.get(str(whole.GlobalId), {})))
+            for guid, whole in wholes.items()
+        },
     )
+
+
+#: The members of a material set, each of which names one material.
+_SET_MEMBERS = ("IfcMaterialLayer", "IfcMaterialProfile", "IfcMaterialConstituent")
+
+
+def _material_names(product: Any) -> tuple[str, ...]:  # noqa: ANN401 - ifcopenshell is untyped
+    """Return the names of a product's materials, in the order the model gives them.
+
+    Args:
+        product: The entity.
+
+    Returns:
+        The names of its material, or of its set's materials, taken from its type where
+        it has none of its own; empty for a product with no material.
+    """
+    util_element = importlib.import_module("ifcopenshell.util.element")
+    material = util_element.get_material(product, should_skip_usage=True)
+    if material is None:
+        return ()
+    # get_materials reads a single material and every kind of set, but not one layer,
+    # profile or constituent associated on its own, which the schema allows.
+    if any(material.is_a(name) for name in _SET_MEMBERS):
+        found = [material.Material]
+    else:
+        found = util_element.get_materials(product)
+    return tuple(str(each.Name) for each in found if each is not None and each.Name)
+
+
+def _load_bearing(psets: Mapping[str, object]) -> bool | None:
+    """Return the ``LoadBearing`` a product's common property set states.
+
+    Args:
+        psets: Its property sets by name, as :attr:`ModelFacts.properties` holds them.
+
+    Returns:
+        True or False as a common property set states it; None where none does.
+    """
+    bearing = None
+    for name, values in psets.items():
+        if name.endswith("Common") and isinstance(values, dict):
+            value = values.get("LoadBearing")
+            if isinstance(value, bool):
+                bearing = value
+    return bearing
 
 
 def _true_north(model: Any) -> tuple[float, float]:  # noqa: ANN401 - ifcopenshell is untyped
@@ -1511,12 +1584,17 @@ def _draw_swings(
     return group
 
 
-def _styles(elements: list[Element], facts: ModelFacts) -> dict[str, str]:
+def _styles(
+    elements: list[Element], facts: ModelFacts, material_styles: Sequence[tuple[str, str]]
+) -> dict[str, str]:
     """Decide how each cut element is drawn: solid, grey, outlined or not at all.
 
     Args:
         elements: The elements drawn.
-        facts: What the model says about each, its load-bearing property among it.
+        facts: What the model says about each: its load-bearing property, its materials
+            and what it is part of.
+        material_styles: How a part is drawn by its materials, as
+            :attr:`SheetSpec.material_styles` says.
 
     Returns:
         A key of :data:`plannotation.export.drafting.STYLES` by GlobalId.
@@ -1525,14 +1603,13 @@ def _styles(elements: list[Element], facts: ModelFacts) -> dict[str, str]:
     for element in elements:
         if element.ifc_guid is None:
             continue
-        bearing = None
-        for name, values in (element.properties or {}).items():
-            if name.endswith("Common") and isinstance(values, dict):
-                value = values.get("LoadBearing")
-                if isinstance(value, bool):
-                    bearing = value
         styles[element.ifc_guid] = style_of(
-            element.ifc_class, load_bearing=bearing, is_a=facts.is_a
+            element.ifc_class,
+            load_bearing=_load_bearing(element.properties or {}),
+            is_a=facts.is_a,
+            materials=facts.materials.get(element.ifc_guid, ()),
+            aggregate=facts.aggregates.get(element.ifc_guid),
+            material_styles=material_styles,
         )
     return styles
 
