@@ -2294,15 +2294,21 @@ class TestWhatAViewSeesBeyondItsCut:
             else:
                 _, exported = _drawn_plan(folder, behind=True, millimetres=millimetres)
             return {
-                (e.name, e.representation): e.paper_bbox
+                (e.name, e.representation): (
+                    e.paper_bbox,
+                    [point for outline in e.paper_outlines or [] for point in outline],
+                )
                 for e in exported.plannotation.elements or []
             }
 
         metres, millimetres = boxes(millimetres=False), boxes(millimetres=True)
         assert any(representation == "projection" for _, representation in metres)
         assert sorted(millimetres, key=str) == sorted(metres, key=str)
-        for key, box in metres.items():
-            assert millimetres[key] == pytest.approx(box, abs=0.001), key
+        for key, (box, points) in metres.items():
+            assert millimetres[key][0] == pytest.approx(box, abs=0.001), key
+            assert len(millimetres[key][1]) == len(points), key
+            for got, want in zip(millimetres[key][1], points, strict=True):
+                assert got == pytest.approx(want, abs=0.001), key
 
     def test_a_line_two_products_run_along_is_split_where_their_edges_meet(
         self, tmp_path: Path

@@ -1069,6 +1069,11 @@ def edges_beyond(local: NDArray[np.float64], faces: NDArray[np.int64]) -> NDArra
 #: edge, in metres.
 _EDGE_TOLERANCE_M = 0.005
 
+#: A margin on that tolerance for the noise of taking a model's own unit to metres. A
+#: model is full of 5 mm offsets -- linings, reveals -- and a line exactly that far from
+#: an edge must be judged the same whether the model is drawn in millimetres or metres.
+_MATCH_M = _EDGE_TOLERANCE_M + 1e-9
+
 #: A piece of a drawn line and whose edge it is: where it starts and ends as fractions
 #: of the line, and the product's GlobalId.
 Piece = tuple[float, float, str]
@@ -1108,7 +1113,7 @@ def line_owners(
     every = np.vstack([edges[guid] for guid in guids])
     owners_of = np.concatenate([np.full(len(edges[guid]), n) for n, guid in enumerate(guids)])
     preferred = np.array([guid in prefer for guid in guids])
-    tolerance = _EDGE_TOLERANCE_M
+    tolerance = _MATCH_M
     ends = every[:, [0, 1]], every[:, [3, 4]]
     index = _edge_index(np.hstack([np.minimum(*ends) - tolerance, np.maximum(*ends) + tolerance]))
     owners: list[list[Piece]] = []
@@ -1327,7 +1332,7 @@ def _dot_owner(
     )
     # An edge seen end on draws nothing on the paper, so it owns no line either.
     through = (span > 0) & (
-        np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]) <= _EDGE_TOLERANCE_M
+        np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1]) <= _MATCH_M
     )
     if not through.any():
         return []
@@ -1584,7 +1589,7 @@ def _seen_beyond(
                     )
                 ends = [(u0 + (u1 - u0) * at, v0 + (v1 - v0) * at) for at in (first, second)]
                 middle = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
-                if all(_near(point, faces[owner]) for point in (*ends, middle)):
+                if all(_near(point, faces[owner], _MATCH_M) for point in (*ends, middle)):
                     continue
             own.setdefault(owner, []).append(
                 [
@@ -1621,15 +1626,16 @@ def _seen_beyond(
     return added
 
 
-def _near(point: tuple[float, float], segments: NDArray[np.float64]) -> bool:
-    """Say whether a point lies on one of some segments, within an edge's tolerance.
+def _near(point: tuple[float, float], segments: NDArray[np.float64], within: float) -> bool:
+    """Say whether a point lies on one of some segments.
 
     Args:
         point: The point, in plane metres.
         segments: ``x0, y0, x1, y1`` rows, in plane metres.
+        within: How far off a segment still counts, in metres.
 
     Returns:
-        True within :data:`_EDGE_TOLERANCE_M` of a segment.
+        True within ``within`` of a segment.
     """
     if not len(segments):
         return False
@@ -1640,7 +1646,7 @@ def _near(point: tuple[float, float], segments: NDArray[np.float64]) -> bool:
         ((point[0] - x0) * dx + (point[1] - y0) * dy) / np.where(span > 0, span, 1.0), 0.0, 1.0
     )
     gap = np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1])
-    return bool((gap <= _EDGE_TOLERANCE_M).any())
+    return bool((gap <= within).any())
 
 
 def _draw_swings(
