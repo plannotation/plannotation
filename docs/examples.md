@@ -32,15 +32,18 @@ credit; the drawings are Plannotation's, not Esplan's.
 
 ## What is read from the model
 
-Storeys, the building's ±0,00, the grid, walls' `LoadBearing`, doors' operation types,
-spaces' `Name`, `LongName` and area (`AR_Ruum.120_Pindala` in this model), and true
-north. What is drawn from them: solid structure and grey partitions, door swings, room
-labels, a floor level, chain-line grids with bay dimensions, level marks relative to
-±0,00, section marks, north arrow and scale bar.
+Storeys, the building's ±0,00, the grid, walls' `LoadBearing`, the materials of the
+roof's layers, doors' operation types, spaces' `Name`, `LongName` and area
+(`AR_Ruum.120_Pindala` in this model), and true north. What is drawn from them: solid
+structure and grey partitions, door swings, room labels, a floor level, chain-line grids
+with bay dimensions, level marks relative to ±0,00, section marks, north arrow and scale
+bar. What each view sees beyond its cut is described element by element, from the lines
+the drawing shows: a product hidden behind another is left out.
 
 ## Known limits
 
-- No material hatching; the roof's layers are outlined, its concrete not filled.
+- No material hatching: the roof's concrete is filled, its insulation and membrane
+  outlined.
 - No ground line: the model's site carries no terrain.
 - Doors the model calls sliding or user-defined get no swing.
 - The validator on `main` reports PL-GEO-010 for the rotated plane axes, which the
