@@ -33,9 +33,8 @@ endif
 
 
 .PHONY: help install lock sync fmt fmt-check lint typecheck test fixtures check \
-        cov licenses samples samples-check examples bench bench-dry site site-serve inspector \
-        hooks precommit \
-        build clean distclean version
+        cov licenses samples samples-check examples examples-check bench bench-dry site \
+        site-serve inspector hooks precommit build clean distclean version
 
 help: ## Show this help
 	@printf 'Plannotation targets:\n\n'
@@ -110,6 +109,12 @@ samples-check: samples ## Build the samples and validate every one of them
 # Needs the svg and ifc extras. Rebuilding writes byte-identical files.
 examples: ## Build the real example sheets (downloads the pinned models once)
 	$(RUN) python tools/build_examples.py --out $(EXAMPLES_DIR)
+
+# Builds the examples, then validates each sheet against the model it was drawn from:
+# every element cross-checked, every dimension between two elements re-measured. Any
+# finding, a warning included, fails it. CI runs it on Linux.
+examples-check: ## Build the example sheets and validate each against its own model
+	$(RUN) python tools/build_examples.py --out $(EXAMPLES_DIR) --check
 
 # The only target that calls a paid API. It needs ANTHROPIC_API_KEY in the
 # environment or in .env (git-ignored), and only for questions whose response is not

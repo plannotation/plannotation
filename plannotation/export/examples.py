@@ -64,11 +64,13 @@ from plannotation.export.views import (
 )
 from plannotation.model import Project
 from plannotation.pdf import embed
+from plannotation.validate import validate
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from plannotation.model import Plannotation
+    from plannotation.validate import Report
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -449,6 +451,31 @@ def build_examples(
         json.dumps({"examples": entries}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return written
+
+
+def check_examples(
+    out_dir: Path, *, cache: Path, only: Sequence[str] | None = None
+) -> dict[str, Report]:
+    """Validate each built sheet against the model it was drawn from.
+
+    The validator then cross-checks every element against the model, and re-measures
+    every dimension that runs between two elements.
+
+    Args:
+        out_dir: Where the sheets were built.
+        cache: Where the pinned models are cached.
+        only: Check just these sheets, by name.
+
+    Returns:
+        Each sheet's report, by name, in the order the examples are listed.
+    """
+    return {
+        example.name: validate(
+            out_dir / f"{example.name}.pdf", ifc_model=fetch(example.source, cache)
+        )
+        for example in EXAMPLES
+        if not only or example.name in only
+    }
 
 
 def index_entry(example: Example, plannotation: Plannotation) -> dict[str, object]:

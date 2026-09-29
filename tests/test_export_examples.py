@@ -16,7 +16,7 @@ import math
 from dataclasses import replace
 from datetime import UTC, datetime
 from itertools import pairwise
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -288,3 +288,72 @@ class TestTheContract:
         second = self._build(tmp_path / "two", monkeypatch)
         for path in sorted(first.iterdir()):
             assert path.read_bytes() == (second / path.name).read_bytes(), path.name
+
+
+def _build_script() -> Any:  # noqa: ANN401 - a script loaded by path
+    """Load tools/build_examples.py, which is a script rather than a module.
+
+    Returns:
+        The module.
+    """
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parent.parent / "tools" / "build_examples.py"
+    loader = importlib.util.spec_from_file_location("build_examples", script)
+    assert loader is not None
+    assert loader.loader is not None
+    module = importlib.util.module_from_spec(loader)
+    loader.loader.exec_module(module)
+    return module
+
+
+@needs_ifc
+@needs_cairo
+class TestTheCheck:
+    """``make examples-check``: each sheet validated against its own model, any finding fatal."""
+
+    def test_a_sheet_drawn_from_its_model_has_nothing_to_report(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The stand-in sheet, against the stand-in model in the cache: no finding."""
+        out = TestTheContract._build(tmp_path, monkeypatch)
+        reports = examples.check_examples(out, cache=tmp_path / "cache")
+        assert list(reports) == ["X-101"]
+        assert reports["X-101"].findings == ()
+        assert len(reports["X-101"].pages) == 1
+
+    def test_the_script_fails_on_any_finding_and_says_which(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A warning is enough; without ``--check`` the same build succeeds."""
+        from plannotation.validate import Finding, Severity
+
+        TestTheContract._build(tmp_path, monkeypatch)
+        script = _build_script()
+        arguments = ["--out", str(tmp_path / "again"), "--cache", str(tmp_path / "cache")]
+        assert script.main([*arguments, "--check"]) == 0
+        real = examples.validate
+
+        def one_warning(source: Path, *, ifc_model: Path) -> Any:  # noqa: ANN401
+            report = real(source, ifc_model=ifc_model)
+            finding = Finding(
+                code="PL-IFC-003",
+                severity=Severity.WARNING,
+                message="a dimension disagrees with the model",
+                path="/annotations/0",
+                source="page 0",
+                rule="",
+                reference="",
+            )
+            return report.with_findings([finding])
+
+        monkeypatch.setattr(examples, "validate", one_warning)
+        capsys.readouterr()
+        assert script.main(arguments) == 0
+        assert script.main([*arguments, "--check"]) == 1
+        printed = capsys.readouterr().out
+        assert "X-101: warning PL-IFC-003 at /annotations/0" in printed
+        assert "X-101: 1 finding(s) against its model" in printed
