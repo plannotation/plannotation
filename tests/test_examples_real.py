@@ -52,7 +52,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 #: What each sheet describes, by representation, as last reviewed.
-COUNTS = {"M18-101": {"cut": 330, "projection": 50}, "M18-301": {"cut": 78, "projection": 125}}
+COUNTS = {"M18-101": {"cut": 330, "projection": 113}, "M18-301": {"cut": 78, "projection": 139}}
 
 #: The shortest line a sheet at 1:100 can say is some product's edge: the 5 mm an edge is
 #: matched within, on the paper.

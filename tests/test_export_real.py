@@ -572,6 +572,22 @@ def _by_class(exported: ExportedSheet, prefix: str) -> list[Element]:
     return [e for e in exported.plannotation.elements or [] if e.ifc_class.startswith(prefix)]
 
 
+def _cut(exported: ExportedSheet, prefix: str) -> list[Element]:
+    """Return the elements whose class starts with a prefix, as the cut draws them.
+
+    A product the plane cuts may also be described by what shows of it beyond the cut,
+    as a second element with the same GlobalId.
+
+    Args:
+        exported: The exported sheet.
+        prefix: Such as ``IfcDoor``.
+
+    Returns:
+        The cut elements.
+    """
+    return [e for e in _by_class(exported, prefix) if e.representation == "cut"]
+
+
 def _annotations(exported: ExportedSheet, kind: str) -> list[Annotation]:
     """Return the annotations of one type.
 
@@ -807,7 +823,8 @@ class TestARotatedPlanIsDrawnSquareToItsGrid:
     def test_only_the_storey_is_drawn(self, tmp_path: Path) -> None:
         """Five walls, one door and two rooms, and nothing else."""
         _, exported = _drawn_plan(tmp_path)
-        classes = sorted(e.ifc_class for e in exported.plannotation.elements or [])
+        products = {(e.ifc_guid, e.ifc_class) for e in exported.plannotation.elements or []}
+        classes = sorted(ifc_class for _, ifc_class in products)
         assert classes == ["IfcDoor", "IfcSpace", "IfcSpace"] + ["IfcWall"] * 4 + [
             "IfcWallStandardCase"
         ]
@@ -844,7 +861,7 @@ class TestThePresentation:
     def test_doors_are_outlined_and_spaces_not_drawn(self, tmp_path: Path) -> None:
         """A black blob where a door stands is not a door."""
         _, exported = _drawn_plan(tmp_path)
-        (door,) = _by_class(exported, "IfcDoor")
+        (door,) = _cut(exported, "IfcDoor")
         assert 'fill="none"' in self._group(exported.svg, door.ifc_guid)
         for space in _by_class(exported, "IfcSpace"):
             assert 'stroke="none"' in self._group(exported.svg, space.ifc_guid)
@@ -1221,7 +1238,7 @@ class TestDoorSwings:
     def test_the_front_door_opens_into_the_room(self, tmp_path: Path, rotation: float) -> None:
         """Its arc lies inside the house, north of the south wall, hinged at grid 1's side."""
         _, exported = _drawn_plan(tmp_path, rotation=rotation)
-        (door,) = _by_class(exported, "IfcDoor")
+        (door,) = _cut(exported, "IfcDoor")
         south = next(e for e in _by_class(exported, "IfcWall") if e.name == "South")
         swing = door.paper_outlines[-2:]
         points = [point for line in swing for point in line]
@@ -1397,7 +1414,7 @@ class TestIfc2x3DoorStyles:
         shut, drawn = (
             {
                 door.name: door.paper_outlines or []
-                for door in _by_class(
+                for door in _cut(
                     export_sheet(built, _spec(door_swings=swings), generator_version="0.0.0-test"),
                     "IfcDoor",
                 )
@@ -1851,6 +1868,24 @@ class TestLineOwners:
         )
         assert pieces == [(0.0, 1.0, "roof")]
 
+    def test_a_tie_goes_to_the_product_the_plane_cuts(self) -> None:
+        """Equally near: the cut product's face hides the other, whichever name sorts first.
+
+        The serializer does not let a cut face hide anything, so the far edge of a wall
+        the plane cuts and the edge of a wall behind it can coincide exactly.
+        """
+        import numpy as np
+
+        from plannotation.export.ifc_svg_pdf import line_owners
+
+        line = np.array([(0.0, 0.0, 1.0, 0.0)])
+        edges = {
+            "a_hidden": np.array([(0.0, 0.0, -2.0, 1.0, 0.0, -2.0)]),
+            "z_cut": np.array([(0.0, 0.0, -2.0, 1.0, 0.0, -2.0)]),
+        }
+        assert line_owners(line, edges) == [[(0.0, 1.0, "a_hidden")]]
+        assert line_owners(line, edges, prefer={"z_cut"}) == [[(0.0, 1.0, "z_cut")]]
+
     def test_no_edges_no_owners(self) -> None:
         """Every line is returned, with no pieces."""
         import numpy as np
@@ -2043,6 +2078,29 @@ class TestWhatAViewSeesBeyondItsCut:
         x0, y0, x1, y1 = box.paper_bbox
         # 1.0 by 0.2 metres at 1:50.
         assert (x1 - x0, y1 - y0) == (pytest.approx(20.0, abs=0.05), pytest.approx(4.0, abs=0.05))
+
+    def test_a_cut_product_is_also_described_by_what_shows_below_its_cut(
+        self, tmp_path: Path
+    ) -> None:
+        """The door the plan cuts: its cut element, and beside it what of it shows below.
+
+        The second element carries the same GlobalId and only lines off its own cut
+        outline; the swing stays with the cut one, and the door is still one door.
+        """
+        from plannotation.export.drafting import segments_of
+
+        _, exported = _drawn_plan(tmp_path)
+        doors = _by_class(exported, "IfcDoor")
+        assert sorted(door.representation or "" for door in doors) == ["cut", "projection"]
+        (cut,) = _cut(exported, "IfcDoor")
+        (seen,) = [door for door in doors if door.representation == "projection"]
+        assert seen.ifc_guid == cut.ifc_guid
+        own = segments_of(cut.paper_outlines or [])
+        for outline in seen.paper_outlines or []:
+            (ax, ay), (bx, by) = outline[0], outline[-1]
+            assert _distance_to(((ax + bx) / 2, (ay + by) / 2), own) > 0.05
+        question = next(q for q in exported.ground_truth if "doors (IfcDoor)" in str(q["question"]))
+        assert question["answer"] == 1
 
     @needs_cairo
     def test_the_section_validates(self, tmp_path: Path) -> None:

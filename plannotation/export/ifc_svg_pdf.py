@@ -100,7 +100,7 @@ from plannotation.svg.carrier import uuid_from_guid
 from plannotation.units import length_unit_for
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Collection, Mapping, Sequence
     from datetime import datetime
     from pathlib import Path
 
@@ -1075,7 +1075,9 @@ Piece = tuple[float, float, str]
 
 
 def line_owners(
-    lines: NDArray[np.float64], edges: dict[str, NDArray[np.float64]]
+    lines: NDArray[np.float64],
+    edges: dict[str, NDArray[np.float64]],
+    prefer: Collection[str] = (),
 ) -> list[list[Piece]]:
     """Say whose edge each line drawn beyond the cut is, piece by piece.
 
@@ -1085,9 +1087,14 @@ def line_owners(
     edge along it starts or ends, and each piece is the edge nearest the viewer that runs
     along it, since that edge hides the others.
 
+    Where edges of two products run along a piece equally near the viewer, one of a
+    product the plane cuts wins: its cut face, which the serializer does not count as
+    hiding anything, hides the other.
+
     Args:
         lines: The segments, one row ``x0, y0, x1, y1`` each, in plane metres.
         edges: Each product's edges beyond the cut, by GlobalId (:func:`edges_beyond`).
+        prefer: The products the plane cuts, which win a tie.
 
     Returns:
         For each segment, its pieces in order, each with the product it is an edge of.
@@ -1100,6 +1107,7 @@ def line_owners(
         return [[] for _ in lines]
     every = np.vstack([edges[guid] for guid in guids])
     owners_of = np.concatenate([np.full(len(edges[guid]), n) for n, guid in enumerate(guids)])
+    preferred = np.array([guid in prefer for guid in guids])
     tolerance = _EDGE_TOLERANCE_M
     ends = every[:, [0, 1]], every[:, [3, 4]]
     index = _edge_index(np.hstack([np.minimum(*ends) - tolerance, np.maximum(*ends) + tolerance]))
@@ -1109,6 +1117,7 @@ def line_owners(
         # order, so the nearest edge wins a tie exactly as it would among all of them.
         found = index.near((min(sx0, sx1), min(sy0, sy1), max(sx0, sx1), max(sy0, sy1)))
         table, owner = every[found], owners_of[found]
+        favoured = preferred[owner]
         x0, y0, d0, x1, y1, d1 = table.T
         run = math.hypot(sx1 - sx0, sy1 - sy0)
         if run <= tolerance:
@@ -1122,9 +1131,8 @@ def line_owners(
             & (min(sy0, sy1) <= np.maximum(y0, y1) + tolerance)
         )
         if run < 2.0 * tolerance:
-            owners.append(
-                _dot_owner(((sx0 + sx1) / 2.0, (sy0 + sy1) / 2.0), table, near, guids, owner)
-            )
+            centre = ((sx0 + sx1) / 2.0, (sy0 + sy1) / 2.0)
+            owners.append(_dot_owner(centre, table[near], guids, owner[near], favoured[near]))
             continue
         ux, uy = (sx1 - sx0) / run, (sy1 - sy0) / run
         # Both ends of an edge along the segment lie on its line; where along it they fall,
@@ -1159,7 +1167,7 @@ def line_owners(
                 continue
             share = (middle - start[cover]) / (end[cover] - start[cover])
             depth = np.round(d0[cover] + share * (d1[cover] - d0[cover]), 4)
-            guid = guids[owner[cover[int(np.argmax(depth))]]]
+            guid = guids[owner[cover[_nearest(depth, favoured[cover])]]]
             if pieces and pieces[-1][2] == guid and (first - pieces[-1][1]) * run <= tolerance:
                 pieces[-1] = (pieces[-1][0], second, guid)
             else:
@@ -1275,26 +1283,43 @@ def _edge_index(boxes: NDArray[np.float64]) -> _EdgeIndex:
     )
 
 
+def _nearest(depth: NDArray[np.float64], favoured: NDArray[np.bool_]) -> int:
+    """Pick the edge nearest the viewer; of edges equally near, one of a product that is cut.
+
+    Args:
+        depth: Each candidate edge's distance towards the viewer, rounded to the tenth of
+            a millimetre the model's points are welded to.
+        favoured: Which candidates belong to a product the plane cuts.
+
+    Returns:
+        The winner's position among the candidates: of those tied, the first favoured
+        one, or else the first.
+    """
+    tied = np.flatnonzero(depth == depth.max())
+    first = tied[favoured[tied]]
+    return int(first[0] if len(first) else tied[0])
+
+
 def _dot_owner(
     point: tuple[float, float],
     table: NDArray[np.float64],
-    near: NDArray[np.bool_],
     guids: list[str],
     owner: NDArray[np.int64],
+    favoured: NDArray[np.bool_],
 ) -> list[Piece]:
     """Say whose edge a segment too short to have a direction is: the nearest through it.
 
     Args:
         point: The segment's midpoint, in plane metres.
-        table: Every edge, as :func:`edges_beyond` gives them.
-        near: Which edges come near the segment at all.
+        table: The edges that come near the segment, as :func:`edges_beyond` gives them.
         guids: The products, in the order ``owner`` numbers them.
         owner: The product each edge belongs to.
+        favoured: Which edges belong to a product the plane cuts, which wins a tie.
 
     Returns:
         One piece covering the whole segment, or none where no edge passes through it.
     """
-    x0, y0, d0, x1, y1, d1 = table[near].T
+    x0, y0, d0, x1, y1, d1 = table.T
     dx, dy = x1 - x0, y1 - y0
     span = dx * dx + dy * dy
     share = np.clip(
@@ -1307,7 +1332,7 @@ def _dot_owner(
     if not through.any():
         return []
     depth = np.where(through, np.round(d0 + share * (d1 - d0), 4), -np.inf)
-    return [(0.0, 1.0, guids[owner[np.flatnonzero(near)[int(np.argmax(depth))]]])]
+    return [(0.0, 1.0, guids[owner[_nearest(depth, favoured)]])]
 
 
 def _representation(guid: str, facts: ModelFacts, built: BuiltModel) -> Representation | None:
@@ -1508,11 +1533,16 @@ def _seen_beyond(
     The serializer draws those lines itself -- below a plan's cut a stair, a low railing,
     the floor slab; beyond a section's the walls, doors and windows of the rooms it looks
     into -- but as anonymous paths in one group, with hidden lines removed. Each line is
-    given to the product whose edge it is (:func:`line_owners`), and every product of the
-    drawing that lies wholly beyond the cut is described by the lines it draws: they are
-    its outlines, and its box is theirs. A product hidden behind another draws no line
-    and is not described, and one partly hidden claims only what shows. Nothing is drawn
-    here, because the serializer already drew it.
+    given to the product whose edge it is (:func:`line_owners`), and each product is
+    described by the lines it draws: they are its outlines, and its box is theirs. A
+    product wholly beyond the cut gets one ``projection`` element. One the plane cuts
+    keeps its cut element and gets a ``projection`` element beside it for what of it
+    shows beyond its cut face -- the far jambs of a wall's window openings, a tilted
+    panel's body -- but not for lines on its own cut outline. A product hidden behind
+    another draws no line and is not described, one partly hidden claims only what
+    shows, and one that draws less than twice the length an edge is matched within is
+    not described either: that little cannot say it is seen. Nothing is drawn here,
+    because the serializer already drew it.
 
     Args:
         facts: What the model says, measured against the view's plane.
@@ -1524,33 +1554,52 @@ def _seen_beyond(
     Returns:
         One ``projection`` element per product seen beyond the cut.
     """
+
+    def metres(x: float, y: float) -> tuple[float, float]:
+        u, v = apply(frame.transform, x, y)
+        return (u * frame.unit_scale, v * frame.unit_scale)
+
     segments = segments_of(lines)
     plane = np.array(
-        [
-            [*apply(frame.transform, x0, y0), *apply(frame.transform, x1, y1)]
-            for x0, y0, x1, y1 in segments
-        ],
-        dtype=np.float64,
+        [[*metres(x0, y0), *metres(x1, y1)] for x0, y0, x1, y1 in segments], dtype=np.float64
     ).reshape(-1, 4)
+    runs = np.hypot(plane[:, 2] - plane[:, 0], plane[:, 3] - plane[:, 1])
+    cut = {element.ifc_guid: element for element in drawn if element.ifc_guid}
+    faces: dict[str, NDArray[np.float64]] = {}
     own: dict[str, list[list[Point]]] = {}
-    for (x0, y0, x1, y1), pieces in zip(
-        segments, line_owners(plane * frame.unit_scale, facts.edges), strict=True
+    length: dict[str, float] = {}
+    for (x0, y0, x1, y1), (u0, v0, u1, v1), run, pieces in zip(
+        segments, plane, runs, line_owners(plane, facts.edges, prefer=cut), strict=True
     ):
         for first, second, owner in pieces:
+            if owner in cut:
+                if owner not in faces:
+                    faces[owner] = segments_of(
+                        [
+                            [metres(*point) for point in line]
+                            for line in cut[owner].paper_outlines or []
+                        ]
+                    )
+                ends = [(u0 + (u1 - u0) * at, v0 + (v1 - v0) * at) for at in (first, second)]
+                middle = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+                if all(_near(point, faces[owner]) for point in (*ends, middle)):
+                    continue
             own.setdefault(owner, []).append(
                 [
                     (round(float(x0 + (x1 - x0) * at), 3), round(float(y0 + (y1 - y0) * at), 3))
                     for at in (first, second)
                 ]
             )
-    seen = {element.ifc_guid for element in drawn}
+            length[owner] = length.get(owner, 0.0) + (second - first) * float(run)
     added: list[Element] = []
     for guid in sorted(built.include or facts.depths):
-        depth, paper = facts.depths.get(guid), own.get(guid)
-        if guid in seen or guid not in facts.classes or depth is None or not paper:
+        paper = own.get(guid)
+        if not paper or length[guid] < 2.0 * _EDGE_TOLERANCE_M or guid not in facts.classes:
             continue
-        if depth[1] >= -_CUT_TOLERANCE_M:
-            continue
+        if guid not in cut:
+            depth = facts.depths.get(guid)
+            if depth is None or depth[1] >= -_CUT_TOLERANCE_M:
+                continue
         ifc_class, name = facts.classes[guid]
         added.append(
             Element(
@@ -1568,6 +1617,28 @@ def _seen_beyond(
             )
         )
     return added
+
+
+def _near(point: tuple[float, float], segments: NDArray[np.float64]) -> bool:
+    """Say whether a point lies on one of some segments, within an edge's tolerance.
+
+    Args:
+        point: The point, in plane metres.
+        segments: ``x0, y0, x1, y1`` rows, in plane metres.
+
+    Returns:
+        True within :data:`_EDGE_TOLERANCE_M` of a segment.
+    """
+    if not len(segments):
+        return False
+    x0, y0, x1, y1 = segments.T
+    dx, dy = x1 - x0, y1 - y0
+    span = dx * dx + dy * dy
+    share = np.clip(
+        ((point[0] - x0) * dx + (point[1] - y0) * dy) / np.where(span > 0, span, 1.0), 0.0, 1.0
+    )
+    gap = np.hypot(x0 + share * dx - point[0], y0 + share * dy - point[1])
+    return bool((gap <= _EDGE_TOLERANCE_M).any())
 
 
 def _draw_swings(
@@ -1592,7 +1663,12 @@ def _draw_swings(
     Returns:
         The view group with the swings drawn.
     """
-    doors = {e.ifc_guid: e for e in elements if e.ifc_guid and e.ifc_class.startswith("IfcDoor")}
+    doors: dict[str, Element] = {}
+    for element in elements:
+        # A door the plane cuts may also be described by what shows of it below the cut;
+        # its swing belongs to the cut one, which comes first.
+        if element.ifc_guid and element.ifc_class.startswith("IfcDoor"):
+            doors.setdefault(element.ifc_guid, element)
     if not doors or built.section is None:
         return group
     swings, _ = door_swings(open_ifc(built.path), doors)
@@ -2150,9 +2226,13 @@ def _draw_tags(
     """
     annotations: list[Annotation] = []
     placed: list[tuple[float, float, float, float]] = []
+    marked: set[str] = set()
     for element in elements:
-        if not element.tag:
+        # A product drawn twice, cut and seen beyond its cut, is marked once: the cut one.
+        if not element.tag or (element.ifc_guid and element.ifc_guid in marked):
             continue
+        if element.ifc_guid:
+            marked.add(element.ifc_guid)
         reference = _reference(element)
         obstacles: list[Sequence[float]] = [
             other.paper_bbox
@@ -2751,8 +2831,15 @@ def _ground_truth(
     annotations = plannotation.annotations or []
 
     def counted(ifc_class: str) -> int:
+        # A product drawn twice -- cut, and seen beyond its own cut -- is one product.
         match = is_a or (lambda cls, ancestor: cls == ancestor)
-        return sum(1 for element in elements if match(element.ifc_class, ifc_class))
+        return len(
+            {
+                element.ifc_guid or element.local_id
+                for element in elements
+                if match(element.ifc_class, ifc_class)
+            }
+        )
 
     questions: list[Question] = [
         {
