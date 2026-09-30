@@ -47,6 +47,10 @@ RAW = "https://raw.githubusercontent.com/plannotation/plannotation/main"
 #: The page style, inlined into every rendered page.
 STYLE_SHEET = REPO_ROOT / "web" / "site.css"
 
+#: The landing page, whose icon every rendered page carries too: a page without one
+#: sends the browser to ask for /favicon.ico, which the site does not serve.
+LANDING = REPO_ROOT / "web" / "index.html"
+
 
 class RenderError(Exception):
     """The site could not be rendered, or does not keep its promise."""
@@ -183,6 +187,22 @@ def _markdown() -> Any:  # noqa: ANN401 - markdown-it-py is not a dependency, so
     )
 
 
+def icon() -> str:
+    """Return the landing page's icon link, which every page of the site carries.
+
+    Returns:
+        The ``<link rel="icon">`` element, with its icon inline.
+
+    Raises:
+        ValueError: If the landing page has no icon link.
+    """
+    found = re.search(r'<link rel="icon"[^>]*>', LANDING.read_text("utf-8"))
+    if found is None:
+        msg = f"{LANDING} has no icon link to give the rendered pages"
+        raise ValueError(msg)
+    return found.group(0)
+
+
 def page(title: str | None, canonical: str, body: str) -> str:
     """Wrap a rendered body in the site's page.
 
@@ -199,6 +219,7 @@ def page(title: str | None, canonical: str, body: str) -> str:
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{html.escape(title or 'Plannotation')}</title>\n"
         f'<link rel="canonical" href="{html.escape(canonical)}">\n'
+        f"{icon()}\n"
         f"<style>\n{STYLE_SHEET.read_text('utf-8')}</style>\n</head>\n<body>\n<main>\n{body}</main>\n</body>\n</html>\n"
     )
 

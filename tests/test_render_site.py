@@ -211,6 +211,9 @@ class TestRender:
         page = written[0].read_text("utf-8")
         assert "<title>The Spec</title>" in page
         assert f'<link rel="canonical" href="{SPEC_URI}/">' in page
+        # The landing page's inline icon: without one the browser asks for /favicon.ico.
+        assert render_site.icon().startswith('<link rel="icon" href="data:image/svg+xml,')
+        assert render_site.icon() in page
         schema = json.loads(
             (REPO_ROOT / "plannotation" / "schema" / "plannotation-0.1.json").read_text("utf-8")
         )["$id"]
